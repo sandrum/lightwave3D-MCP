@@ -223,6 +223,37 @@ configuration writes" for the full investigation, including a
 suggestive (not yet confirmed) link to item 3's unexplained
 `SelectItem 40010000`.
 
+**Surface/material writes** (ROADMAP2.md item 8) -
+`lw_set_surface(surface, color=, diffuse=, luminosity=, specularity=,
+glossiness=, reflection=, transparency=, smoothing=)` - the write-side
+counterpart to `lw_get_surface_info`, and the first write in this
+connector to go through the read-path's Master plugin (`LWComRing`)
+instead of the one-way Command Port, since there's no native
+`SurfaceEditor` command - it just opens the UI panel - and
+`lwsdk.LWSurfaceFuncs()`'s `setFlt()` is the only real path. Confirmed
+live end to end against a real surface (`CONNECTOR`, on a loaded
+`.lwo`): `diffuse=0.5` alone showed "Diffuse 50.0%" in Surface Editor;
+`color=[1,0,0]` + `glossiness=0.8` together showed a genuinely red
+color swatch and "Glossiness 80.0%", both matching
+`lw_get_surface_info`'s read-back exactly.
+
+The first live attempt appeared to hang Layout forever (the exact
+debug-log signature of this project's one other confirmed crash,
+`LWChannelInfo`/`nextGroup`) - reproduced twice, but Layout's own UI
+stayed fully responsive both times and `lw_ping` recovered immediately,
+ruling out a full crash. **That diagnosis turned out to be wrong**: the
+real bug was `_TOPIC_RE`, the regex `lw_mcp_ring.py` uses to parse
+`"{MCP} ..."` messages - its original GREEDY pattern matched from the
+first `{` to the *last* `}` in the whole message, so `set_surface`'s
+JSON-encoded argument (which has its own `{`/`}`) corrupted the topic
+match and got silently dropped before `setFlt()` was ever reached, on
+*both* "confirmed" attempts. Caught by writing a standalone regex test
+rather than re-trusting the same live symptom, fixed by making the
+regex non-greedy, then fully re-verified live from scratch. See
+`PLAN.md` "Surface/material writes" for the complete investigation -
+worth reading as a methodology lesson on its own, not just for the
+feature.
+
 **Light/object visibility linking** (ROADMAP2.md item 1) -
 `lw_include_light(light, obj)`, `lw_exclude_light(light, obj)`,
 `lw_include_object_light(obj, light)`, `lw_exclude_object_light(obj,

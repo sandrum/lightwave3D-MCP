@@ -240,20 +240,57 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    that real numeric ID and worked correctly. See `PLAN.md` "IK chain
    configuration writes" for the full investigation.
 
-8. **Surface/material writes** - genuinely new territory. No simple
-   native command exists for this (`SurfaceEditor` in the command list
-   just opens the UI panel, it doesn't take settable arguments). The
-   real path is `LWSurfaceFuncs().setFlt()`/`setColorVMap()`/`setImg()`/
-   `setMaterial()` etc - the same SDK class this connector already uses
-   to *read* surfaces (`lw_get_surface_info`, via `lw_mcp_ring.py`).
-   Writing through it would be a first for this project: every existing
-   write goes through the one-way Command Port (`lw_run_command` and
-   its wrappers), but this would go through the read-path's Master
-   plugin instead, since that's where `lwsdk`'s surface API is actually
-   accessible. Real architectural interest, real uncertainty about
-   whether writes through that path behave as cleanly as reads have -
-   deserves a dedicated session, not something to rush alongside the
-   easier wins above.
+8. **Surface/material writes - DONE, plus a real methodology lesson
+   about this project's own crash-detection norm.** Shipped
+   `lw_set_surface(surface, color=, diffuse=, luminosity=,
+   specularity=, glossiness=, reflection=, transparency=, smoothing=)`,
+   the first write in this connector to go through the read-path's
+   Master plugin (`LWComRing`) instead of the one-way Command Port -
+   `SurfaceEditor` in the command list just opens the UI panel, it
+   doesn't take settable arguments, so `lwsdk.LWSurfaceFuncs()` (the
+   same class `lw_get_surface_info` already reads through) via its
+   `setFlt()` method was the only real path. A temporary `lw_introspect`
+   diagnostic tool (since removed) confirmed `LWSurfaceFuncs` genuinely
+   exposes `setFlt`/`setColorVMap`/`setImg`/`setMaterial`/`setInt`/
+   `setShadingModel`/`setTex` as real bound methods before writing
+   anything against them.
+
+   **The first live test appeared to hang Layout forever** - the debug
+   log logged the incoming request and then went silent permanently for
+   that call, the same signature as this project's one previously
+   confirmed crash (`LWChannelInfo`/`nextGroup`, see `PLAN.md`).
+   Reproduced twice, ruled out a full app crash (LightWave's own UI
+   stayed fully responsive both times, confirmed via screenshot, and a
+   subsequent `lw_ping` succeeded immediately), and shipped `setFlt` as
+   a permanently-disabled stub rather than guess at a fix - the same
+   "confidently wrong code is worse than an honest gap" call this
+   project has made before.
+
+   **That diagnosis turned out to be wrong**, caught before this was
+   ever finalized: a standalone regex test (not just re-reading the
+   same live symptom again) revealed the real bug was transport-level,
+   not `setFlt` at all. `_TOPIC_RE`'s original pattern used a GREEDY
+   `(.+)`, which matches from the first `{` to the *last* `}` in the
+   whole raw message - harmless for every earlier command, whose
+   payloads never contained braces, but `set_surface`'s JSON-encoded
+   argument does. The regex silently parsed a real `set_surface`
+   message's topic as garbage (not `"MCP"`), so `_handle_query` - let
+   alone `setFlt()` - was never even reached the first time this was
+   tested; there was never a hang to diagnose. Fixed by making the
+   regex's first group non-greedy, then fully reverted the disabled
+   stub and re-verified live from scratch: `diffuse=0.5` alone (Surface
+   Editor showed 50.0%), then `color=[1,0,0]` + `glossiness=0.8`
+   together (a genuinely red color swatch and "Glossiness 80.0%"),
+   both matching `lw_get_surface_info`'s read-back exactly.
+
+   Real, reusable lesson for this project's own methodology: a
+   debug-log signature that looks exactly like the one documented crash
+   (message logged, then silence) does not by itself prove the same
+   failure mode - the silence here had a completely different, mundane
+   cause. The fix was to write the smallest possible standalone
+   reproduction (a three-line regex test) rather than trust a plausible
+   diagnosis from the live symptom alone. See `PLAN.md` "Surface/
+   material writes" for the full investigation.
 
 9. **Keyframe/envelope reading** - `lw_get_transform` only reports the
    evaluated value at one point in time (now via the live playhead, see

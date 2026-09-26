@@ -53,7 +53,20 @@ DEBUG_LOG_PATH = os.path.join(_HERE, "_mcp_ring_debug.log")
 RENDER_STATUS_PATH = os.path.join(_HERE, "_mcp_render_status.json")
 
 TOPIC = "MCP"
-_TOPIC_RE = re.compile(r"^\{(.+)\}\s*(.*)$")
+# ROADMAP2.md item 8: this was originally r"^\{(.+)\}\s*(.*)$" - a GREEDY
+# (.+) matches from the first "{" all the way to the LAST "}" in the whole
+# message, not the first one. Every command before this item happened to
+# have no braces in its own payload, so this bug was invisible until
+# set_surface's JSON-encoded arg (e.g. '{MCP} set_surface X|{"diffuse": 0.5}')
+# introduced a second pair. Confirmed via a standalone regex test: the old
+# pattern parsed topic as 'MCP} set_surface X|{"diffuse": 0.5' (garbage,
+# != "MCP") and rest as "" - so `if topic != TOPIC: return` silently dropped
+# the message before _handle_query ever ran. This was misdiagnosed the first
+# time as LWSurfaceFuncs().setFlt() hanging forever (the debug log looked
+# identical either way: the incoming message logs, then nothing) - setFlt()
+# was never actually reached. Fixed with a non-greedy (.+?) so topic stops
+# at the FIRST "}" instead of the last one.
+_TOPIC_RE = re.compile(r"^\{(.+?)\}\s*(.*)$")
 
 
 def _log(line):
@@ -270,6 +283,84 @@ def _get_surface_info(name):
         "transparency": sf.getFlt(surf, lwsdk.SURF_TRAN),
         "smoothing": sf.getFlt(surf, lwsdk.SURF_SMAN),
     }
+
+
+_SURF_SCALAR_CHANNELS = {
+    "diffuse": "SURF_DIFF",
+    "luminosity": "SURF_LUMI",
+    "specularity": "SURF_SPEC",
+    "glossiness": "SURF_GLOS",
+    "reflection": "SURF_REFL",
+    "transparency": "SURF_TRAN",
+    "smoothing": "SURF_SMAN",
+}
+
+
+def _set_surface(arg):
+    """ROADMAP2.md item 8 - the first WRITE in this connector to go
+    through the read-path's Master plugin/LWComRing instead of the
+    one-way Command Port, since lwsdk.LWSurfaceFuncs() (already used to
+    read surfaces) is where the setter methods actually live - there is
+    no native SurfaceEditor-style Command Port command for this, it
+    just opens the UI panel. A temporary lw_introspect diagnostic tool
+    (since removed) confirmed LWSurfaceFuncs really does expose
+    setFlt/setColorVMap/setImg/setMaterial/setInt/setShadingModel/setTex
+    as real bound methods, not just a C-docs claim.
+
+    Wire format: `arg` is "<surface_name>|<json object>" - the surface
+    name is kept outside the JSON so it can contain spaces without
+    escaping, using "|" as a separator on the (safe) assumption a real
+    surface name won't contain one.
+
+    IMPORTANT, found the hard way: this function was briefly shipped as
+    a permanently-disabled stub after set_surface calls appeared to hang
+    the ring_event callback forever (confirmed "twice" via the debug log
+    going silent right after logging the incoming request). That
+    diagnosis was WRONG. The real bug was in _TOPIC_RE (see its
+    definition above): the original pattern's GREEDY (.+) matched from
+    the first "{" to the LAST "}" in the whole raw message, not the
+    first one - fine for every prior command, whose payloads never
+    contained braces, but this command's JSON-encoded arg does. A
+    standalone regex test confirmed the old pattern parsed topic as
+    garbage (e.g. 'MCP} set_surface CONNECTOR|{"diffuse": 0.5', not
+    "MCP") for a real set_surface message, so `if topic != TOPIC: return`
+    silently dropped it before _handle_query - let alone setFlt() - ever
+    ran. setFlt() was never actually reached the first time this was
+    tested. Fixed by making _TOPIC_RE's first group non-greedy. Real
+    lesson for this project's methodology: an "it looks exactly like our
+    one documented crash" debug-log signature (message logged, then
+    silence) does NOT by itself prove the same failure mode - the
+    silence here had a completely different, mundane cause. Re-verify
+    with the simplest possible reproduction (a standalone script, not
+    just re-reading the same live symptom) before concluding a new SDK
+    call is unsafe.
+
+    After the _TOPIC_RE fix, re-verified live from scratch rather than
+    trusting the fix on paper: setFlt(surf, SURF_DIFF, 0.5) alone first
+    (Surface Editor showed 50.0%, lw_get_surface_info read back 0.5),
+    then setFlt(surf, SURF_COLR, (1,0,0)) + setFlt(surf, SURF_GLOS, 0.8)
+    together in one call (screenshot showed a genuinely red color
+    swatch and "Glossiness 80.0%", both matching the read-back exactly).
+    setFlt(surf, SURF_COLR, (r,g,b)) accepting a plain 3-tuple, the same
+    as getFlt returns, is now confirmed symmetric, not just assumed."""
+    surf_name, sep, props_json = arg.partition("|")
+    if not sep:
+        return {"error": "malformed set_surface arg, expected 'name|{json}': %r" % arg}
+    props = json.loads(props_json)
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    surf = surf_ids[0]
+    sf = lwsdk.LWSurfaceFuncs()
+    sent = []
+    if "color" in props:
+        sf.setFlt(surf, lwsdk.SURF_COLR, tuple(props["color"]))
+        sent.append("color")
+    for key, const_name in _SURF_SCALAR_CHANNELS.items():
+        if key in props:
+            sf.setFlt(surf, getattr(lwsdk, const_name), float(props[key]))
+            sent.append(key)
+    return {"result": "set %s on %s" % (sent, surf_name)}
 
 
 def _probe_channels(name):
@@ -542,6 +633,8 @@ def _handle_query(text):
             payload = {"result": _get_transform(arg or "TransformTest")}
         elif command == "get_surface_info":
             payload = {"result": _get_surface_info(arg)}
+        elif command == "set_surface":
+            payload = {"result": _set_surface(arg)}
         elif command == "probe_channels":
             payload = {"result": _probe_channels(arg or "TransformTest")}
         elif command == "probe_surf":

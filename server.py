@@ -498,10 +498,63 @@ def lw_get_surface_info(name: str) -> str:
     """Get a surface/material's color, diffuse, luminosity, specularity,
     glossiness, reflection, transparency, and smoothing by surface name.
     Uses LWSurfaceFuncs(), confirmed via real-world Python plugin code
-    for calling conventions - less thoroughly live-tested than other
-    tools here (see PLAN.md), so treat unexpected errors as a signal to
-    check the debug log rather than retry blindly."""
+    for calling conventions. Confirmed live against a real textured
+    surface (ROADMAP2.md item 8): a loaded object's "CONNECTOR" surface
+    read back color_rgb [0.784, 0.784, 0.784] (matching the Surface
+    Editor's 200/200/200 - colors are 0.0-1.0 fraction here, 0-255 in
+    the UI, same convention as lw_set_light's LightColor), glossiness
+    0.4 (40%), diffuse 1.0 (100%), everything else 0.0 - exact match to
+    the visible UI panel."""
     return json.dumps(_query("get_surface_info", name))
+
+
+@mcp.tool()
+def lw_set_surface(surface: str, color: list = None, diffuse: float = None,
+                    luminosity: float = None, specularity: float = None,
+                    glossiness: float = None, reflection: float = None,
+                    transparency: float = None, smoothing: float = None) -> str:
+    """Set a surface/material's properties (ROADMAP2.md item 8) - the
+    write-side counterpart to lw_get_surface_info, and the FIRST write
+    in this whole connector that goes through the read-path's Master
+    plugin (LWComRing) instead of the one-way Command Port, since
+    LWSurfaceFuncs (already used to read surfaces) is where the setter
+    methods actually live - there's no native SurfaceEditor Command
+    Port command, it just opens the UI panel. color is [r, g, b], each
+    0.0-1.0 (same convention as lw_set_light's color); all other
+    properties are 0.0-1.0 fractions matching lw_get_surface_info's
+    read-back (e.g. glossiness=0.4 shows as "40.0%" in the UI).
+
+    Confirmed live end to end against a real object's real surface
+    ("CONNECTOR", from a loaded .lwo): sent diffuse=0.5 alone first, a
+    Surface Editor screenshot showed 50.0% and lw_get_surface_info read
+    back 0.5; then color=[1,0,0]+glossiness=0.8 in one call, screenshot
+    showed a genuinely red color swatch (255/0/0) and "Glossiness 80.0%"
+    (grayed out since Specular is 0% - a real UI precondition, not a
+    sign anything's wrong), both matching lw_get_surface_info's
+    read-back exactly.
+
+    This call was briefly, INCORRECTLY believed to hang Layout forever
+    on the first attempt - see lw_mcp_ring.py's _set_surface docstring
+    for the full story. The real bug was a transport-level regex
+    (_TOPIC_RE) that silently dropped any message containing its own
+    "{"/"}" characters, which this tool's JSON-encoded wire format
+    introduces - setFlt() was never actually reached that first time.
+    Fixed by making that regex non-greedy, then re-verified live from
+    scratch rather than trusting the fix on paper - see PLAN.md
+    'Surface/material writes' for the full investigation, including why
+    the original diagnosis was wrong and how it was caught."""
+    props = {}
+    if color is not None:
+        props["color"] = list(color)
+    for key, value in (
+        ("diffuse", diffuse), ("luminosity", luminosity), ("specularity", specularity),
+        ("glossiness", glossiness), ("reflection", reflection),
+        ("transparency", transparency), ("smoothing", smoothing),
+    ):
+        if value is not None:
+            props[key] = value
+    arg = "%s|%s" % (surface, json.dumps(props))
+    return json.dumps(_query("set_surface", arg))
 
 
 @mcp.tool()

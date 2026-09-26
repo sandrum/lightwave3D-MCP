@@ -1597,3 +1597,136 @@ more reason to expect it'll hold. Not chased further this session
 since it's new, separate scope from item 7.
 
 `ROADMAP2.md` item 7 is closed.
+
+## Surface/material writes (ROADMAP2.md item 8)
+
+Goal: `lw_set_surface`, the write-side counterpart to
+`lw_get_surface_info`. Genuinely new territory going in: `SurfaceEditor`
+in the command list just opens the UI panel, it takes no settable
+arguments, so there is no native Command Port command for this at all -
+the real path is `lwsdk.LWSurfaceFuncs()`'s setter methods, the same
+class `lw_get_surface_info` already reads through. This would be the
+first write in the whole connector to go through the read-path's Master
+plugin (`LWComRing`) instead of the one-way Command Port, since that's
+the only place `lwsdk`'s surface API is reachable from Python at all.
+
+**Checked the real bound method names before writing anything against
+them.** Added a temporary `lw_introspect` MCP tool (wired to the
+pre-existing but unexposed `_introspect()` diagnostic already in
+`lw_mcp_ring.py`) to dump `dir(lwsdk.LWSurfaceFuncs())` from a live
+session, since this SDK's Python bindings have already been found to
+diverge from the C docs more than once (`byName`/`getFlt` return plain
+Python lists/floats, not C-style out-params). Confirmed live:
+`LWSurfaceFuncs` genuinely exposes `setFlt`/`setColorVMap`/`setImg`/
+`setMaterial`/`setInt`/`setShadingModel`/`setTex` as real bound methods,
+not just a C-docs claim - `setFlt` (the counterpart to `getFlt`, already
+used for every scalar `lw_get_surface_info` field, including the vec3
+`SURF_COLR`) was the obvious target.
+
+**Wire format**: since this is the first write to ever go through
+`LWComRing`'s `Ring()` mechanism instead of a native Command Port
+command, and a surface write needs a surface name plus a whole object
+of properties (not just one string arg like every existing
+`lw_mcp_ring.py` query), designed `arg` as `"<surface_name>|<json
+object>"` - the surface name kept outside the JSON (so it can contain
+spaces without escaping) using `"|"` as a separator, on the assumption
+a real surface name won't contain one. Confirmed by reading
+`lwcommandport`'s `_send_command` that `Ring()` sends its whole string
+as one raw UDP payload with zero escaping (`args=None` means no further
+`join()`/formatting happens), so a JSON blob survives intact over the
+wire - but `decodeData(('s:256', ...))` caps the whole `"{MCP} ..."`
+message around 256 bytes, fine for one or two properties at a time, a
+real limit for many at once or a very long surface name.
+
+**The first live test appeared to hang Layout forever - a serious,
+carefully-handled scare.** Sent `diffuse=0.5` against a real surface
+(`CONNECTOR`, on `connector_01`/`lightwavemcp_test_object_out`, a
+loaded `.lwo`). `lw_set_surface` timed out. `_mcp_ring_debug.log` showed
+the incoming `"set_surface CONNECTOR|{\"diffuse\": 0.5}"` request logged,
+then nothing - no further line ever appeared for that call. This is the
+exact same signature as this project's one previously confirmed crash
+(`LWChannelInfo`/`nextGroup`, see "LWChannelInfo crash" above): a
+message logged, then total silence. Treated it with the same gravity -
+did not retry blindly, asked the user to check for a crash dialog
+(none) and confirm Layout's own responsiveness (screenshot showed the
+UI, menus, and Master Plugins panel all fully working). Sent `lw_ping`
+immediately after: it succeeded, proving the read-path listener itself
+was still alive and answering other calls. Retried `set_surface` once
+more with a different value (`diffuse=0.6`) to check reproducibility -
+same silent-forever signature, and `lw_ping` still recovered
+immediately afterward both times.
+
+Given this was reproducible, non-recoverable for that specific call,
+but *not* a full app crash the way `LWChannelInfo` was, shipped
+`_set_surface` as a permanently-disabled stub (matching
+`_probe_channels`'s precedent from the original crash) rather than
+guess at a workaround - an "edit-session bracket" or different
+threading/marshaling approach was briefly considered but never
+attempted, since `LWSurfaceFuncs`'s own method list showed no
+`editBegin`/`editEnd`-style methods to base such a guess on, and this
+project's norm is an honest documented gap over confidently wrong code.
+
+**That diagnosis was wrong, caught before it was finalized - a real,
+useful methodology lesson.** Before considering item 8 closed as a
+partial dead end, wrote the smallest possible standalone reproduction
+of the actual mechanism, rather than re-reading the same live symptom
+and trusting the pattern-match to the known crash: a three-line Python
+script testing `_TOPIC_RE` (the regex `ring_event` uses to split the
+`"{MCP} ..."` topic from the rest of the message) against a real
+`set_surface`-shaped string. The result was immediate and unambiguous:
+
+```python
+>>> re.match(r'^\{(.+)\}\s*(.*)$', '{MCP} set_surface CONNECTOR|{"diffuse": 0.5}').groups()
+('MCP} set_surface CONNECTOR|{"diffuse": 0.5', '')
+```
+
+The original pattern's `(.+)` is GREEDY - it matches from the first `{`
+all the way to the LAST `}` in the entire string, not the first one.
+Every command before this item happened to have a payload with no
+braces in it at all, so this bug was completely invisible until
+`set_surface`'s JSON-encoded argument introduced a second `{`/`}` pair.
+`topic` came out as literal garbage (`'MCP} set_surface CONNECTOR|
+{"diffuse": 0.5'`, not `"MCP"`), so `ring_event`'s own `if topic !=
+TOPIC: return` silently dropped the message before `_handle_query` -
+let alone `setFlt()` - was ever reached. There was never a hang inside
+`setFlt` to diagnose; the message never got that far, on *either*
+attempt. Both "confirmations" of the hang were really just two
+confirmations of the same transport bug.
+
+Fixed by making the regex's first group non-greedy (`(.+?)`), confirmed
+via the same standalone test that this parses correctly for both a
+plain command (`{MCP} ping` -> `("MCP", "ping")`) and a
+brace-containing one (`{MCP} set_surface ...` -> `("MCP", "set_surface
+...")`). Reverted `_set_surface` fully back to its real
+`setFlt`-calling implementation - no reason left to believe it was ever
+broken. Reloaded the plugin and re-verified live from scratch, not just
+trusting the fix on paper: `diffuse=0.5` alone first - Surface Editor
+screenshot showed "Diffuse 50.0%", `lw_get_surface_info` read back
+`0.5`. Then `color=[1,0,0]` + `glossiness=0.8` together in one call -
+screenshot showed a genuinely red color swatch (255/0/0, "Glossiness
+80.0%" visible though grayed out, a real precondition since Specular
+was 0% - not a sign of a problem), both matching `lw_get_surface_info`'s
+read-back exactly. `setFlt(surf, SURF_COLR, (r,g,b))` accepting a plain
+3-tuple, symmetric with `getFlt`'s return shape, is now confirmed live,
+not just assumed by analogy.
+
+**The real, reusable lesson for this project's own methodology**: a
+debug-log signature that looks exactly like a previously-confirmed
+crash (message logged, then silence) does not by itself prove the same
+failure mode recurred. The two situations can look identical from the
+log's point of view while having completely different root causes -
+here, a transport-level parsing bug that never reached the SDK call at
+all, versus `LWChannelInfo`'s genuine, immediate native crash. The fix
+that actually mattered was writing the smallest possible standalone
+reproduction of the specific mechanism in question (a three-line regex
+test) rather than re-testing the same live symptom again and trusting a
+plausible-looking pattern-match to a known failure. Also: LightWave
+scene state does not survive a full Layout close/reopen unless
+explicitly reloaded - the test scene had to be reloaded via
+`lw_load_scene` twice during this investigation after full restarts,
+each time correctly restoring `CONNECTOR` to its original defaults,
+which incidentally re-confirmed `lw_load_scene`/`lw_get_surface_info`
+together rather than being purely incidental overhead.
+
+`ROADMAP2.md` item 8 is closed. `lw_set_surface` ships fully functional;
+`lw_introspect` (temporary) has been removed, its job done.
