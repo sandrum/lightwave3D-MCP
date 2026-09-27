@@ -245,29 +245,52 @@ checking Cmd History against a real UI click first.
    corruption. Noted as an operational observation, not a confirmed
    root cause - see `PLAN.md` for the full writeup.
 
-6. **Deeper bone rigging.** `ROADMAP2.md` item 7 covered chain-level IK
-   flags (`FullTimeIK`/`UnaffectedByIK`) and goal/pole assignment
-   (`lw_set_goal`/`lw_set_pole`, from `ROADMAP.md`), but a real bone
-   itself has a much larger property set never touched:
-   `BoneActive` (argument-less, unverified - enable/disable a bone),
-   `BoneStrength`/`BoneStrengthMultiply`, `BoneWeightMapName`/
-   `BoneWeightMapOnly` (bind a bone to a named weight map - real value
-   for anyone driving a rigged character), `BoneRestPosition`/
-   `BoneRestRotation`/`BoneRestLength`, `BoneFalloffType`,
-   `BoneLimitedRange`/`BoneMinRange`/`BoneMaxRange`, and a "muscle"
-   family for organic deformation - `BoneJointComp`/`BoneJointCompParent`/
-   `BoneJointCompAmounts`, `BoneMuscleFlex`/`BoneMuscleFlexParent`/
-   `BoneMuscleFlexAmounts`, `BoneTwist`/`BoneTwistAmount`,
-   `BoneBulge`/`BoneBulgeAmount`/`BoneBulgeParent`/
-   `BoneBulgeParentAmount`. This is a genuinely large surface (40+
-   bone-specific commands found) - real, but needs scoping down to the
-   most valuable subset (`BoneWeightMapName`/`BoneStrength`/
-   `BoneActive`/`BoneFalloffType` look like the highest-value, most
-   commonly-needed subset for basic rigging control) rather than
-   wrapping all 40+ in one pass. Bones already have a working numeric-ID
-   resolution path from `ROADMAP2.md` item 7 (`_get_bones` reports each
-   bone's own `id`, `_resolve_item_id` passes numeric strings straight
-   through) - this item builds directly on that groundwork.
+6. **Deeper bone rigging - DONE for the scoped subset.** `ROADMAP2.md`
+   item 7 covered chain-level IK flags (`FullTimeIK`/`UnaffectedByIK`)
+   and goal/pole assignment, but a real bone itself has a much larger
+   property set - 40+ bone-specific commands found in the original
+   survey, deliberately scoped down to the highest-value subset rather
+   than wrapping all of them. Shipped `lw_set_bone(item, strength=,
+   rest_length=, rest_position=, rest_rotation=, weight_map_name=,
+   falloff_type=, min_range=, max_range=)` and `lw_toggle_bone_flag(item,
+   flag)` (`flag` is `"active"` or `"limited_range"`).
+
+   Found the real UI location: Modify tab > Properties button (while a
+   bone is the current item) opens a "Bones for &lt;object&gt;" panel -
+   distinct from both the generic Modify toolbar and the item-level
+   Motion Options (which only covers IK goal/pole, already wrapped).
+   This panel has object-wide settings (Falloff Type, Limited Bones
+   Number) at the top and per-bone settings (Bone Active, Rest Position/
+   Length, Weight Map, Strength, Limited Range, the muscle/joint-comp
+   family) below, keyed to whichever bone is "Current Bone".
+
+   Confirmed live on `Bone1`: `BoneStrength(0.5)` showed "Strength:
+   50.0%"; `BoneRestLength(2)` showed "Rest Length: 2m";
+   `BoneFalloffType(2)` (the object-wide dropdown) changed "Falloff
+   Type" from "Inverse Distance ^16" to "Inverse Distance ^2";
+   `BoneActive`/`BoneLimitedRange` both confirmed genuine argument-less
+   toggles (a freshly-created bone defaulted to `BoneActive` unchecked -
+   a bone can exist and be parented into a chain while still inactive).
+   `BoneWeightMapName` was sent and logged cleanly but couldn't be
+   visually confirmed - this test rig's bones live on a plain Null with
+   no real mesh/vmap data to match against. `BoneRestPosition`/
+   `BoneRestRotation`/`BoneMinRange`/`BoneMaxRange` share the same
+   confirmed-`*args` signature shape as the tested properties but
+   weren't independently live-tested - shipped by pattern-confidence,
+   consistent with this project's approach for lower-priority members of
+   an already-proven-correct command family.
+
+   The muscle/joint-compensation family (`BoneJointComp*`/
+   `BoneMuscleFlex*`/`BoneTwist*`/`BoneBulge*`) and
+   `BoneWeightMapOnly`/`BoneStrengthMultiply` were surveyed but not
+   wrapped this pass - real, but narrower organic-deformation features
+   better suited to a dedicated session with a real mesh to test weight
+   maps against, rather than this Null-based test rig. Bones already had
+   a working numeric-ID resolution path from `ROADMAP2.md` item 7
+   (`_get_bones` reports each bone's own `id`, `_resolve_item_id` passes
+   numeric strings straight through) - this item builds directly on that
+   groundwork with no new resolution work needed. See `PLAN.md` "Deeper
+   bone rigging" for the full investigation.
 
 7. **Morph/Endomorph control.** Small but genuinely new: `MorphAmount(morph)`
    and `MorphTarget(itemid)` (both confirmed `*args`-taking), plus

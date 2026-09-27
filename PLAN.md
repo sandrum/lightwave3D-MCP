@@ -2382,3 +2382,99 @@ extending an already-large item.
 
 `ROADMAP3.md` item 4 is closed for backdrop and fog, with `FogColor`'s
 gap honestly documented rather than resolved.
+
+## Deeper bone rigging (ROADMAP3.md item 6)
+
+Goal: a scoped subset of the 40+ bone-specific commands found in the
+original `ROADMAP3.md` survey - `ROADMAP2.md` item 7 already covered
+chain-level IK flags and goal/pole assignment, but a real bone's own
+rigging properties (strength, rest length, weight map, falloff, active
+state, limited range) were untouched. Checked exact stub signatures
+first: most were already correctly wrapped with real arguments;
+`BoneActive`/`BoneStrengthMultiply`/`BoneWeightMapOnly`/
+`BoneLimitedRange` were the bare zero-arg candidates needing live
+verification.
+
+**Finding the real UI location took a few tries.** Bone1's item-level
+Motion Options only showed IK goal/pole/chain settings (already wrapped
+in `ROADMAP2.md` item 7) - no bone-specific rigging fields at all. The
+generic Modify tab (Translate/Rotate/Transform tools) didn't have them
+either. The actual panel turned out to be reachable via the "Properties"
+button in the bottom status bar while a bone is the current item, which
+opens a "Bones for BoneTestObject" panel - a genuinely different,
+bone-specific properties dialog from both Motion Options and Item
+Properties.
+
+**This panel has object-wide settings above per-bone settings**, both
+in the same dialog: "Use Bones From Object", "Falloff Type", "Faster
+Bones", "Limited Bones Number" apply to every bone on the object; below
+a "Current Bone" selector, "Bone Type", "Bone Active", "Rest Position/
+Rotation/Length", "Bone Weight Map", "Strength", "Limited Range" (Min/
+Max), and the muscle/joint-compensation family apply only to whichever
+bone is currently selected there. `BoneFalloffType` specifically targets
+the OBJECT-WIDE dropdown, not a per-bone one - worth remembering since
+its name alone doesn't signal that scope.
+
+**`BoneActive` confirmed a genuine toggle, with a real, interesting
+default.** Clicking the checkbox live logged `BoneActive` bare in Cmd
+History - no stub bug. Also found: a real, already-existing bone
+(`Bone1`, part of a genuine 2-bone chain used throughout this project's
+bone work) had "Bone Active" UNCHECKED by default, confirming a bone
+can exist, be parented, and participate in a hierarchy while still
+being inactive - a real LightWave rigging concept, not a connector
+artifact.
+
+**`BoneStrength(0.5)` and `BoneRestLength(2)` confirmed live with zero
+precondition** - "Strength" showed "50.0%", "Rest Length" showed "2m",
+both immediately.
+
+**`BoneWeightMapName("TestWeightMap")` sent successfully but couldn't
+be visually confirmed** - logged cleanly in Cmd History, no error, but
+"Bone Weight Map" stayed "(none)" in the dropdown. Not treated as a
+failure: this project's bone test rig (`BoneTestObject`) is a plain Null
+with `AddBone`/`AddChildBone`-attached bones, no real mesh geometry or
+vertex maps at all - there was never a real weight map named
+"TestWeightMap" for the dropdown to match against. Documented as
+likely-correct-by-signature (matching the confirmed `(name)` argument
+shape) rather than independently verified, honest about the test rig's
+own limitation rather than claiming success or failure either way.
+
+**`BoneLimitedRange` confirmed a genuine toggle that gates real
+fields** - checking it live correctly ungrayed the "Min"/"Max" fields
+underneath (previously grayed at their defaults, 0m/1m) - the same
+DOF/Motion-Blur precondition shape from earlier roadmaps, now confirmed
+for bones too.
+
+**`BoneFalloffType(2)` confirmed live and object-wide** - the dropdown
+at the top of the panel (shared across all bones on the object) changed
+from "Inverse Distance ^16" to "Inverse Distance ^2", confirming both
+that the write works and that it's genuinely object-scoped, not
+per-bone, exactly as its position in the panel suggested.
+
+Shipped `lw_set_bone` (bundling `BoneStrength`/`BoneRestLength`/
+`BoneRestPosition`/`BoneRestRotation`/`BoneWeightMapName`/
+`BoneFalloffType`/`BoneMinRange`/`BoneMaxRange`) and `lw_toggle_bone_flag`
+(`BoneActive`/`BoneLimitedRange`), following the exact `lw_set_ik_options`
++ `lw_toggle_ik_flag` split precedent from `ROADMAP2.md` item 7 for the
+same reason: some properties are real settable values, two are
+argument-less toggles with no way to read a known state back.
+`rest_position`/`rest_rotation`/`min_range`/`max_range` weren't
+independently live-tested - shipped by pattern-confidence given the
+identical confirmed `*args` shape already proven for their siblings in
+the same panel. Re-verified `lw_set_bone(strength=0.8)` and
+`lw_toggle_bone_flag(flag="limited_range")` through the actual wrapped
+tools by numeric bone ID after a Claude Desktop restart - both correctly
+updated the panel ("Strength: 80.0%", "Limited Range" unchecked),
+confirming the wrappers and `_resolve_item_id`'s numeric-passthrough
+(from `ROADMAP2.md` item 7) work correctly together for bones.
+
+The muscle/joint-compensation family (`BoneJointComp*`/
+`BoneMuscleFlex*`/`BoneTwist*`/`BoneBulge*`) and
+`BoneWeightMapOnly`/`BoneStrengthMultiply` were surveyed (all visible in
+the same panel) but deliberately not wrapped this pass - genuinely real
+organic-deformation features, but ones that would benefit from a real
+mesh with actual weight maps to test against meaningfully, rather than
+this session's plain-Null test rig. Left for a future, dedicated
+session.
+
+`ROADMAP3.md` item 6 is closed for the scoped subset.

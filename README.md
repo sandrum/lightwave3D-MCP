@@ -248,6 +248,24 @@ and what's explicitly out of scope.
   other color command tested this item. Shipped with this explicitly
   flagged as unconfirmed rather than proven working. See `PLAN.md`
   "Scene environment/atmosphere" for the full investigation.
+- **Deeper bone rigging** (ROADMAP3.md item 6) - `lw_set_bone(item,
+  strength=, rest_length=, rest_position=, rest_rotation=,
+  weight_map_name=, falloff_type=, min_range=, max_range=)` and
+  `lw_toggle_bone_flag(item, flag)` (`flag` is `"active"` or
+  `"limited_range"`). `item` must be a bone's numeric ID (from
+  `lw_get_hierarchy`'s bone `id` field). Found the real UI location - a
+  "Bones for &lt;object&gt;" panel reachable via the Properties button
+  while a bone is current, distinct from both Motion Options (IK only)
+  and the generic Modify tab. Confirmed live: `strength=0.5` showed
+  "Strength: 50.0%"; `rest_length=2` showed "Rest Length: 2m";
+  `falloff_type=2` (object-wide, not per-bone) changed "Inverse Distance
+  ^16" to "Inverse Distance ^2"; `BoneActive`/`BoneLimitedRange`
+  confirmed genuine argument-less toggles - a real bone defaulted to
+  inactive, confirming a bone can exist and be parented while still
+  off. `weight_map_name` sent cleanly but couldn't be visually confirmed
+  since this test rig's bones have no real mesh/vmap to match against.
+  The muscle/joint-compensation family was surveyed but not wrapped this
+  pass. See `PLAN.md` "Deeper bone rigging" for the full investigation.
 
 **Modeler**
 - `modeler_run_command` - same pattern as `lw_run_command` but for

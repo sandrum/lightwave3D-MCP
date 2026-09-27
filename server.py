@@ -1495,6 +1495,109 @@ def lw_set_alpha_channel_mode(item: str, mode: int) -> str:
 
 
 @mcp.tool()
+def lw_set_bone(item: str, strength: float = None, rest_length: float = None,
+                 rest_position: list = None, rest_rotation: list = None,
+                 weight_map_name: str = None, falloff_type: int = None,
+                 min_range: float = None, max_range: float = None) -> str:
+    """Set a bone's rigging properties (ROADMAP3.md item 6, Modify >
+    Properties > "Bones for <object>" panel, opened while a bone is the
+    current item). `item` must be a bone's numeric ID (e.g. "40000000")
+    from lw_get_hierarchy's bone `id` field - `_resolve_item_id` passes
+    a purely numeric string straight through (see ROADMAP2.md item 7),
+    the same mechanism this whole family of bone tools relies on since
+    bones have no name lw_get_item_id can resolve.
+
+    `falloff_type` is object-wide (the "Falloff Type" dropdown at the
+    TOP of the Bones panel, above "Current Bone" - it applies to every
+    bone on the object, not just the selected one), everything else is
+    per-bone. `rest_position`/`rest_rotation` are [x,y,z]/[h,p,b]
+    triples (untested this session - see below).
+
+    Confirmed live on a real bone (Bone1): `strength=0.5` showed
+    "Strength: 50.0%"; `rest_length=2` showed "Rest Length: 2m";
+    `falloff_type=2` changed the object-wide dropdown from "Inverse
+    Distance ^16" to "Inverse Distance ^2" (exact enum values for other
+    dropdown entries not confirmed). `weight_map_name` sent cleanly (no
+    error, logged correctly) but couldn't be visually confirmed - this
+    test rig's bones live on a plain Null with no real mesh/vmap data,
+    so there was no actual weight map for the name to match; treat this
+    as likely-correct-by-signature rather than fully confirmed.
+    `rest_position`/`rest_rotation`/`min_range`/`max_range` were not
+    tested live this session - `min_range`/`max_range` map to the
+    "Limited Range" Min/Max fields, gated by the same precondition
+    lw_toggle_bone_flag's "limited_range" flag controls (confirmed live
+    that those fields are grayed out until it's checked, matching the
+    DOF/Motion-Blur precondition shape from earlier roadmaps) - all four
+    share the same confirmed-`*args` signature shape as the tested
+    properties above, shipped by pattern-confidence."""
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
+    lw = _layout()
+    sent = []
+    try:
+        lw.SelectItem(item_id)
+        if strength is not None:
+            lw.BoneStrength(strength)
+            sent.append("BoneStrength")
+        if rest_length is not None:
+            lw.BoneRestLength(rest_length)
+            sent.append("BoneRestLength")
+        if rest_position is not None:
+            lw.BoneRestPosition(*rest_position)
+            sent.append("BoneRestPosition")
+        if rest_rotation is not None:
+            lw.BoneRestRotation(*rest_rotation)
+            sent.append("BoneRestRotation")
+        if weight_map_name is not None:
+            lw.BoneWeightMapName(weight_map_name)
+            sent.append("BoneWeightMapName")
+        if falloff_type is not None:
+            lw.BoneFalloffType(falloff_type)
+            sent.append("BoneFalloffType")
+        if min_range is not None:
+            lw.BoneMinRange(min_range)
+            sent.append("BoneMinRange")
+        if max_range is not None:
+            lw.BoneMaxRange(max_range)
+            sent.append("BoneMaxRange")
+        return json.dumps({"result": "set %s on %s (id %s)" % (sent, item, item_id)})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_toggle_bone_flag(item: str, flag: str) -> str:
+    """Flip BoneActive or BoneLimitedRange for a bone (ROADMAP3.md item
+    6). `flag` is `"active"` or `"limited_range"`. `item` must be a
+    bone's numeric ID (see lw_set_bone's docstring for why).
+
+    Both confirmed live to be genuine argument-less TOGGLES, same shape
+    and same limitation as every other confirmed toggle in this
+    connector (lw_toggle_ik_flag, lw_toggle_object_visibility): no way
+    to read current state back, so this flips rather than sets.
+    `BoneActive` (Bone Active checkbox) defaulted to unchecked on a
+    freshly-created bone in this test rig - a bone can exist and be
+    parented into a chain while still "inactive". `BoneLimitedRange`
+    gates the "Limited Range" Min/Max fields lw_set_bone's `min_range`/
+    `max_range` write to - confirmed live those fields are grayed out
+    until this is checked."""
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
+    command = {"active": "BoneActive", "limited_range": "BoneLimitedRange"}.get(flag)
+    if not command:
+        return json.dumps({"error": "flag must be 'active' or 'limited_range', got %r" % flag})
+    lw = _layout()
+    try:
+        lw.SelectItem(item_id)
+        getattr(lw, command)()
+        return json.dumps({"result": "toggled %s on %s (id %s)" % (command, item, item_id)})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
 def lw_include_light(light: str, obj: str) -> str:
     """Add an object to a light's inclusion list (Light Properties >
     Objects tab, "Include" mode - unchecked "Exclude" column) - the
