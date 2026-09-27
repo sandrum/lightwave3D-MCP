@@ -2009,9 +2009,9 @@ class Layout(CommandPort):
     def UnseenByCamera(self):
         """ UnseenByCamera() """
         self._send_command("UnseenByCamera")
-    def UnseenByAlphaChannel(self):
-        """ UnseenByAlphaChannel() """
-        self._send_command("UnseenByAlphaChannel")
+    def UnseenByAlphaChannel(self, *args):
+        """ UnseenByAlphaChannel(mode) """
+        self._send_command("UnseenByAlphaChannel", args)
     def UnaffectedByFog(self):
         """ UnaffectedByFog() """
         self._send_command("UnaffectedByFog")

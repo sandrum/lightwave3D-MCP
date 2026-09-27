@@ -146,20 +146,46 @@ checking Cmd History against a real UI click first.
    work, never wired up). Real value for anyone using this connector to
    set up a scene's look, not just its geometry/animation.
 
-5. **Per-object render-visibility flags.** `UnseenByCamera`,
-   `UnseenByRays`, `UnseenByAlphaChannel`, `UnseenByRadiosity`,
-   `UnaffectedByFog` - all argument-less, same shape as the confirmed
-   real toggles `UnaffectedByIK`/`FullTimeIK` from `ROADMAP2.md` item 7
-   (and worth checking against the same shape that turned out to be
-   real *bugs* for `Ring`/`SetRenderDisplay`/`MotionBlur` - don't assume
-   either way). These are genuinely different from `ROADMAP2.md` item
-   1's light/object illumination linking (`IncludeObject`/
-   `ExcludeObject`/etc., which control which objects a light lights) -
-   this cluster is about whether an object is visible to the *camera*,
-   *reflections/refractions*, *alpha channel*, or *radiosity*
-   calculations at all, a real and distinct rendering-control axis.
-   Object Properties' render-visibility checkboxes were seen in earlier
-   screenshots this project has taken but never wrapped.
+5. **Per-object render-visibility flags - DONE, plus a real stub bug and
+   a genuine surprise finding.** Shipped `lw_toggle_object_visibility(
+   item, flag)` (flag is one of `"unseen_by_rays"`, `"unseen_by_camera"`,
+   `"unseen_by_radiosity"`, `"unaffected_by_fog"`) and
+   `lw_set_alpha_channel_mode(item, mode)`.
+
+   `UnseenByRays`/`UnseenByCamera`/`UnseenByRadiosity`/`UnaffectedByFog`
+   confirmed live to be genuine argument-less toggles - Cmd History
+   logged each one bare after clicking the real "Object Properties >
+   Render" buttons, no stub fix needed. These are genuinely different
+   from `ROADMAP2.md` item 1's light/object illumination linking
+   (`IncludeObject`/`ExcludeObject`/etc., which control which objects a
+   light lights) - this cluster is about whether an object is visible to
+   the camera, reflection/refraction rays, radiosity calculations, or
+   fog at all, a distinct rendering-control axis.
+
+   `UnseenByAlphaChannel` turned out to be a genuine surprise on two
+   counts. First, a real bug: it's wrapped bare in the stub, same shape
+   as the other four, but Cmd History showed `UnseenByAlphaChannel 1`
+   after a real UI interaction - it actually takes an argument, the same
+   missing-`*args` bug class found repeatedly in earlier roadmaps
+   (`Ring`/`SetRenderDisplay`/`MotionBlur`), fixed here. Second, and more
+   surprising: it isn't a boolean visibility flag at all, despite its
+   name and despite matching the exact toggle shape of its four
+   siblings - it's the Object Properties "Alpha Channel" dropdown's
+   underlying command, an enum. Confirmed live: `0` = "Use Surface
+   Settings" (default), `1` = "Constant Value" - the only two options
+   this dropdown offered in this install. Shipped as
+   `lw_set_alpha_channel_mode` rather than folded into the boolean-toggle
+   tool, with the confirmed mapping documented and unconfirmed values
+   (other LightWave versions' docs mention more, e.g. Shadow Density)
+   explicitly flagged as unverified rather than guessed at.
+
+   A UI freeze occurred partway through live-testing these two tools
+   (Cmd History kept logging new commands, but window interaction like
+   scrollbars stopped responding) - not clearly attributable to either
+   new command, since both had already logged cleanly with no errors
+   beforehand, and a full LightWave restart recovered cleanly with no
+   corruption. Noted as an operational observation, not a confirmed
+   root cause - see `PLAN.md` for the full writeup.
 
 6. **Deeper bone rigging.** `ROADMAP2.md` item 7 covered chain-level IK
    flags (`FullTimeIK`/`UnaffectedByIK`) and goal/pole assignment

@@ -315,6 +315,31 @@ Confirmed live end to end via the actual UI panels, not just Cmd
 History: adding, and toggling Include ↔ Exclude, both correctly
 updated the same list entry rather than creating duplicates.
 
+**Per-object render-visibility flags** (ROADMAP3.md item 5) -
+`lw_toggle_object_visibility(item, flag)` (`flag` is one of
+`"unseen_by_rays"`, `"unseen_by_camera"`, `"unseen_by_radiosity"`,
+`"unaffected_by_fog"`) and `lw_set_alpha_channel_mode(item, mode)`.
+Genuinely different from the light/object illumination linking above -
+this is about whether an object is visible to the camera, reflection/
+refraction rays, radiosity, or fog at all, not which light illuminates
+it. The four toggle flags confirmed live to be genuine argument-less
+toggles (Cmd History logged each bare after clicking the real Object
+Properties > Render buttons) - no way to read them back, so the tool
+flips rather than sets, same limitation as the Light/IK toggles.
+`UnseenByAlphaChannel` turned out to be a real find: it's wrapped bare
+in the stub like its four siblings, but Cmd History showed it actually
+takes an argument (a real missing-`*args` bug, same class as
+`Ring`/`SetRenderDisplay`/`MotionBlur`, fixed here) - and despite its
+name, it isn't a boolean at all, it's the Object Properties "Alpha
+Channel" dropdown's underlying enum command (confirmed live: `0` = "Use
+Surface Settings", `1` = "Constant Value", the only two options this
+install's dropdown offered). Shipped as its own tool rather than folded
+into the boolean toggles, where it would have been misleading. A UI
+freeze occurred during live testing of these two tools, not clearly
+attributable to either (both had already logged cleanly beforehand) -
+see `PLAN.md` "Per-object render-visibility flags" for the honest
+writeup.
+
 ## Setup
 
 **1. Enable the Command Port (once per Layout session)**

@@ -1164,6 +1164,87 @@ def lw_toggle_ik_flag(item: str, flag: str) -> str:
 
 
 @mcp.tool()
+def lw_toggle_object_visibility(item: str, flag: str) -> str:
+    """Flip a per-object render-visibility flag (ROADMAP3.md item 5).
+    flag must be one of "unseen_by_rays", "unseen_by_camera",
+    "unseen_by_radiosity", "unaffected_by_fog".
+
+    All four confirmed live to be genuine argument-less TOGGLES, same
+    shape and same finding as lw_toggle_ik_flag's FullTimeIK/
+    UnaffectedByIK: Cmd History showed each command bare, no argument
+    following, after clicking every one of the four real "Object
+    Properties > Render" buttons on a live object. There is no way to
+    read any of these flags' current state back, so this FLIPS whatever
+    it currently is - call it once, then check Object Properties (or
+    call it again to flip back) if the direction matters.
+
+    Deliberately different from ROADMAP2.md item 1's light/object
+    illumination linking (lw_include_light/lw_exclude_light etc., which
+    control which objects a light lights) - these four are about
+    whether the object is visible to the camera, reflection/refraction
+    rays, radiosity calculations, or fog at all, a distinct
+    render-visibility axis found by surveying the command list, not by
+    extending the light-linking work.
+
+    Deliberately does NOT include "unseen_by_alpha_channel" - that
+    command turned out NOT to be a boolean visibility flag at all (see
+    lw_set_alpha_channel_mode) despite matching this exact bare-call
+    shape in the stub before it was fixed."""
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
+    command = {
+        "unseen_by_rays": "UnseenByRays",
+        "unseen_by_camera": "UnseenByCamera",
+        "unseen_by_radiosity": "UnseenByRadiosity",
+        "unaffected_by_fog": "UnaffectedByFog",
+    }.get(flag)
+    if not command:
+        return json.dumps({"error": "flag must be one of 'unseen_by_rays', 'unseen_by_camera', "
+                                     "'unseen_by_radiosity', 'unaffected_by_fog', got %r" % flag})
+    lw = _layout()
+    try:
+        lw.SelectItem(item_id)
+        getattr(lw, command)()
+        return json.dumps({"result": "toggled %s on %s (id %s)" % (command, item, item_id)})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_set_alpha_channel_mode(item: str, mode: int) -> str:
+    """Set an object's Alpha Channel mode (ROADMAP3.md item 5). Wraps
+    UnseenByAlphaChannel(mode) - a real, confirmed bug found while
+    investigating this: the native command genuinely takes an argument
+    (confirmed live via Cmd History: "UnseenByAlphaChannel 1"), but the
+    bundled lwcommandport stub had it wrapped with no way to pass one at
+    all, the same class of bug as Ring()/SetRenderDisplay()/MotionBlur()
+    from earlier roadmaps - fixed here.
+
+    Despite its name suggesting a boolean "unseen by alpha channel"
+    toggle (and matching the exact bare-call shape lw_toggle_object_
+    visibility's four real toggles use), this is actually the Object
+    Properties "Alpha Channel" dropdown's underlying command - an enum,
+    not a boolean. Only two values confirmed live via that dropdown in
+    this LightWave 2019.1.5 install: 0 = "Use Surface Settings" (the
+    default), 1 = "Constant Value" (pairs with the separate AlphaValue
+    command/field). Other LightWave versions' docs mention additional
+    options (e.g. Shadow Density) that were NOT independently confirmed
+    in this dropdown - pass an unconfirmed value at your own risk, this
+    tool does not validate the range."""
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
+    lw = _layout()
+    try:
+        lw.SelectItem(item_id)
+        lw.UnseenByAlphaChannel(mode)
+        return json.dumps({"result": "set UnseenByAlphaChannel(%s) on %s (id %s)" % (mode, item, item_id)})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
 def lw_include_light(light: str, obj: str) -> str:
     """Add an object to a light's inclusion list (Light Properties >
     Objects tab, "Include" mode - unchecked "Exclude" column) - the

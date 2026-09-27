@@ -2107,3 +2107,90 @@ properties.
 `ROADMAP3.md` item 2 is closed for reading; writing and the
 un-enveloped-value read gap remain open, natural candidates for a
 future session.
+
+## Per-object render-visibility flags (ROADMAP3.md item 5)
+
+Goal: `UnseenByCamera`/`UnseenByRays`/`UnseenByAlphaChannel`/
+`UnseenByRadiosity`/`UnaffectedByFog` - five commands found during the
+`ROADMAP3.md` survey, all wrapped bare (no arguments) in the stub, the
+same shape that's turned out to be a real bug four times
+(`Ring`/`SetRenderDisplay`/`MotionBlur`/`LightFalloffType`) and a
+genuine toggle four times (`LightVisibleToCamera`/`LightCastsShadows`/
+`UnaffectedByIK`/`FullTimeIK`) across the first two roadmaps. Checked
+live rather than assumed either way, per this project's established
+rule for this exact shape.
+
+**Found the real UI location first.** Selected `connector_01`, opened
+Object Properties, found all five candidates under the "Render" tab -
+four styled as buttons (`Unseen by Rays`/`Unseen by Camera`/`Unseen by
+Radiosity`/`Unaffected by Fog`), the fifth (`Unseen by Alpha Channel`)
+not present as its own button at all - only an "Alpha Channel" dropdown
+currently showing "Use Surface Settings" was visible instead.
+
+**The four buttons: confirmed genuine toggles, no stub bug.** Clicked
+each one in turn, checking Cmd History after each: `UnseenByCamera`,
+`UnseenByRays`, `UnseenByRadiosity`, `UnaffectedByFog` all logged bare,
+no argument following, exactly matching the current stub. All four
+buttons showed checked afterward. No fix needed - shipped
+`lw_toggle_object_visibility(item, flag)` directly mirroring
+`lw_toggle_ik_flag`'s shape (resolve item, `SelectItem`, call the bare
+command) since there's no way to read any of these back to a known
+state, same limitation as the Light/IK toggles before them.
+
+**The fifth, `UnseenByAlphaChannel`, turned out to be something else
+entirely.** Asked whether the "Alpha Channel" dropdown had an option
+matching this name - it didn't directly, but had exactly two choices:
+"Use Surface Settings" (the current default) and "Constant Value".
+Selected "Constant Value" and checked Cmd History: it logged
+`UnseenByAlphaChannel 1` - **with an argument**, unlike all four
+siblings. This is a real, confirmed stub bug (the same missing-`*args`
+class as `Ring`/`SetRenderDisplay`/`MotionBlur`), fixed by adding
+`*args` to the stub. But it also revealed something more interesting:
+this command isn't a boolean "unseen by alpha channel" flag at all
+despite its name and despite sharing the exact bare-call shape of its
+four true-toggle siblings - it's the underlying command for the Alpha
+Channel dropdown itself, an enum. Switched the dropdown back to "Use
+Surface Settings" and confirmed live: logged `UnseenByAlphaChannel 0`,
+completing the mapping (`0` = Use Surface Settings, `1` = Constant
+Value - the only two options this dropdown offered, no others were
+available to test). Shipped as its own tool, `lw_set_alpha_channel_mode
+(item, mode)`, rather than folding it into the boolean-toggle tool where
+it would have been actively misleading - documented the two confirmed
+values plainly and flagged that other LightWave versions' documentation
+mentions additional modes (e.g. Shadow Density) never independently
+confirmed in this install's dropdown, so passing an unconfirmed integer
+is explicitly at the caller's own risk.
+
+**A real UI freeze occurred during live testing of both new tools,
+worth recording honestly even though it was never root-caused.** After
+calling `lw_toggle_object_visibility(item="connector_01",
+flag="unseen_by_camera")` and `lw_set_alpha_channel_mode(item=
+"connector_01", mode=1)` back to back through the actual wrapped tools
+(both returned clean success, no errors), the Object Properties/Scene
+Editor/Command History/Master Plugins floating windows all stopped
+responding to mouse interaction (couldn't drag the Cmd History
+scrollbar, couldn't click into other panels), while the main Layout
+window's left-side menu remained clickable. Cmd History kept logging
+newly-arriving commands correctly even during the freeze (confirmed via
+`lw_toggle_object_visibility`/`lw_set_alpha_channel_mode` calls made
+while investigating), showing the Command Port and its processing loop
+were still alive - this was not the same failure mode as the
+`LWChannelInfo`/`nextGroup` crash (no silence, no unresponsive process),
+more narrowly a UI-interaction freeze. `lw_ping` initially still
+succeeded, then subsequently `lw_get_scene_info` timed out as the
+session degraded further. Not clearly attributable to either new
+command specifically - both had already logged cleanly with zero errors
+in Cmd History well before the freeze became apparent, and this was a
+very long session with many restart/reload cycles by this point, a
+plausible alternative explanation (cumulative resource pressure) that
+was not and could not be ruled out. Recovered cleanly via a full
+LightWave close/reopen and scene reload, with no corruption - Object
+Properties for `connector_01` displayed normally afterward, all four
+toggles correctly reset to their saved (unchecked) state, and both new
+tools were still functioning correctly post-recovery. Recorded as an
+honest operational note, not a confirmed root cause - if this recurs
+under more controlled conditions in a future session, especially
+isolated to one specific command, it deserves the same staged
+investigation this project has given its two confirmed real crashes.
+
+`ROADMAP3.md` item 5 is closed.
