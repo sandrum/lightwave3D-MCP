@@ -739,6 +739,111 @@ def lw_set_camera_resolution(width: int, height: int) -> str:
 
 
 @mcp.tool()
+def lw_set_render_globals(threads: int = None, tile_size: int = None) -> str:
+    """Set scene-wide render quality/performance settings (ROADMAP3.md
+    item 3) - the biggest remaining "can trigger renders but can't
+    configure them" gap this connector had. Wraps RenderThreads(threads)
+    and RenderTileSize(tilesize), both already correctly taking real
+    arguments in the stub.
+
+    Confirmed live: `tile_size` directly updated Render Properties >
+    Render > "Render Tile Size" (64 -> 32), no precondition. `threads`
+    directly updated "Multithreading Limit" (e.g. 4 -> "4 Threads") AND
+    correctly auto-unchecked "Automatic Multithreading" as a side
+    effect, with no separate precondition command needed - a cleaner
+    result than lw_set_camera's MotionBlur precondition."""
+    lw = _layout()
+    sent = []
+    try:
+        if threads is not None:
+            lw.RenderThreads(threads)
+            sent.append("RenderThreads")
+        if tile_size is not None:
+            lw.RenderTileSize(tile_size)
+            sent.append("RenderTileSize")
+        return json.dumps({"result": "set %s" % sent})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_toggle_global_illumination() -> str:
+    """Flip the "Enable GI" checkbox (Render Properties > Global
+    Illumination) (ROADMAP3.md item 3). Wraps EnableRadiosity0 -
+    confirmed live to be a genuine argument-less TOGGLE (Cmd History
+    logged it bare, repeatedly, after clicking the real checkbox
+    on/off several times) - same limitation as every other confirmed
+    toggle in this connector (lw_toggle_ik_flag, lw_toggle_object_
+    visibility): no way to read current state back, so this flips
+    rather than sets.
+
+    A sibling command, EnableRadiosity1, was found in the same survey
+    but never independently confirmed live - the "Type" dropdown next
+    to "Enable GI" only offered "Monte Carlo" in this install, no
+    second mode to toggle it against, so it's left unwrapped rather
+    than guessed at."""
+    try:
+        _layout().EnableRadiosity0()
+        return json.dumps({"result": "toggled EnableRadiosity0 (Enable GI)"})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_set_gi_interpolated(enabled: int) -> str:
+    """Set whether Global Illumination uses Interpolated mode (Render
+    Properties > Global Illumination > "Interpolated" checkbox, under
+    Monte Carlo) (ROADMAP3.md item 3). Wraps RadiosityInterpolation
+    (enabled) - confirmed correctly taking a real argument in the stub
+    already. Confirmed live: RadiosityInterpolation(1) correctly checked
+    the "Interpolated" checkbox. `enabled=0` was not independently
+    confirmed live this session, only inferred from the command's own
+    name and argument-count requirement - treat with slightly less
+    confidence than the confirmed `1` case.
+
+    This gates lw_set_gi_radiosity_tolerance's precondition, but not
+    completely - see that tool's docstring for a real, still-open
+    limitation found while testing this."""
+    try:
+        _layout().RadiosityInterpolation(enabled)
+        return json.dumps({"result": "sent RadiosityInterpolation %s" % enabled})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_set_gi_radiosity_tolerance(degrees: float) -> str:
+    """Set Global Illumination's Angular Tolerance (Render Properties >
+    Global Illumination > Interpolated > "Angular Tolerance")
+    (ROADMAP3.md item 3). Wraps ObjGIRadiosityTolerance(degrees),
+    already correctly taking a real argument in the stub.
+
+    Real, unresolved precondition found live: LightWave pops "This
+    option only applies when Global Illumination Mode is set to Monte
+    Carlo Interpolated" - and this persisted even after enabling GI
+    (lw_toggle_global_illumination) AND setting Interpolated mode
+    (lw_set_gi_interpolated(1)), both confirmed to have taken visible
+    effect in the UI beforehand. The "Type" dropdown this install
+    offers only has one option, "Monte Carlo" - no distinct "Monte
+    Carlo Interpolated" mode was ever reachable to select, despite the
+    error message referencing it by that exact name. Shipped anyway,
+    following the same precedent as lw_set_camera's MotionBlur-gated
+    shutter properties: the write command itself is legitimate and its
+    argument is confirmed correct, it just couldn't be exercised to a
+    visible effect in this install this session. Also worth noting: two
+    calls to this command were silently dropped somewhere between this
+    connector and Layout during testing (never appeared in Cmd History
+    at all, not even as the precondition error) - the one-way Command
+    Port has no delivery guarantee, so an apparently-silent call here
+    isn't necessarily this command's own fault."""
+    try:
+        _layout().ObjGIRadiosityTolerance(degrees)
+        return json.dumps({"result": "sent ObjGIRadiosityTolerance %s" % degrees})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
 def lw_set_camera(camera: str, zoom_factor: float = None, f_stop: float = None,
                    aperture_height: float = None, shutter_open: float = None,
                    shutter_efficiency: float = None, rolling_shutter: float = None) -> str:

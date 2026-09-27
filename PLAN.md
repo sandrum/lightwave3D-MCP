@@ -2194,3 +2194,105 @@ isolated to one specific command, it deserves the same staged
 investigation this project has given its two confirmed real crashes.
 
 `ROADMAP3.md` item 5 is closed.
+
+## Render Globals / GI / quality settings (ROADMAP3.md item 3)
+
+Goal: `RenderThreads`/`RenderTileSize`/`RenderAlgorithm`/`RenderMode`/
+`Antialiasing` family/`RadiosityInterpolation`/`ObjGIRadiosityTolerance`/
+`ColorSpaceOutput` family - closing the biggest remaining "can trigger a
+render but can't configure it" gap. Checked exact stub signatures first
+(a now-routine step): `RenderThreads`/`RenderTileSize`/`RenderAlgorithm`/
+`RenderMode`/`ObjGIRadiosityTolerance`/`RadiosityInterpolation`/
+`Antialiasing`/`MinAntialiasing`/`MaxAntialiasing` were all already
+correctly wrapped with real arguments; `EnableRadiosity0`/
+`EnableRadiosity1`/`BakeRadiosityScene`/the `ColorSpaceOutput` family
+were bare zero-arg candidates needing live verification, per this
+project's now-established rule for that shape.
+
+**Found the real UI locations first**, via Render Properties (Render
+menu > Render Properties). The "Render" tab showed "Render Tile Size:
+64" and "Automatic Multithreading" (checked, with "Multithreading
+Limit: 12" grayed out) - direct, confident matches for `RenderTileSize`
+and `RenderThreads`.
+
+**`RenderTileSize(32)` confirmed live, zero precondition** - the field
+updated 64 -> 32 immediately.
+
+**`RenderThreads(4)` confirmed live, and better-behaved than expected**
+- not only did "Multithreading Limit" update to "4 Threads", but
+"Automatic Multithreading" auto-unchecked itself as a side effect, with
+no separate precondition command needed at all - a cleaner result than
+`lw_set_camera`'s Motion Blur precondition, which needed an explicit
+`DepthOfField()`-style toggle sent first.
+
+**The Global Illumination tab.** "Enable GI" (checked) and a "Type"
+dropdown showing only "Monte Carlo" - clicking it revealed no second
+option ("monte carlo is the only option, strangely"). Toggled "Enable
+GI" on/off repeatedly while checking Cmd History: `EnableRadiosity0`
+logged bare every single time, confirming a genuine argument-less
+toggle, no stub bug. Clicking "Bake Scene" (under "Interpolated Cache")
+required "Enable Caching" first, then triggered a real, visible render/
+bake process (a "Render Status" progress window, "Preprocessing
+Frame...") - confirming `BakeRadiosityScene` is a genuine one-shot
+render-trigger action, not a persistent setting, the same category as
+`MatchGoalOrientation`/`KeepGoalWithinReach` found (and deliberately
+left unwrapped) during `ROADMAP2.md` item 7's bone work.
+
+**`ObjGIRadiosityTolerance` - a real, unresolved precondition.**
+"Angular Tolerance: 20.0°" under the "Interpolated" sub-section looked
+like an exact match. Sent `ObjGIRadiosityTolerance(45)` directly - got a
+real LightWave error dialog: "This option only applies when Global
+Illumination Mode is set to Monte Carlo Interpolated." Tried satisfying
+it: `RadiosityInterpolation(1)` correctly checked the "Interpolated"
+checkbox (confirmed live via screenshot) - but resending
+`ObjGIRadiosityTolerance(45)` produced the *exact same* precondition
+error again, unchanged. The dropdown genuinely only ever offered "Monte
+Carlo" as a `Type` choice in this install - no distinct "Monte Carlo
+Interpolated" *mode* (as opposed to the "Interpolated" checkbox, which
+is evidently a different, narrower thing) was ever reachable to select,
+despite the error message referencing that exact name. Left as an
+honest, unresolved gap - shipped `lw_set_gi_radiosity_tolerance` anyway
+since the argument itself is confirmed correct (the same call succeeded
+without an argument-count error both times), following the same
+"ship the legitimate write, document the precondition honestly" call
+`lw_set_camera` made for its Motion-Blur-gated shutter properties before
+that gap was later closed.
+
+**A genuinely new operational finding, not specific to this item.**
+Tested all four new tools together via one parallel tool-call batch
+(`lw_set_render_globals(threads=2, tile_size=16)`,
+`lw_toggle_global_illumination()`, `lw_set_gi_interpolated(1)`,
+`lw_set_gi_radiosity_tolerance(30)`) - all four returned clean "sent"
+success responses with no errors. But Cmd History told a different
+story: `RenderThreads 2` and `RenderTileSize 16` logged correctly,
+`EnableRadiosity0` logged correctly, but `RadiosityInterpolation`
+logged as `0` - the OPPOSITE of the `1` actually sent - and
+`ObjGIRadiosityTolerance` never appeared in Cmd History at all, the
+same silent-drop symptom seen once already earlier in this same
+investigation (with a single, non-batched call). Immediately re-sent
+just `lw_set_gi_interpolated(1)` alone, sequentially - it logged
+correctly as `1` this time, and the "Interpolated" checkbox showed
+checked, confirming the tool itself was never wrong. This points to a
+real, if unsurprising in hindsight, characteristic of the Command
+Port: it's plain UDP, with no delivery or ordering guarantee, and this
+project's own tools already document every write as "one-way,
+fire-and-forget... no confirmation LightWave accepted it" - but this is
+the first time that abstract caveat manifested as a concretely
+observed, reproducible symptom (a wrong value logged, not just a
+missing one) rather than just a theoretical risk. Lesson for future
+work: sending several related settings together, whether via one
+`lw_run_command` sequence or several tool calls in one batch, should be
+verified afterward via a screenshot or read rather than trusting a
+clean batch of "sent" responses at face value - this project's own
+"one-way" framing is not merely a formality.
+
+`EnableRadiosity1` and the `RenderAlgorithm`/`RenderMode`/
+`Antialiasing`/`ColorSpaceOutput` families were surveyed (stub
+signatures checked, confirmed real-`*args` where applicable) but not
+tested live or wrapped this pass - no confident UI correspondence was
+found for most of them under the VPR renderer this install defaults to,
+and the item's core stated goal (thread/tile/GI quality control) was
+already substantially met by the four tools shipped. Left open for a
+future pass rather than guessed at.
+
+`ROADMAP3.md` item 3 is closed for the confirmed subset.

@@ -198,6 +198,31 @@ and what's explicitly out of scope.
   exact frame count matters. Also fixed a real bug: the counter was
   continuing to climb across separate renders in the same session
   instead of resetting. See `PLAN.md` for the full investigation.
+- **Render Globals / GI quality settings** (ROADMAP3.md item 3) -
+  `lw_set_render_globals(threads=, tile_size=)`, `lw_toggle_global_
+  illumination()`, `lw_set_gi_interpolated(enabled)`,
+  `lw_set_gi_radiosity_tolerance(degrees)`. Closes the biggest remaining
+  "can trigger renders but can't configure them" gap. `threads`/
+  `tile_size` confirmed live with zero preconditions - `threads` even
+  auto-unchecked "Automatic Multithreading" as a side effect.
+  `lw_toggle_global_illumination` confirmed live as a genuine
+  argument-less toggle for "Enable GI". `lw_set_gi_interpolated(1)`
+  confirmed live to check the "Interpolated" checkbox. `lw_set_gi_
+  radiosity_tolerance` hit a real, unresolved precondition - LightWave's
+  error dialog references a "Monte Carlo Interpolated" mode this
+  install's Type dropdown never actually offered as a selectable option
+  - shipped anyway since the argument itself is confirmed correct,
+  documented honestly rather than hidden.
+
+  **Real operational finding**: sending several of these tools together
+  in one parallel batch caused `RadiosityInterpolation` to log the wrong
+  value and `ObjGIRadiosityTolerance` to vanish from Cmd History
+  entirely - a UDP packet-reordering/loss artifact of the one-way
+  Command Port under concurrent load, not a bug in the tools (re-sending
+  the same call alone, sequentially, worked correctly). Verify important
+  settings via a screenshot/read after a batch of parallel writes rather
+  than trusting every "sent" response at face value. See `PLAN.md`
+  "Render Globals / GI / quality settings" for the full investigation.
   Bonus: `SetRenderDisplay` turns out to be scriptable after all
   (`lw_run_command("SetRenderDisplay", ["LW MCP Render Monitor"])`) -
   a wrapped-method bug, not a real LightWave limitation.

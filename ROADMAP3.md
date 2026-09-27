@@ -112,24 +112,57 @@ checking Cmd History against a real UI click first.
    item 8 used. See `PLAN.md` "Node Editor / PrincipledBSDF nodes" for
    the complete nine-step investigation.
 
-3. **Render Globals / GI / quality settings.** Right now this connector
-   can trigger a render (`lw_render_frame`/`lw_render_scene`) and read
-   completion state (`lw_get_render_status`), but has zero control over
-   render *quality* - every render runs at whatever settings a human
-   last configured in the UI. Real, confirmed-`*args` commands found
-   for: `RenderThreads(threads)`, `RenderTileSize`, `RenderAlgorithm`,
-   `RenderMode`, `Antialiasing(level)`/`MinAntialiasing`/
-   `MaxAntialiasing`, `RadiosityInterpolation(enabled)`,
-   `ObjGIRadiosityTolerance`, `ColorSpaceOutput`/`ColorSpaceOutputAlpha`/
-   `ColorSpaceOutputVPR`. Also found argument-less toggle candidates
-   needing live verification before use: `EnableRadiosity0`,
-   `EnableRadiosity1` (possibly two different radiosity passes/methods -
-   LightWave 2019's Global Illumination panel has multiple radiosity
-   algorithm options, worth checking Cmd History against the real UI
-   dropdown before assuming these are simple on/off toggles rather than
-   a `LightFalloffType`-style enum command with a wrong-looking
-   zero-arg wrapper), and `BakeRadiosityScene`. High value: this is the
-   biggest remaining "can run renders but can't configure them" gap.
+3. **Render Globals / GI / quality settings - DONE for the confirmed
+   subset, with two honest open findings.** Shipped
+   `lw_set_render_globals(threads=, tile_size=)`,
+   `lw_toggle_global_illumination()`, `lw_set_gi_interpolated(enabled)`,
+   and `lw_set_gi_radiosity_tolerance(degrees)`. Closes the biggest
+   remaining "can run renders but can't configure them" gap - this
+   connector could only trigger renders and read completion before this.
+
+   `RenderThreads`/`RenderTileSize` confirmed live with zero
+   preconditions - `tile_size` directly updated "Render Tile Size" (64 ->
+   32); `threads` updated "Multithreading Limit" AND correctly
+   auto-unchecked "Automatic Multithreading" as a side effect, cleaner
+   than `lw_set_camera`'s Motion Blur precondition ever was.
+   `EnableRadiosity0` confirmed live as a genuine argument-less toggle
+   for the "Enable GI" checkbox (Cmd History logged it bare, repeatedly).
+   `RadiosityInterpolation(1)` confirmed live to check the "Interpolated"
+   checkbox correctly.
+
+   `ObjGIRadiosityTolerance` (targets "Angular Tolerance") hit a real,
+   unresolved precondition: LightWave's own error dialog says it "only
+   applies when Global Illumination Mode is set to Monte Carlo
+   Interpolated" - but this install's "Type" dropdown only ever offered
+   one choice, "Monte Carlo", with no distinct "Monte Carlo Interpolated"
+   mode reachable to select, even after enabling GI and Interpolated
+   mode. Shipped anyway (the argument itself is confirmed correct),
+   following `lw_set_camera`'s Motion-Blur-gated-shutter-properties
+   precedent, with the gap honestly documented rather than papered over.
+
+   `EnableRadiosity1` and the whole `RenderAlgorithm`/`RenderMode`/
+   `Antialiasing` family/`ColorSpaceOutput` family were surveyed but not
+   tested or wrapped this pass - no clear UI correspondence was found
+   for most of them under VPR (LightWave's other render engines/AA
+   models may expose them differently), and this item's core stated goal
+   (render thread/tile/GI quality control) was already substantially
+   met. Left for a future pass rather than guessed at.
+
+   **Real operational finding, not specific to any one command**: sending
+   several `lw_run_command`-style calls in one parallel tool-call batch
+   risks UDP packet loss/reordering - confirmed live when four commands
+   sent together resulted in `RadiosityInterpolation` logging the wrong
+   value (`0` instead of the `1` actually sent) and
+   `ObjGIRadiosityTolerance` not appearing in Cmd History at all,
+   while the other two calls in the same batch worked correctly.
+   Re-sending the same `RadiosityInterpolation(1)` call alone,
+   sequentially, worked perfectly - confirming this was a delivery
+   artifact of the one-way, unordered UDP Command Port under
+   concurrent load, not a bug in any of the new tools. Worth remembering
+   for any future work that bundles several related settings into one
+   call or one batch of parallel calls - verify the end result via a
+   screenshot/read rather than trusting every "sent" response
+   uncritically when several went out at once.
 
 4. **Scene environment/atmosphere.** A coherent, entirely untouched
    category: `Backdrop`, `BackdropColor(r, g, b)`, `GradientBackdrop`,
