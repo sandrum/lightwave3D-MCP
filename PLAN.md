@@ -2296,3 +2296,89 @@ already substantially met by the four tools shipped. Left open for a
 future pass rather than guessed at.
 
 `ROADMAP3.md` item 3 is closed for the confirmed subset.
+
+## Scene environment/atmosphere (ROADMAP3.md item 4)
+
+Goal: `Backdrop`/`BackdropColor`/`GradientBackdrop`/`SkyColor`/
+`SkySqueezeColor` and the `Fog` family - a coherent, entirely untouched
+category for a scene's visual environment, separate from geometry and
+animation. Checked exact stub signatures first, as usual: most of the
+color/numeric commands were already correctly wrapped with real
+arguments; `Backdrop`/`GradientBackdrop`/`EnableVolumetricLights`/
+`EnableVolumetrics` were the bare zero-arg candidates needing live
+verification.
+
+**Found the real UI location via the left sidebar's "Backdrop ^F5"
+link**, which opens an "Effects" panel with Backdrop/Compositing/Legacy
+Volumetrics/Processing tabs. Opening it logged a bare `Backdrop` in Cmd
+History immediately - confirming `Backdrop()` is a panel-opener command,
+the same category as `SurfaceEditor`/`ItemProperties`, not a setting to
+wrap.
+
+**`GradientBackdrop` confirmed a genuine toggle** - unchecking the real
+"Gradient Backdrop" checkbox logged it bare, and the Zenith/Sky/Ground/
+Nadir Color fields correctly grayed out, confirming it gates them.
+
+**`BackdropColor`/`SkyColor` confirmed live with real color swatches** -
+`BackdropColor(1, 0, 0)` showed genuinely red (255/0/0); after
+re-enabling Gradient Backdrop, `SkyColor(0, 1, 0)` showed genuinely
+green. `ZenithColor`/`GroundColor`/`NadirColor` (same panel, identical
+confirmed `(red, green, blue)` signature) were found in the stub but not
+independently live-tested this pass, given how consistently this exact
+command shape has already proven correct twice in the same panel.
+
+**Fog turned out to live somewhere different than expected.** The
+"Legacy Volumetrics" tab of the Effects panel turned out to be a
+plugin-based add-on system (Ground Fog/HyperVoxels 3.0/PixieDust, added
+via an "Add Legacy Volumetric" dropdown) - a different mechanism
+entirely from the flat `FogType`/`FogColor`-style commands being
+investigated. The real match was found instead under Render Properties'
+"Volumetrics" tab (not "Legacy Volumetrics"), which has "Enable
+Volumetrics", "Fog Type", "Min/Max Distance", "Min/Max Amount", and "Fog
+Color" fields matching the survey's command list closely.
+
+**`EnableVolumetrics` confirmed a genuine toggle with a real, important
+precondition role.** Sent `FogType(1)`/`FogColor(0, 0, 1)` while
+"Enable Volumetrics" was unchecked - both were accepted without error
+and logged cleanly in Cmd History, but Fog Type stayed "Off" and Fog
+Color stayed white, no visible change at all. Sent `EnableVolumetrics()`
+- confirmed it checked the box. Resent `FogType(1)` alone - this time
+the dropdown correctly showed "Linear" (confirmed by clicking that exact
+entry and finding no new Cmd History line, meaning it was already
+correctly set to that value, just not freshly redrawn until interacted
+with). This is exactly the DOF/Motion Blur precondition shape from
+earlier roadmaps, now confirmed for the entire Volumetrics/Fog panel as
+a whole.
+
+**`FogColor` alone never visibly updated, even after the precondition
+was satisfied - a real, unresolved gap.** Resent `FogColor(0, 0, 1)`
+after `EnableVolumetrics` was confirmed checked and `FogType` was
+confirmed showing "Linear" - Cmd History logged it cleanly, but the Fog
+Color swatch stayed white (255/255/255), never showing blue. This is
+different from every other color command tested this session
+(`BackdropColor`/`SkyColor` both updated correctly), and different from
+`FogType`'s own initial staleness (which turned out to just need a UI
+interaction to redraw, not a real failure). Genuinely ambiguous whether
+this is a real no-op specific to `FogColor` or just a redraw quirk that
+would resolve with more UI interaction - left as an honest, explicitly
+flagged unconfirmed gap in `lw_set_fog`'s docstring rather than either
+overclaiming success or dropping the parameter entirely.
+
+Shipped four tools consolidating these findings: `lw_set_backdrop`,
+`lw_toggle_gradient_backdrop`, `lw_toggle_volumetrics`, `lw_set_fog`.
+Re-verified `lw_set_backdrop(color=[0,0,1])` and
+`lw_toggle_gradient_backdrop()` through the actual wrapped tools after a
+Claude Desktop restart - both logged correctly and the Backdrop Color
+swatch showed genuinely blue, confirming the wrappers introduce no bugs
+of their own.
+
+Per-light `LightVolumetricSamples`/`LightVolumetricIntensity` (natural
+extensions to `lw_set_light`, given Light Properties already showed
+"Volumetric Samples"/"Volumetric Intensity" fields in earlier
+`ROADMAP2.md` item 5 screenshots) and `EnableVolumetricLights` were
+surveyed and confirmed real signatures but not tested live or wrapped
+this pass - deliberately left for a future session rather than further
+extending an already-large item.
+
+`ROADMAP3.md` item 4 is closed for backdrop and fog, with `FogColor`'s
+gap honestly documented rather than resolved.

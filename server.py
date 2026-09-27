@@ -844,6 +844,151 @@ def lw_set_gi_radiosity_tolerance(degrees: float) -> str:
 
 
 @mcp.tool()
+def lw_set_backdrop(color: list = None, zenith_color: list = None, sky_color: list = None,
+                     ground_color: list = None, nadir_color: list = None) -> str:
+    """Set the scene's backdrop/environment colors (ROADMAP3.md item 4,
+    Effects > Backdrop panel). `color` is the flat Backdrop Color
+    (visible when Gradient Backdrop is off); `zenith_color`/`sky_color`/
+    `ground_color`/`nadir_color` are the four gradient stops (visible
+    when it's on - see lw_toggle_gradient_backdrop). Each is [r, g, b],
+    0.0-1.0.
+
+    `color` and `sky_color` confirmed live: `BackdropColor(1, 0, 0)`
+    correctly showed a red swatch (255/0/0); `SkyColor(0, 1, 0)`
+    correctly showed green, both with zero precondition.
+    `zenith_color`/`ground_color`/`nadir_color` (ZenithColor/GroundColor/
+    NadirColor) were NOT independently tested live this session - they
+    share the identical `(red, green, blue)` 3-arg signature already
+    confirmed twice for `BackdropColor`/`SkyColor` in this same panel,
+    so treat them as high-confidence by pattern, not independently
+    verified."""
+    lw = _layout()
+    sent = []
+    try:
+        if color is not None:
+            lw.BackdropColor(*color)
+            sent.append("BackdropColor")
+        if zenith_color is not None:
+            lw.ZenithColor(*zenith_color)
+            sent.append("ZenithColor")
+        if sky_color is not None:
+            lw.SkyColor(*sky_color)
+            sent.append("SkyColor")
+        if ground_color is not None:
+            lw.GroundColor(*ground_color)
+            sent.append("GroundColor")
+        if nadir_color is not None:
+            lw.NadirColor(*nadir_color)
+            sent.append("NadirColor")
+        return json.dumps({"result": "set %s" % sent})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_toggle_gradient_backdrop() -> str:
+    """Flip the "Gradient Backdrop" checkbox (Effects > Backdrop)
+    (ROADMAP3.md item 4). Wraps GradientBackdrop - confirmed live to be
+    a genuine argument-less TOGGLE (Cmd History logged it bare after
+    clicking the real checkbox on and off). No way to read current
+    state back, so this flips rather than sets - same limitation as
+    every other confirmed toggle in this connector.
+
+    Also found live: `Backdrop()` (no relation to this toggle despite
+    the similar name) is NOT a setting at all - opening the Effects >
+    Backdrop panel itself logged a bare `Backdrop` command, meaning it's
+    a panel-opener like `SurfaceEditor`/`ItemProperties`, not wrapped
+    here."""
+    try:
+        _layout().GradientBackdrop()
+        return json.dumps({"result": "toggled GradientBackdrop"})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_toggle_volumetrics() -> str:
+    """Flip the "Enable Volumetrics" checkbox (Render Properties >
+    Volumetrics) (ROADMAP3.md item 4). Wraps EnableVolumetrics -
+    confirmed live to be a genuine argument-less TOGGLE. No way to read
+    current state back, so this flips rather than sets.
+
+    Real precondition confirmed live for the whole Volumetrics panel,
+    including Fog (lw_set_fog): every field under this checkbox
+    (Fog Type, Fog Color, etc.) reads/shows as disabled/default until
+    this is checked - sending Fog settings before checking this has no
+    visible effect, confirmed live by sending FogType/FogColor before
+    enabling Volumetrics and seeing no change, then resending the exact
+    same values after enabling it and seeing FogType correctly update
+    to "Linear". Call this once before lw_set_fog if Volumetrics isn't
+    already enabled."""
+    try:
+        _layout().EnableVolumetrics()
+        return json.dumps({"result": "toggled EnableVolumetrics"})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_set_fog(fog_type: int = None, min_distance: float = None, max_distance: float = None,
+               min_amount: float = None, max_amount: float = None, color: list = None) -> str:
+    """Set scene fog (Render Properties > Volumetrics > Fog Type/Min-Max
+    Distance/Min-Max Amount/Fog Color) (ROADMAP3.md item 4). `color` is
+    [r, g, b], 0.0-1.0. Requires "Enable Volumetrics" checked first (see
+    lw_toggle_volumetrics) - confirmed live that Fog settings sent
+    before enabling it have no visible effect, even though they're
+    accepted without error and logged in Cmd History.
+
+    `fog_type` confirmed live and its enum mapping confirmed by
+    selecting the matching UI dropdown entry after sending it:
+    `fog_type=1` correctly showed "Linear" in the dropdown (0 is
+    presumably "Off", matching the dropdown's default/unset state, but
+    that specific value was never explicitly sent and confirmed - the
+    dropdown also lists "Nonlinear 1"/"Nonlinear 2"/"Realistic", whose
+    numeric values were not tested). `min_distance`/`max_distance`/
+    `min_amount`/`max_amount` (FogMinDistance/FogMaxDistance/
+    FogMinAmount/FogMaxAmount) were NOT independently tested live -
+    same confirmed-`*args` signature shape as every other command in
+    this survey, shipped by pattern-confidence, not verified.
+
+    `color` (FogColor) has a real, unresolved gap: sent successfully
+    (logged cleanly in Cmd History, no error) both before AND after
+    enabling Volumetrics, but the Fog Color swatch never visibly updated
+    from its default white (255/255/255) in either case, unlike
+    BackdropColor/SkyColor/FogType, which all updated correctly under
+    the same connector. Left shipped rather than removed, since the
+    command is accepted without error and the failure mode is
+    ambiguous (could be a UI redraw lag rather than a real no-op,
+    similar to FogType's own initial-looking staleness that turned out
+    to just need a UI interaction to redraw) - but treat this
+    specifically as unconfirmed, not working, until verified further."""
+    lw = _layout()
+    sent = []
+    try:
+        if fog_type is not None:
+            lw.FogType(fog_type)
+            sent.append("FogType")
+        if min_distance is not None:
+            lw.FogMinDistance(min_distance)
+            sent.append("FogMinDistance")
+        if max_distance is not None:
+            lw.FogMaxDistance(max_distance)
+            sent.append("FogMaxDistance")
+        if min_amount is not None:
+            lw.FogMinAmount(min_amount)
+            sent.append("FogMinAmount")
+        if max_amount is not None:
+            lw.FogMaxAmount(max_amount)
+            sent.append("FogMaxAmount")
+        if color is not None:
+            lw.FogColor(*color)
+            sent.append("FogColor")
+        return json.dumps({"result": "set %s" % sent})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
 def lw_set_camera(camera: str, zoom_factor: float = None, f_stop: float = None,
                    aperture_height: float = None, shutter_open: float = None,
                    shutter_efficiency: float = None, rolling_shutter: float = None) -> str:

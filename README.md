@@ -226,6 +226,28 @@ and what's explicitly out of scope.
   Bonus: `SetRenderDisplay` turns out to be scriptable after all
   (`lw_run_command("SetRenderDisplay", ["LW MCP Render Monitor"])`) -
   a wrapped-method bug, not a real LightWave limitation.
+- **Scene environment/atmosphere** (ROADMAP3.md item 4) -
+  `lw_set_backdrop(color=, zenith_color=, sky_color=, ground_color=,
+  nadir_color=)`, `lw_toggle_gradient_backdrop()`,
+  `lw_toggle_volumetrics()`, `lw_set_fog(fog_type=, min_distance=,
+  max_distance=, min_amount=, max_amount=, color=)`. `Backdrop()`
+  (despite the central-looking name) turned out to just be a panel-opener
+  like `SurfaceEditor` - opening Effects > Backdrop logged it bare, not a
+  setting. `GradientBackdrop` confirmed a genuine toggle;
+  `BackdropColor`/`SkyColor` confirmed live with real color swatches
+  (red, then green). Fog lives under Render Properties > Volumetrics
+  (not the "Legacy Volumetrics" Effects tab, which turned out to be an
+  unrelated plugin-based system - Ground Fog/HyperVoxels/PixieDust) -
+  `EnableVolumetrics` confirmed a genuine toggle that gates the *entire*
+  Fog panel as a precondition, same shape as DOF/Motion Blur; `FogType`
+  confirmed live with enum value `1` = "Linear".
+
+  **Real, unresolved gap**: `FogColor` is accepted and logged cleanly in
+  Cmd History both before and after satisfying the Volumetrics
+  precondition, but the swatch never visibly updates - unlike every
+  other color command tested this item. Shipped with this explicitly
+  flagged as unconfirmed rather than proven working. See `PLAN.md`
+  "Scene environment/atmosphere" for the full investigation.
 
 **Modeler**
 - `modeler_run_command` - same pattern as `lw_run_command` but for

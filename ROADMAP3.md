@@ -164,20 +164,45 @@ checking Cmd History against a real UI click first.
    screenshot/read rather than trusting every "sent" response
    uncritically when several went out at once.
 
-4. **Scene environment/atmosphere.** A coherent, entirely untouched
-   category: `Backdrop`, `BackdropColor(r, g, b)`, `GradientBackdrop`,
-   `SkyColor(r, g, b)`, `SkySqueezeColor`, and a full `Fog` family -
-   `FogType(type)`, `FogMinDistance`/`FogMaxDistance`/`FogMinAmount`/
-   `FogMaxAmount`(all confirmed `*args`-taking), `FogColor(r, g, b)`,
-   plus `FogLevel` (not yet checked for argument shape). Also
-   `EnableVolumetricLights`/`EnableVolumetrics` (argument-less,
-   unverified) and per-light `LightVolumetricSamples`/
-   `LightVolumetricIntensity` (real `*args` commands, natural
-   extensions to `lw_set_light` alongside `LightConeAngle` etc. - Light
-   Properties already showed "Volumetric Samples"/"Volumetric
-   Intensity" fields in earlier screenshots from this project's light
-   work, never wired up). Real value for anyone using this connector to
-   set up a scene's look, not just its geometry/animation.
+4. **Scene environment/atmosphere - DONE for backdrop and fog, one real
+   unresolved color-write gap found.** Shipped `lw_set_backdrop(color=,
+   zenith_color=, sky_color=, ground_color=, nadir_color=)`,
+   `lw_toggle_gradient_backdrop()`, `lw_toggle_volumetrics()`, and
+   `lw_set_fog(fog_type=, min_distance=, max_distance=, min_amount=,
+   max_amount=, color=)`.
+
+   Found live that `Backdrop()` (despite its central-looking name) is
+   just a panel-opener, matching `SurfaceEditor`/`ItemProperties` -
+   opening Effects > Backdrop itself logged a bare `Backdrop`, not a
+   setting to wrap. `GradientBackdrop` confirmed a genuine argument-less
+   toggle. `BackdropColor`/`SkyColor` confirmed live with correct color
+   swatches (red, then green); `ZenithColor`/`GroundColor`/`NadirColor`
+   share the identical confirmed 3-arg signature but weren't
+   independently tested this pass.
+
+   `EnableVolumetrics` confirmed a genuine toggle, and confirmed to gate
+   the *entire* Fog panel as a real precondition - Fog settings sent
+   before enabling it are silently accepted (no error, logged cleanly in
+   Cmd History) but have zero visible effect, exactly the DOF/Motion
+   Blur precondition shape from earlier roadmaps. `FogType` confirmed
+   live with its enum value `1` mapped to "Linear" by directly selecting
+   that dropdown entry afterward. `FogMinDistance`/`FogMaxDistance`/
+   `FogMinAmount`/`FogMaxAmount` share the same confirmed signature shape
+   but weren't independently tested.
+
+   **`FogColor` has a real, unresolved gap**: sent successfully both
+   before and after enabling Volumetrics, logged cleanly both times, but
+   the Fog Color swatch never visibly updated from its default white -
+   unlike every other color command tested this item. Shipped anyway
+   (accepted without error, ambiguous whether this is a real no-op or
+   just a UI redraw lag like `FogType` briefly appeared to have) but
+   explicitly flagged as unconfirmed, not proven working.
+
+   Per-light `LightVolumetricSamples`/`LightVolumetricIntensity` (natural
+   extensions to `lw_set_light`) and `EnableVolumetricLights` were
+   surveyed but not wrapped this pass - left for a future session rather
+   than further extending an already-large item. See `PLAN.md` "Scene
+   environment/atmosphere" for the complete investigation.
 
 5. **Per-object render-visibility flags - DONE, plus a real stub bug and
    a genuine surprise finding.** Shipped `lw_toggle_object_visibility(
