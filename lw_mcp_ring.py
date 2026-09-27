@@ -387,6 +387,100 @@ def _probe_channels(name):
     }
 
 
+_MAX_CHANNELS_PER_ITEM = 20
+_MAX_KEYS_PER_CHANNEL = 500
+
+
+def _get_channels(name):
+    """ROADMAP2.md item 9 - the real, shipped feature this whole
+    investigation was building toward: an item's channel/keyframe
+    structure (which frames have keys, what value, what interpolation
+    shape), closing the gap lw_get_transform's single-point-in-time
+    evaluation always had.
+
+    Built entirely on mechanisms confirmed safe by explicit,
+    user-approved live testing first (see PLAN.md 'Keyframe/envelope
+    reading' for the full staged investigation, matching this project's
+    standing rule for this exact SDK area - the one place with a
+    confirmed real crash, LWChannelInfo/nextGroup, see 'LWChannelInfo
+    crash'):
+      - LWItemInfo().chanGroup(item) is the item's OWN channel group -
+        confirmed live that LWChannelInfo().nextChannel(chanGroup(item),
+        None) directly enumerates the item's own channels (Position.X,
+        Position.Y, ...), no LWChannelInfo().nextGroup() hop needed at
+        all for this purpose (nextGroup instead walks to OTHER, related
+        groups - e.g. a child bone's own group - confirmed by name via
+        groupName(), not needed here).
+      - nextChannel(group, prev)/nextKey(envelope, prev): prev=None for
+        the first result, the previous real result to continue: a
+        second real call in both cases returned a genuine next
+        result (channel: "Position.Y"; a fresh confirmation the pattern
+        continues correctly, not just works once) and confirmed live
+        that Python None (not a crash, not an exception, not
+        LWITEM_NULL) is the reliable "no more" sentinel, obtained on a
+        channel with a single implicit key.
+      - keyGet(envelope, key, LWKEY_TIME/VALUE/SHAPE) returns a 2-element
+        [status, value] list, not a bare value - confirmed live
+        (originally miscalled as keyGet(key, param), a 3-arg call that
+        raised a clean, catchable "takes exactly 4 arguments" error, not
+        a crash - fixed to keyGet(envelope, key, param)).
+
+    Bounded the same way _get_bones is (a fixed cap far above any
+    realistic real count, as a safety margin against a hypothetical
+    malformed/circular list hanging the loop, not because normal data
+    should ever approach it) rather than trusting an unbounded while
+    True. key "time" is converted from raw seconds to a frame number via
+    LWSceneInfo().framesPerSecond, the same convention _get_current_time
+    already established, alongside the raw seconds value for anyone who
+    needs it. "shape" is the raw LWKEY_SHAPE integer (matching the Graph
+    Editor's interpolation curve types) - not translated to a name here,
+    since no confirmed mapping of those integers to LightWave's own
+    labels (TCB/Linear/Stepped/etc.) was established this session; do
+    not guess at that mapping without live verification against a key
+    with a known, UI-set interpolation type."""
+    item = _find_item(name)
+    if item is None:
+        return {"error": "item not found: %s" % name}
+    ii = lwsdk.LWItemInfo()
+    ci = lwsdk.LWChannelInfo()
+    ef = lwsdk.LWEnvelopeFuncs()
+    fps = lwsdk.LWSceneInfo().framesPerSecond
+
+    group = ii.chanGroup(item)
+    channels = []
+    chan = None
+    chan_count = 0
+    while chan_count < _MAX_CHANNELS_PER_ITEM:
+        chan = ci.nextChannel(group, chan)
+        if chan is None:
+            break
+        chan_count += 1
+        env = ci.channelEnvelope(chan)
+        keys = []
+        key = None
+        key_count = 0
+        while key_count < _MAX_KEYS_PER_CHANNEL:
+            key = ef.nextKey(env, key)
+            if key is None:
+                break
+            key_count += 1
+            _, t = ef.keyGet(env, key, lwsdk.LWKEY_TIME)
+            _, v = ef.keyGet(env, key, lwsdk.LWKEY_VALUE)
+            _, shape = ef.keyGet(env, key, lwsdk.LWKEY_SHAPE)
+            keys.append({
+                "time_seconds": t,
+                "frame": t * fps if fps else None,
+                "value": v,
+                "shape": shape,
+            })
+        channels.append({
+            "name": ci.channelName(chan),
+            "type": ci.channelType(chan),
+            "keys": keys,
+        })
+    return {"name": name, "channels": channels}
+
+
 def _resolve_name(ii, item_id):
     """None for LWITEM_NULL (no relationship set), otherwise the item's
     name. Isolated so a bad/unexpected ID degrades to None instead of
@@ -637,6 +731,8 @@ def _handle_query(text):
             payload = {"result": _set_surface(arg)}
         elif command == "probe_channels":
             payload = {"result": _probe_channels(arg or "TransformTest")}
+        elif command == "get_channels":
+            payload = {"result": _get_channels(arg or "TransformTest")}
         elif command == "probe_surf":
             payload = {"result": _probe_surf_constants()}
         elif command == "get_render_status":

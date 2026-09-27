@@ -292,15 +292,61 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    diagnosis from the live symptom alone. See `PLAN.md` "Surface/
    material writes" for the full investigation.
 
-9. **Keyframe/envelope reading** - `lw_get_transform` only reports the
-   evaluated value at one point in time (now via the live playhead, see
-   ROADMAP.md item 9); there's no way to see the actual keyframe
-   structure of an item's channels - which frames have keys, what
-   interpolation type each uses. Real value for inspecting existing
-   animation rather than just sampling it. Last on purpose: this is
-   `LWChannelInfo`-adjacent territory, the exact SDK area that has
-   already crashed Layout outright once with no Python exception (see
-   PLAN.md "LWChannelInfo crash"). Do this only with the same staged,
-   cautious probing bone traversal got (ROADMAP.md item 11) - confirm
-   the mechanism exists and a single call is safe before writing any
-   real loop - once the rest of this list is solid.
+9. **Keyframe/envelope reading - DONE.** Shipped `lw_get_channels(name)`,
+   closing the gap `lw_get_transform`'s single-point-in-time evaluation
+   always had: now the actual keyframe structure (which frames have
+   keys, what value, what interpolation shape) is readable, not just a
+   sampled value at one instant. This was `LWChannelInfo`-adjacent
+   territory, the exact SDK area that had already crashed Layout outright
+   once with no Python exception (see `PLAN.md` "LWChannelInfo crash") -
+   handled with the same staged, cautious, explicitly-user-approved
+   probing bone traversal got (ROADMAP.md item 11), one single call at a
+   time, each confirmed safe before the next.
+
+   Root cause of the original crash finally found: it passed an item's
+   own NodeID (from `LWItemInfo`) as `nextGroup`'s first argument - never
+   confirmed to be the right ID *type*. `LWItemInfo().chanGroup(item)`
+   (found in an unrelated introspection dump from item 7) turned out to
+   be the correct argument - confirmed live, safely, in stages: first a
+   read-only `dir()` check (no SDK call at all), then one explicitly
+   approved `nextGroup(chanGroup_result, None)` call (succeeded, no
+   crash), then `groupName()` on the result (real data: `"Bone1"`), then
+   a second reconnaissance step confirming `nextChannel`/`nextKey` are
+   also safe and that Python `None` (not a crash) is the reliable
+   "no more results" sentinel, then the real bounded traversal loop
+   (matching `_get_bones`'s safety-margin-cap pattern) built and shipped
+   once every individual piece was proven.
+
+   Confirmed live two ways: a static, unkeyed Null correctly showed all
+   9 channels with one implicit key each at frame 0 (real LightWave
+   defaults - Position 0.0, Rotation 0.0, Scale 1.0). A Null keyframed at
+   frames 0 and 30 (position only, via `lw_set_keyframe`) correctly
+   showed the real multi-key data, and surfaced a genuinely new,
+   previously-unobservable LightWave behavior in the process: every
+   channel also gets an automatic extra key at the scene's configured
+   end frame, and a channel whose value never actually changed between
+   the two keyframe calls (Rotation/Scale here) gets only that end-frame
+   key, not a redundant real one - LightWave's `CreateKey` appears to
+   skip adding a keyframe when the value hasn't moved. See `PLAN.md`
+   "Keyframe/envelope reading" for the complete staged investigation.
+
+## Status: all 9 items done
+
+Item 6 turned out to have a mixed result (`AddToSelection` genuinely
+works, but doesn't unlock batched writes the way it was hoped to).
+Item 8 had a real scare mid-investigation (a false "hangs forever"
+diagnosis that looked exactly like this project's one other crash,
+caught and corrected via a standalone regex test rather than trusted on
+pattern-match alone). Item 9 closed out this project's oldest deferred
+risk by finally root-causing the original `LWChannelInfo` crash - wrong
+argument type, not a fundamentally broken API - through the same
+staged, explicitly-approved, one-call-at-a-time discipline item 7's
+bone-ID work and ROADMAP.md item 11's bone traversal already
+established. Every other item shipped as originally scoped. Combined
+with `ROADMAP.md`, this connector now covers writes and reads across
+scene management, item creation/loading, hierarchy and IK, cameras,
+lights, surfaces, selection, and animation/keyframe structure - the
+remaining confirmed, documented dead ends are Modeler reads
+(`ROADMAP.md` item 5) and the still-open, deliberately-not-guessed-at
+`SelectItem 40010000`/possible-object-index-formula thread from items 3
+and 7.

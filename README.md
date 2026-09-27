@@ -77,9 +77,30 @@ and what's explicitly out of scope.
   by name. Useful before rigging on top of something already parented.
   **Now also walks bone chains within each object** (`LWItemInfo.first(
   LWI_BONE, object)`/`next()`) - confirmed live and safe against a real
-  2-bone chain, unlike `LWChannelInfo`/`nextGroup`, which crashed
-  Layout outright (see `PLAN.md`). Bones don't need a real mesh object
-  to test against - `AddBone`/`AddChildBone` attach directly to a Null.
+  2-bone chain. `LWChannelInfo`/`nextGroup` also crashed Layout outright
+  once (see `PLAN.md` "LWChannelInfo crash") - since resolved, see
+  `lw_get_channels` below. Bones don't need a real mesh object to test
+  against - `AddBone`/`AddChildBone` attach directly to a Null.
+- `lw_get_channels(name)` (ROADMAP2.md item 9) - an item's real keyframe/
+  envelope structure: which channels exist (Position.X, Rotation.H,
+  etc.) and every keyframe's frame, value, and interpolation shape.
+  Closes the last gap `lw_get_transform`'s single-point-in-time
+  evaluation always had. Root-caused this project's one confirmed real
+  crash in the process: the original `LWChannelInfo().nextGroup()` crash
+  had passed an item's own ID as the argument, when
+  `LWItemInfo().chanGroup(item)` was the correct one all along - found
+  via an unrelated introspection dump, confirmed safe via the same
+  staged, explicitly-approved, one-call-at-a-time discipline
+  `lw_get_hierarchy`'s bone traversal used. Confirmed live two ways: a
+  static Null showed all 9 channels with one implicit key each at frame
+  0 (real LightWave defaults); a Null keyframed at frames 0 and 30
+  showed the real multi-key data, and surfaced a genuinely new,
+  previously-unobservable behavior - every channel gets an automatic
+  extra key at the scene's end frame, and a channel whose value never
+  actually changed only gets that bonus key, not a redundant real one.
+  `shape` is the raw `LWKEY_SHAPE` integer (no confirmed name mapping
+  established). See `PLAN.md` "Keyframe/envelope reading" for the full
+  staged investigation.
 - `lw_get_current_time` - the live playhead's frame and time (seconds).
 
   **Formerly a known limitation, now solved:** camera/light/transform

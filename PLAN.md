@@ -1730,3 +1730,162 @@ together rather than being purely incidental overhead.
 
 `ROADMAP2.md` item 8 is closed. `lw_set_surface` ships fully functional;
 `lw_introspect` (temporary) has been removed, its job done.
+
+## Keyframe/envelope reading (ROADMAP2.md item 9)
+
+Goal: `lw_get_channels`, closing the last real gap `lw_get_transform`'s
+single-point-in-time evaluation always had - seeing the actual keyframe
+structure of an item's channels (which frames have keys, what value,
+what interpolation shape), not just a value sampled at the live
+playhead. Deliberately last on this roadmap: this is `LWChannelInfo`-
+adjacent territory, the exact SDK area with this project's one
+confirmed real crash (`LWChannelInfo().nextGroup()`, see "LWChannelInfo
+crash" above) - `_probe_channels` had been sitting as a permanently
+disabled stub since ROADMAP.md item 1b, blocked "until NewTek's actual
+SDK docs/header... can be consulted, or until someone finds a working
+reference sample."
+
+**A genuinely new lead, found by reviewing an unrelated introspection
+dump.** The original crash passed an item's own `NodeID` (from
+`LWItemInfo`, e.g. via `_find_item`) as `nextGroup`'s first argument -
+this was always just "the only ID this connector had on hand," never
+confirmed to be the *correct* ID type for that call. Item 7's IK
+investigation had incidentally dumped `dir(lwsdk.LWItemInfo())` for an
+unrelated reason and it included a `chanGroup` method, never tried
+before. This was the concrete, specific, non-speculative reason to
+revisit an area that had been correctly left alone for the rest of the
+project up to this point.
+
+**Staged the risk down exactly the way ROADMAP.md item 11's bone
+traversal did, with explicit user approval at every step involving a
+previously-untested call in this SDK area:**
+
+1. **Read-only recon, zero SDK risk.** `LWItemInfo().chanGroup(item)` is
+   a plain getter, already proven-safe-in-spirit (same class as
+   `_get_transform`'s `param()`, `_get_hierarchy`'s `parent()`/
+   `target()`/`goal()`/`pole()`). Called it and reported its `repr()`/
+   `type()` without ever touching `LWChannelInfo`. Confirmed live:
+   returns a `NodeID`-typed SWIG object - same *type* as an item's own
+   ID, but a genuinely different underlying handle (different memory
+   address), a real, distinct value worth trying.
+
+2. **The single cautious call, explicitly approved first.** Asked the
+   user directly: "this carries real risk of crashing Layout again... do
+   you want me to attempt this?" Only proceeded after an explicit yes.
+   Called `LWChannelInfo().nextGroup(chanGroup_result, None)` - logging
+   immediately before and after, the same discipline the original crash
+   investigation used, so a crash this time would leave the same kind of
+   forensic evidence instead of a mysterious gap. Confirmed live: it
+   returned a real result, no crash, `lw_ping` succeeded immediately
+   after. The `chanGroup()` hypothesis was correct - the original crash
+   really was just the wrong argument type, not a fundamentally broken
+   API.
+
+3. **One more simple getter, still no loop.** Tried `groupName()` on
+   both the starting `chanGroup` and the `nextGroup` result. Confirmed
+   live: real, meaningful names - the starting group was named
+   `"BoneTestObject"` (the item's own name) and the `nextGroup` result
+   was named `"Bone1"` (a child bone). This showed `nextGroup` walks to
+   OTHER, related channel groups (e.g. a bone's own group), not
+   something needed to reach an item's own channels.
+
+4. **A safe, read-only `dir(lwsdk)` scan** (no live SDK calls, no
+   item/channel touched) before designing anything further, to check
+   whether a real keyframe-reading API even existed: confirmed live that
+   `lwsdk.LWEnvelopeFuncs` exists, along with `LWKEY_TIME`/`LWKEY_VALUE`/
+   `LWKEY_SHAPE`/`LWKEY_TAN_IN`/`LWKEY_TAN_OUT`/`LWKEY_TENSION`/
+   `LWKEY_CONTINUITY`/`LWKEY_PARAM_0..3` and `LWENVTAG_KEYCOUNT`
+   constants. Also dumped `dir(lwsdk.LWEnvelopeFuncs())` itself (still
+   just Python introspection on a fresh object, zero risk) and found
+   `nextKey`/`prevKey`/`keyGet`/`findKey` alongside the expected write-
+   side methods (`createKey`/`keySet`/etc., not touched - out of scope
+   for a read-only feature).
+
+5. **The combined chain, explicitly approved given two still-untested
+   calls (`nextChannel`, `nextKey`) in this same SDK area.** Asked
+   directly before running it, since chaining untested calls together
+   compounds the crash risk even though each followed the exact
+   "start handle + `None` prev" shape already proven safe for
+   `nextGroup`. Logged before/after every individual call, not just the
+   whole function. Confirmed live: `nextChannel(chanGroup(item), None)`
+   -> real channel named `"Position.X"`; `channelEnvelope()` -> real
+   envelope; `nextKey(envelope, None)` -> real key. `keyGet(key, param)`
+   (2 args) failed with a clean, catchable `"takes exactly 4 arguments
+   (3 given)"` - not a crash, just a wrong call shape, fixed to
+   `keyGet(envelope, key, param)`. Retried: `key_time`/`key_value`/
+   `key_shape` all came back as `[1, value]` (a `[status, value]` pair,
+   not a bare value).
+
+6. **Clarified the group hierarchy before building the real loop.**
+   The chain above went `chanGroup(item)` -> `nextGroup` -> `nextChannel`
+   - i.e. it had been reading `"Bone1"`'s channels, not the item's own.
+   Tested `nextChannel(chanGroup(item), None)` DIRECTLY, skipping
+   `nextGroup` entirely: also returned `"Position.X"` - confirming
+   `chanGroup(item)` is already the traversable group for the item's OWN
+   channels, and `nextGroup` is for something else (sibling/related
+   groups, e.g. bones) not needed for this feature at all. This
+   simplified the real implementation to not need `nextGroup` in the
+   final version.
+
+7. **The remaining unknown: what does "no more results" look like?**
+   Every test so far only ever asked for the *first* result
+   (`prev=None`). Explicitly flagged this gap and asked before testing
+   it. Confirmed live, with the user's go-ahead: a second call to
+   `nextChannel(group, first_channel)` returned a genuine second channel
+   (`"Position.Y"` - the pattern continues correctly, not a one-shot
+   fluke), and a second call to `nextKey(envelope, first_key)` on a
+   channel with only one implicit key returned Python `None` cleanly -
+   not a crash, not `LWITEM_NULL`, not an exception. `None` is the
+   reliable loop-termination sentinel for both.
+
+**With every individual piece proven safe, built and shipped the real
+feature**: `lw_get_channels(name)`, a bounded double loop (channels,
+then keys per channel) capped the same way `_get_bones` is
+(`_MAX_CHANNELS_PER_ITEM = 20`, `_MAX_KEYS_PER_CHANNEL = 500` - generous
+safety margins, not expected to ever bind on real data) rather than an
+unbounded `while True`. `time` is converted from raw seconds to a frame
+number via `LWSceneInfo().framesPerSecond`, matching
+`_get_current_time`'s existing convention; raw seconds is also
+included. `shape` is left as the raw `LWKEY_SHAPE` integer - no
+confirmed mapping to LightWave's own interpolation names (TCB/Linear/
+Stepped/etc.) was established this session, and guessing at one would
+repeat exactly the mistake this whole investigation was staged to
+avoid.
+
+**Confirmed live two ways.** A static, never-keyframed Null
+(`BoneTestObject`) correctly showed all 9 channels (Position/Rotation/
+Scale x/y/z) each with exactly one implicit key at frame 0, holding
+LightWave's real defaults (Position 0.0, Rotation 0.0, Scale 1.0) - a
+clean baseline case. Then created a fresh Null
+(`KeyframeTestNull`) and keyframed it via `lw_set_keyframe` at frame 0
+(position `[0,0,0]`) and frame 30 (position `[10,5,0]`, rotation/scale
+untouched). `lw_get_channels` correctly showed the real multi-key data
+for Position.X/Y/Z (three keys each: frame 0, frame 30, and a bonus
+key - see below) - and surfaced a genuinely new, previously-
+unobservable LightWave behavior in the process:
+
+- Every channel, including ones never explicitly touched, got an extra
+  key at `frame 900` (30 seconds at this scene's 30fps) - the scene's
+  configured end frame - holding whatever its last value was. This
+  looks like LightWave automatically bookending any keyed item's
+  channels at the scene's range boundary, presumably to stop animation
+  from extrapolating unexpectedly past the keyed range.
+- Rotation.H/P/B and Scale.X/Y/Z - never explicitly set to a different
+  value in either `lw_set_keyframe` call - show only TWO keys (frame 0
+  and the frame-900 bonus key), not three. `CreateKey` at frame 30
+  appears to skip adding a real keyframe on a channel whose value hasn't
+  actually changed since the previous key, rather than stamping a
+  redundant one everywhere.
+
+Neither of these was possible to observe before this tool existed -
+`lw_get_transform` can only ever report a channel's evaluated value at
+one instant, never whether a real key exists at a given frame or how
+many there are.
+
+`ROADMAP2.md` item 9 is closed - the last item on this roadmap. All
+four temporary diagnostic tools built during the staged investigation
+(`lw_probe_chan_group`, `lw_probe_next_group`, `lw_probe_envelope_api`,
+`lw_probe_keyframes`) have been removed, their job done; the original
+`_probe_channels` stub from ROADMAP.md item 1b is left in place as the
+permanent historical record of the crash this whole investigation
+finally explained.

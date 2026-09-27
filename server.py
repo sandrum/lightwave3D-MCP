@@ -569,6 +569,49 @@ def lw_probe_channels(name: str = "TransformTest") -> str:
 
 
 @mcp.tool()
+def lw_get_channels(name: str) -> str:
+    """Get an item's real keyframe/envelope structure - which channels
+    exist (Position.X, Rotation.H, etc.), and for each, every keyframe's
+    frame/time, value, and interpolation shape (ROADMAP2.md item 9).
+    Closes the gap lw_get_transform's single-point-in-time evaluation
+    always had: that tool only ever reports the value at one instant,
+    this reports the actual underlying keyframe data.
+
+    Built on LWChannelInfo/LWEnvelopeFuncs, the exact SDK area with this
+    project's one other confirmed real crash (LWChannelInfo().nextGroup
+    called with an item's own ID - see PLAN.md 'LWChannelInfo crash').
+    That crash is NOT re-triggered here: this uses
+    LWItemInfo().chanGroup(item) (confirmed live to directly enumerate
+    an item's own channels via nextChannel, no nextGroup() call needed
+    at all for this purpose) plus nextKey/keyGet on each channel's
+    envelope - every one of these calls was explicitly tested live, with
+    user approval given the crash history, before this real bounded loop
+    was written; see PLAN.md 'Keyframe/envelope reading' for the full
+    staged investigation. "shape" is the raw LWKEY_SHAPE integer
+    (LightWave's own interpolation-curve type, as seen in the Graph
+    Editor) - not translated to a name, since no confirmed mapping was
+    established this session. "frame" is derived from the raw seconds
+    value via LWSceneInfo().framesPerSecond, the same convention
+    lw_get_current_time already uses; "time_seconds" is also included.
+
+    Confirmed live two ways: a static, never-keyframed Null correctly
+    showed all 9 channels with exactly one implicit key each at frame 0
+    (Position 0.0, Rotation 0.0, Scale 1.0 - LightWave's real defaults).
+    A Null keyframed via lw_set_keyframe at frames 0 and 30 (position
+    only) correctly showed the real multi-key data - and surfaced a
+    genuinely new, previously-unobservable LightWave behavior: every
+    channel also got an extra key at the scene's configured end frame
+    (holding its last value), and channels whose value never actually
+    changed between the two lw_set_keyframe calls (Rotation/Scale) got
+    only that end-frame key, not a redundant real one at frame 30 -
+    LightWave's CreateKey appears to skip adding a keyframe when the
+    value hasn't changed. This was invisible before this tool existed,
+    since lw_get_transform can only sample a value, never see whether a
+    real key exists at a given frame."""
+    return json.dumps(_query("get_channels", name))
+
+
+@mcp.tool()
 def lw_probe_surf() -> str:
     """DIAGNOSTIC, temporary: lists SURF_* constants from lwsdk, routed
     through lw_mcp_ring.py. Will be replaced by lw_get_surface_info."""
