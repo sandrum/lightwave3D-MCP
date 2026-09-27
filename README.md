@@ -28,8 +28,10 @@ and what's explicitly out of scope.
   its file content referenced the actual items with correct numeric
   IDs, cleared the scene, reloaded it, and confirmed every item came
   back. Loading from outside LightWave's configured Content Directory
-  pops a blocking "Change Content Directory?" dialog a one-way command
-  can't dismiss - answering "No" still lets the scene load.
+  used to pop a blocking "Change Content Directory?" dialog a one-way
+  command can't dismiss (answering "No" still let the scene load, but
+  needed a human present) - **now solvable**, see
+  `lw_set_content_directory` below (ROADMAP3.md item 1).
   `lw_save_object` has a real, documented limitation: for a freshly
   loaded multi-layer object (via `lw_load_object`), `SelectItem` by
   name or by its regular numeric ID may not switch the current object
@@ -39,6 +41,14 @@ and what's explicitly out of scope.
 - `lw_run_command` - generic passthrough to any of the ~800 native
   commands in `lwcommandport/layout/__init__.py`. One-way, no
   confirmation LightWave accepted it, just that it was sent.
+- `lw_set_content_directory(path)` (ROADMAP3.md item 1) - wraps the
+  native `ContentDirectory(dirname)` command. Confirmed live this fully
+  closes the Content Directory dialog gap noted above: called with the
+  target path, then reloaded the exact scene/path combination that
+  previously triggered the dialog - it loaded silently instead, with
+  `lw_get_scene_info` confirming every item came back intact. Call once
+  per session before loading from a path outside whatever Content
+  Directory LightWave started with.
 - `lw_set_keyframe(name, frame, position, rotation, scale)` - wraps the
   common by-hand animation sequence (select, go to frame, set
   transform, create key) into one call. Confirmed live: two keyframes

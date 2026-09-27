@@ -1889,3 +1889,52 @@ four temporary diagnostic tools built during the staged investigation
 `_probe_channels` stub from ROADMAP.md item 1b is left in place as the
 permanent historical record of the crash this whole investigation
 finally explained.
+
+## Content Directory management (ROADMAP3.md item 1)
+
+Goal: figure out whether `ContentDirectory(dirname)` could close a real,
+already-documented gap from `ROADMAP2.md` item 3 - loading a scene or
+object from outside LightWave's configured Content Directory pops a
+blocking "Change Content Directory?" dialog that a one-way command
+can't dismiss, so far only worked around by asking a human to click
+"No" every time.
+
+Checked the stub first: `ContentDirectory(self, *args)` already takes a
+real argument correctly (`dirname`), no repeat of the missing-`*args`
+bug class found repeatedly in earlier roadmaps. Tested directly via
+`lw_run_command` before writing any wrapper: sent
+`ContentDirectory(C:\Users\sandr\AppData\Local\Temp)` (the exact
+directory the test scene lives in, outside LightWave's default Content
+Directory) - Cmd History logged it cleanly, no error, no dialog.
+
+**Confirmed live that this fully closes the gap.** Reloaded
+`lightwavemcp_test_scene.lws` from that same Temp path via
+`lw_load_scene` immediately after setting the Content Directory - no
+"Change Content Directory?" dialog appeared this time, the scene loaded
+silently, and `lw_get_scene_info` confirmed every item
+(`BoneTestObject`, `connector_01`, `KeyframeTestNull`, `Light`,
+`Camera`) came back intact. This is a genuine fix, not just a
+workaround: the previous approach needed a human present to click "No"
+every single load; this needs one command sent once per session before
+the first load from an unfamiliar path.
+
+Shipped `lw_set_content_directory(path)`, a thin wrapper (following the
+same shape as every other simple settable command here). Re-tested
+through the actual wrapped tool (not just `lw_run_command`) after a
+Claude Desktop restart - Cmd History showed the identical
+`ContentDirectory C:\Users\sandr\AppData\Local\Temp` line, confirming
+the wrapper introduces no bugs of its own.
+
+Surveyed but did not wrap two related commands: `ContentTypeDirectory(
+type, dirname)` sets a per-content-type sub-path (e.g. just Objects or
+just Scenes), but its `type` argument's real accepted values were never
+confirmed live - guessing at an enum here would repeat exactly the
+mistake this project's methodology exists to avoid, given `type`-style
+integer arguments have already turned out to need live UI confirmation
+more than once (`LightFalloffType`, `channelType`). `CreateContentPath`
+(argument: `pathtype`) and `RecentContentDirs` (argument-less) both look
+like one-shot UI actions (creating the standard subfolder layout,
+opening a recent-directories menu) rather than pure setters worth
+automating - not investigated further.
+
+`ROADMAP3.md` item 1 is closed.

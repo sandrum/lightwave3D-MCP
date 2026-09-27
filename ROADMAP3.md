@@ -25,23 +25,32 @@ checking Cmd History against a real UI click first.
 
 ## Priority order
 
-1. **Content Directory management.** `ContentDirectory(dirname)` is a
-   real, single-string-argument settable command (confirmed correctly
-   wrapped with `*args` in the stub, unlike several commands found
-   broken in prior roadmaps) - not yet used anywhere in this connector.
-   Directly relevant to a real, already-documented limitation: `ROADMAP2.md`
-   item 3 found that loading a scene or object from outside LightWave's
-   configured Content Directory pops a blocking "Change Content
-   Directory?" dialog that a one-way command can't dismiss (the
-   workaround has been asking a human to click "No" every time). Setting
-   `ContentDirectory` to the target path *before* `LoadScene`/
-   `LoadObject` may eliminate that dialog entirely - worth confirming
-   live before assuming it fixes the gap outright, since the dialog's
-   exact trigger condition was never root-caused, only worked around.
-   `ContentTypeDirectory`/`CreateContentPath`/`RecentContentDirs` are
-   related and worth a look in the same pass. Placed first since it's
-   low-effort, high-confidence, and directly closes a known gap rather
-   than opening new territory.
+1. **Content Directory management - DONE, closes a real documented
+   gap.** Shipped `lw_set_content_directory(path)`, wrapping the native
+   `ContentDirectory(dirname)` command (confirmed correctly wrapped with
+   `*args` in the stub, unlike several commands found broken in prior
+   roadmaps).
+
+   Confirmed live that this fully closes `ROADMAP2.md` item 3's
+   documented limitation: loading a scene or object from outside
+   LightWave's configured Content Directory used to pop a blocking
+   "Change Content Directory?" dialog that a one-way command couldn't
+   dismiss, needing a human to click "No" every time. Reproduced the
+   exact scenario that originally triggered it (loading
+   `lightwavemcp_test_scene.lws` from a Temp path outside the default
+   Content Directory), then called `lw_set_content_directory` with that
+   same Temp path and reloaded - the dialog did not appear, the scene
+   loaded silently, and `lw_get_scene_info` confirmed every item came
+   back intact. Call this once per session before loading from any path
+   outside whatever Content Directory LightWave started with.
+
+   `ContentTypeDirectory(type, dirname)` (a per-content-type sub-path)
+   and `CreateContentPath`/`RecentContentDirs` were surveyed but not
+   wrapped - the first needs a `type` argument whose real values were
+   never confirmed live, and the other two look like one-shot UI actions
+   (opening a dialog/menu) rather than pure setters worth automating.
+   See `PLAN.md` "Content Directory management" for the full
+   investigation.
 
 2. **Node Editor / surface & light node graphs, especially PrincipledBSDF
    nodes.** Prioritized explicitly, given real interest in driving

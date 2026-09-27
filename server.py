@@ -179,6 +179,38 @@ def lw_create_null(name: str = "MCP_Null") -> str:
 
 
 @mcp.tool()
+def lw_set_content_directory(path: str) -> str:
+    """Set LightWave's Content Directory (ROADMAP3.md item 1). Wraps the
+    native ContentDirectory(dirname) command - path must be an absolute
+    directory LightWave's process can read.
+
+    Confirmed live: this closes a real, previously-documented limitation
+    (ROADMAP2.md item 3) - loading a scene from a path outside the
+    configured Content Directory used to pop a blocking "Change Content
+    Directory?" dialog that a one-way command couldn't dismiss (the only
+    workaround was asking a human to click "No" every time). Calling
+    this with the target path BEFORE lw_load_scene/lw_load_object
+    eliminates the dialog entirely - confirmed by reloading the exact
+    scene/path combination that previously triggered it and getting a
+    silent, successful load instead, verified via lw_get_scene_info
+    showing every item intact afterward. Call this once per session
+    before loading from a path outside whatever Content Directory
+    LightWave started with.
+
+    ContentTypeDirectory(type, dirname) (a per-content-type sub-path,
+    e.g. just Objects or just Scenes) and CreateContentPath/
+    RecentContentDirs also exist in the command list but weren't wrapped
+    here - the first needs a `type` argument whose real values were
+    never confirmed live, and the other two look like one-shot UI
+    actions (opening a dialog/menu) rather than pure setters."""
+    try:
+        _layout().ContentDirectory(path)
+        return json.dumps({"result": "sent ContentDirectory %s" % path})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
 def lw_load_object(filename: str) -> str:
     """Load a real mesh object (.lwo file) into the current LightWave
     scene - ROADMAP2.md item 2, closing this connector's biggest
@@ -219,10 +251,13 @@ def lw_load_scene(filename: str) -> str:
     item 3. Wraps the native LoadScene(filename) command. filename must
     be an absolute path LightWave's process can read. Confirmed live:
     a full save/clear/load round trip correctly restored every item.
-    KNOWN GOTCHA: loading from a path outside LightWave's configured
-    Content Directory pops a blocking "Change Content Directory?"
-    dialog that a one-way command can't dismiss - answering "No"
-    (keep the existing content path) still lets the scene load."""
+    KNOWN GOTCHA, NOW SOLVABLE: loading from a path outside LightWave's
+    configured Content Directory pops a blocking "Change Content
+    Directory?" dialog that a one-way command can't dismiss - answering
+    "No" (keep the existing content path) still lets the scene load, but
+    needs a human present. ROADMAP3.md item 1's lw_set_content_directory
+    eliminates this dialog entirely when called with the target path
+    first - confirmed live, no human intervention needed."""
     try:
         _layout().LoadScene(filename)
         return json.dumps({"result": "sent LoadScene %s" % filename})
