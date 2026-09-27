@@ -1938,3 +1938,172 @@ opening a recent-directories menu) rather than pure setters worth
 automating - not investigated further.
 
 `ROADMAP3.md` item 1 is closed.
+
+## Node Editor / PrincipledBSDF nodes (ROADMAP3.md item 2)
+
+Goal: read (and eventually write) LightWave's node-based shading
+parameters, especially the Principled BSDF node (base color, roughness,
+metallic, specular - the same physically-based shading model most
+modern renderers converged on), given explicit user interest in this
+specific node type. Prioritized ahead of several other roadmap items
+per that request, despite real structural complexity making
+"deliberately last" the initial instinct when this roadmap was drafted.
+
+**Confirmed up front, before any code: no native Command Port command
+exists for this at all.** A survey of `lwcommandport/layout/__init__.py`
+turned up only `NodeDisplacement`/`NodeDisplacementOrder`/`NodeEdges` -
+none of which touch the graph itself. This meant the SDK's node API,
+reachable only through the read-path's `LWComRing` Master plugin
+(`lw_mcp_ring.py`), was the only possible route - the same
+architectural shift `ROADMAP2.md` item 8 required for flat surface
+properties, one level deeper still.
+
+**Staged the investigation exactly the way item 8 and item 9 both
+did**, given this was genuinely new, unmapped SDK territory: dir()-only
+introspection first (zero risk), then one live call at a time, asking
+for explicit approval before every new untested call - nine steps in
+total.
+
+**Step 1 - safe `dir(lwsdk)` scan, no live calls.** Filtered for "node"/
+"shader"/"bsdf"/"principl". Confirmed a real, substantial node API
+exists in this build: `LWNodeFuncs`, `LWNodeEditorFuncs`,
+`LWNodeInputFuncs`, `LWNodeOutputFuncs`, `LWNodeUtilityFuncs`,
+`LWNodeDrawFuncs`, `LWNodeMenuFuncs`, plus `LWBSDFFuncs` specifically
+(very promising-looking given the goal) and `SURF_BSDF_INPUT`/
+`NOT_BSDF` constants. Also dumped `dir()` on a fresh instance of each of
+the most promising classes (still zero risk - Python introspection on
+freshly-constructed objects, nothing live touched). `LWBSDFFuncs`
+turned out to be a real, but different, thing than hoped: its methods
+(`createBxDF`, `addBSSRDF`, `BxDF_SampleF`, `resetBSDF`, etc.) are a
+*shader-plugin-authoring* API - for building custom BSDF rendering math
+inside a plugin, evaluated at render time - not a way to read an
+existing node's UI-configured parameters. A real dead end for this
+specific goal, spotted from the method names alone before wasting any
+live-call budget on it.
+
+**Step 2, EXPLICITLY APPROVED - the first live call.** Resolved a real
+surface (`CONNECTOR`, from the loaded `.lwo`, already used in item 8)
+and called `LWSurfaceFuncs().getNodeEditor(surf)` - seen in an earlier
+introspection dump, never called. Confirmed live: returned a real
+`NodeID`-typed handle, no crash, `lw_ping` recovered immediately after.
+
+**Step 3, EXPLICITLY APPROVED - enumerate nodes.** Chained
+`LWNodeEditorFuncs`'s `numberOfNodes`/`nodeByIndex` (a bounded-count
+shape, not an open-ended `first`/`next` traversal - deliberately chosen
+to avoid re-guessing at a termination sentinel in a brand new class when
+a safer shape was available) with `LWNodeFuncs`'s `nodeName`/
+`serverUserName` to identify each one. Confirmed live, and found a
+genuine surprise: `CONNECTOR` (using the classic flat "Standard"
+material panel, never manually node-edited) already had a real 3-node
+graph - `"Surface"` (the graph's root/output), `"Input"`, and
+`"Standard (1)"`. LightWave 2019's nodal architecture underlies *every*
+surface, not just ones a human has opened in the Node Editor - the
+classic property panels are a friendly facade over an always-present
+implicit graph.
+
+**User added a real Principled BSDF node via the UI** (Surface Editor >
+Edit Node Graph > add node, connected to the Surface node) so there
+would be a real node of the target type to test against. Re-running the
+enumeration correctly showed a 4th node, `"Principled BSDF (1)"` /
+server name `"Principled BSDF"` - confirming the exact string to match
+on going forward.
+
+**Step 4, EXPLICITLY APPROVED - read a node's inputs.** Used
+`LWNodeInputFuncs`'s `numInputs`/`byIndex` (same bounded-count shape as
+step 3, deliberately not its `first`/`next` pair) to enumerate the
+Principled BSDF node's inputs. Confirmed live: correctly enumerated all
+27 real parameter names (`"Color"`, `"Roughness"`, `"Specular"`,
+`"Metallic"`, `"Clearcoat"`, etc.), an exact match to the Surface
+Editor's visible panel. Tried `evaluate_scalar`/`evaluate_vector` per
+input to get each one's actual value - both failed identically: `"takes
+exactly 4 arguments (2 given)"`. Not a crash, a clean, catchable error -
+these calls need two more arguments than `(self, input)`, almost
+certainly a shading-context structure (something like a per-shading-
+point ray/vertex state) this connector has no way to construct outside
+an active render callback. A real, confirmed dead end for reading a
+parameter's live value *this specific way*.
+
+**Step 5, EXPLICITLY APPROVED - a different hypothesis.**
+`LWSurfaceFuncs` has a `chanGrp()` method (seen in an earlier, unrelated
+introspection dump, never called) - possibly analogous to
+`LWItemInfo().chanGroup(item)` from `ROADMAP2.md` item 9's keyframe
+work, which would mean node parameters are reachable through the
+already fully-proven `LWChannelInfo`/`LWEnvelopeFuncs` machinery instead
+of fighting `evaluate_scalar`'s unclear extra arguments. Confirmed live:
+returned a real `NodeID`-typed handle, no crash.
+
+**Step 6, EXPLICITLY APPROVED - the critical test, first attempt.** Fed
+`chanGrp(surf)`'s result into `LWChannelInfo().nextChannel(group,
+prev)`, the exact traversal shape item 9 already proved safe for item
+transform channels. Result: zero channels, but *not* a crash -
+`nextChannel` just returned `None` immediately. The hypothesis wasn't
+wrong, just incomplete.
+
+**Step 7, EXPLICITLY APPROVED - refining via `nextGroup`.** Recognized
+the parallel to item 9 precisely: `chanGroup(item)` alone hadn't reached
+a bone's own channels either, one `nextGroup()` hop was needed to reach
+`"Bone1"`'s own sub-group. Applied the same idea here: walked
+`nextGroup(chanGrp(surf), prev)` in a bounded loop. Confirmed live:
+found exactly one sub-group, named `"Nodes"` - a container, not yet an
+individual node's group (still no direct channels on it either).
+
+**Step 8, EXPLICITLY APPROVED - one more level.** Used `"Nodes"` as the
+new parent for a second bounded `nextGroup` walk. Confirmed live: found
+exactly two sub-groups, named `"Standard (1)"` and `"Principled BSDF
+(1)"` - the real per-node groups, matching the two shader nodes in the
+graph exactly. Neither had a direct channel yet, though - the mystery
+wasn't fully solved.
+
+**The missing piece, found via the UI, not more guessing.** Asked the
+user to right-click "Roughness" on the Principled BSDF node and add an
+envelope to it (matching LightWave's own UI path for making any node
+parameter animatable). Re-ran the group enumeration: `"Principled BSDF
+(1)"`'s group now showed a real channel, `"Roughness"` - confirming the
+missing link. A node parameter is only a real, `LWChannelInfo`-reachable
+channel once a human (or a future write tool) has explicitly enveloped
+it; an un-enveloped parameter simply has no channel at all, which is
+why steps 6-8's groups all legitimately showed zero channels rather than
+crashing - there was never anything broken, just nothing there yet.
+LightWave's own Graph Editor channel browser confirmed the exact same
+hierarchy independently: `Channels > Surfaces > connector_01 > CONNECTOR
+> Nodes > Principled BSDF`, matching `chanGrp(surf) -> "Nodes" ->
+"Principled BSDF (1)"` precisely.
+
+**Step 9 - the full end-to-end read, no separate approval needed** (a
+chain of calls already individually proven safe, not new territory):
+`channelEnvelope()`/`nextKey()`/`keyGet()` on the now-real Roughness
+channel - the identical mechanism `_get_channels` already uses for item
+transforms. Confirmed live: correctly read back `{"value": 0.1, "frame":
+0.0, ...}`, an exact match to the UI's "10.0%".
+
+**Shipped three real tools**, consolidating the nine temporary
+diagnostic probes built during this investigation into clean, permanent
+code (all nine `lw_probe_*`/`_probe_*` functions removed, their job
+done): `lw_get_surface_nodes(surface)` (list every node, using the
+proven `getNodeEditor`/`numberOfNodes`/`nodeByIndex` shape),
+`lw_get_node_inputs(surface, node)` (list a node's real parameter names,
+using `numInputs`/`byIndex` - documents the `evaluate_scalar`/
+`evaluate_vector` dead end plainly rather than silently returning
+useless data), and `lw_get_node_channel(surface, node, channel)` (the
+full `chanGrp -> nextGroup -> nextGroup -> nextChannel ->
+channelEnvelope -> nextKey -> keyGet` chain). Re-tested all three live,
+end to end, after the consolidation - all matched the values already
+confirmed during the staged investigation, proving the cleanup
+introduced no regressions.
+
+**Honest, confirmed limitation to carry forward**: only parameters with
+an existing envelope are readable. This is real value (anyone who has
+already set up keyframed shader parameters, e.g. an animated Roughness
+sweep, can now read that data back), but it does not yet answer "what
+is Metallic currently set to" for a never-touched, un-enveloped
+parameter - that would need either solving `evaluate_scalar`'s real
+argument shape (the shading-context structure it wants was never
+identified this session) or some other still-unexplored read path.
+Writing (creating a new envelope/key, or wiring up node connections) was
+deliberately out of scope this pass, following the same "confirm read
+before write" discipline `ROADMAP2.md` item 8 used for flat surface
+properties.
+
+`ROADMAP3.md` item 2 is closed for reading; writing and the
+un-enveloped-value read gap remain open, natural candidates for a
+future session.

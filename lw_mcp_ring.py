@@ -481,6 +481,180 @@ def _get_channels(name):
     return {"name": name, "channels": channels}
 
 
+_MAX_NODES_PER_EDITOR = 50
+_MAX_INPUTS_PER_NODE = 60
+_MAX_SURFACE_GROUPS = 30
+_MAX_SURFACE_CHANNELS = 60
+
+
+def _get_surface_nodes(surf_name):
+    """ROADMAP3.md item 2 - list every node in a surface's node graph
+    (e.g. "Surface", "Input", "Standard (1)", "Principled BSDF (1)" for
+    a surface with a Principled BSDF added). Uses LWSurfaceFuncs()
+    .getNodeEditor(surf) + LWNodeEditorFuncs numberOfNodes/nodeByIndex
+    (a bounded-count-then-index shape, not an open-ended
+    first()/next() traversal) plus LWNodeFuncs nodeName/serverUserName
+    to identify each one. Confirmed live: even a "Standard"-material
+    surface that was never manually node-edited already has an implicit
+    3-node graph ("Surface"/"Input"/"Standard (1)") - LightWave's nodal
+    architecture underlies every surface, not just ones built by hand in
+    the Node Editor. node_name includes a "(N)" instance suffix when
+    more than one of the same node type exists; server_user_name is the
+    plain type name (e.g. "Principled BSDF") without that suffix - use
+    server_user_name to find a node type regardless of how many
+    instances exist, node_name to address one specific instance."""
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    surf = surf_ids[0]
+    sf = lwsdk.LWSurfaceFuncs()
+    editor = sf.getNodeEditor(surf)
+
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+    count = nef.numberOfNodes(editor)
+    nodes = []
+    for i in range(min(count, _MAX_NODES_PER_EDITOR)):
+        node = nef.nodeByIndex(editor, i)
+        nodes.append({
+            "node_name": nf.nodeName(node),
+            "server_user_name": nf.serverUserName(node),
+        })
+    return {"surface": surf_name, "nodes": nodes}
+
+
+def _get_node_inputs(surf_name, target_node_name):
+    """ROADMAP3.md item 2 - list a specific node's input parameter names
+    and raw type codes (e.g. Principled BSDF's "Color"/"Roughness"/
+    "Metallic"/etc. - confirmed live to correctly enumerate all 27 real
+    parameters, exactly matching the Surface Editor panel). Uses
+    LWNodeInputFuncs numInputs/byIndex (bounded-count shape, not the
+    untested first()/next() pair this class also exposes).
+
+    Does NOT report each input's current value: LWNodeInputFuncs
+    evaluate_scalar/evaluate_vector both failed live needing "4
+    arguments (2 given)" - these appear to be render-time calls needing
+    extra shading context (a per-shading-point structure) this
+    connector has no way to supply outside an active render, not simple
+    property getters. To read a specific input's actual value, add an
+    envelope to it in the UI (Graph Editor, or the node's own envelope
+    button) and use lw_get_node_channel instead - confirmed live to
+    correctly read back an enveloped Roughness value (0.1, matching the
+    UI's "10.0%") end to end via the same LWChannelInfo/LWEnvelopeFuncs
+    machinery ROADMAP2.md item 9 already proved safe. This is a real,
+    confirmed limitation, not a placeholder: a parameter with no
+    envelope has no value reachable through this connector today."""
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    surf = surf_ids[0]
+    sf = lwsdk.LWSurfaceFuncs()
+    editor = sf.getNodeEditor(surf)
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+
+    count = nef.numberOfNodes(editor)
+    target_node = None
+    for i in range(min(count, _MAX_NODES_PER_EDITOR)):
+        node = nef.nodeByIndex(editor, i)
+        if nf.nodeName(node) == target_node_name:
+            target_node = node
+            break
+    if target_node is None:
+        return {"error": "node not found: %s" % target_node_name}
+
+    nif = lwsdk.LWNodeInputFuncs()
+    input_count = nif.numInputs(target_node)
+    inputs = []
+    for i in range(min(input_count, _MAX_INPUTS_PER_NODE)):
+        inp = nif.byIndex(target_node, i)
+        inputs.append({"name": nif.name(inp), "type": nif.type(inp)})
+    return {"surface": surf_name, "node": target_node_name, "inputs": inputs}
+
+
+def _get_node_channel(surf_name, node_name, channel_name):
+    """ROADMAP3.md item 2 - the real payoff of this whole investigation:
+    read a node parameter's actual keyframe data (frame/time, value,
+    interpolation shape), the same shape lw_get_channels already reports
+    for item transform channels.
+
+    Root-caused live, in stages, why a node parameter isn't reachable
+    through LWNodeInputFuncs.evaluate_scalar/vector (see
+    lw_get_node_inputs): the real path turned out to mirror ROADMAP2.md
+    item 9's item-channel discovery almost exactly.
+    LWSurfaceFuncs().chanGrp(surf) is a surface's own top-level channel
+    group; ONE nextGroup() hop reaches a "Nodes" container group
+    (confirmed live: chanGrp(surf) alone has zero direct channels - not
+    a crash, just legitimately empty); a SECOND nextGroup() hop within
+    "Nodes", matched by groupName(), reaches the specific node's own
+    group (e.g. "Principled BSDF (1)"); nextChannel() within THAT group
+    finds the parameter, but ONLY if a human (or a future write tool)
+    has explicitly added an envelope to it first - confirmed live that
+    an un-enveloped parameter's group has zero channels (not a crash,
+    still just empty), and the exact same parameter appears the instant
+    an envelope is added via the UI. Once found, channelEnvelope()/
+    nextKey()/keyGet() are the identical, already-proven-safe calls
+    lw_get_channels already uses for item transforms.
+
+    Confirmed live end to end: after enveloping Principled BSDF's
+    "Roughness" via the Graph Editor, this correctly read back
+    {"value": 0.1, "frame": 0.0, ...}, matching the UI's "10.0%" exactly.
+    Real, confirmed limitation: reports "channel not found" for any
+    parameter that hasn't been enveloped - this is the honest boundary
+    of what's readable today, not a bug to work around."""
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    surf = surf_ids[0]
+    sf = lwsdk.LWSurfaceFuncs()
+    top_group = sf.chanGrp(surf)
+
+    ci = lwsdk.LWChannelInfo()
+    ef = lwsdk.LWEnvelopeFuncs()
+    fps = lwsdk.LWSceneInfo().framesPerSecond
+
+    nodes_group = ci.nextGroup(top_group, None)
+    if nodes_group is None:
+        return {"error": "no 'Nodes' sub-group found on %s" % surf_name}
+
+    target_group = None
+    group = None
+    for _ in range(_MAX_SURFACE_GROUPS):
+        group = ci.nextGroup(nodes_group, group)
+        if group is None:
+            break
+        if ci.groupName(group) == node_name:
+            target_group = group
+            break
+    if target_group is None:
+        return {"error": "node group not found: %s" % node_name}
+
+    target_chan = None
+    chan = None
+    for _ in range(_MAX_SURFACE_CHANNELS):
+        chan = ci.nextChannel(target_group, chan)
+        if chan is None:
+            break
+        if ci.channelName(chan) == channel_name:
+            target_chan = chan
+            break
+    if target_chan is None:
+        return {"error": "channel not found (not enveloped?): %s" % channel_name}
+
+    env = ci.channelEnvelope(target_chan)
+    keys = []
+    key = None
+    for _ in range(_MAX_KEYS_PER_CHANNEL):
+        key = ef.nextKey(env, key)
+        if key is None:
+            break
+        _, t = ef.keyGet(env, key, lwsdk.LWKEY_TIME)
+        _, v = ef.keyGet(env, key, lwsdk.LWKEY_VALUE)
+        _, shape = ef.keyGet(env, key, lwsdk.LWKEY_SHAPE)
+        keys.append({"time_seconds": t, "frame": t * fps if fps else None, "value": v, "shape": shape})
+    return {"surface": surf_name, "node": node_name, "channel": channel_name, "keys": keys}
+
+
 def _resolve_name(ii, item_id):
     """None for LWITEM_NULL (no relationship set), otherwise the item's
     name. Isolated so a bad/unexpected ID degrades to None instead of
@@ -733,6 +907,17 @@ def _handle_query(text):
             payload = {"result": _probe_channels(arg or "TransformTest")}
         elif command == "get_channels":
             payload = {"result": _get_channels(arg or "TransformTest")}
+        elif command == "get_surface_nodes":
+            payload = {"result": _get_surface_nodes(arg or "CONNECTOR")}
+        elif command == "get_node_inputs":
+            surf_arg, _, node_arg = arg.partition("|")
+            payload = {"result": _get_node_inputs(surf_arg or "CONNECTOR", node_arg or "Principled BSDF (1)")}
+        elif command == "get_node_channel":
+            parts_gnc = arg.split("|")
+            surf_a = parts_gnc[0] if len(parts_gnc) > 0 and parts_gnc[0] else "CONNECTOR"
+            node_a = parts_gnc[1] if len(parts_gnc) > 1 and parts_gnc[1] else "Principled BSDF (1)"
+            chan_a = parts_gnc[2] if len(parts_gnc) > 2 and parts_gnc[2] else "Roughness"
+            payload = {"result": _get_node_channel(surf_a, node_a, chan_a)}
         elif command == "probe_surf":
             payload = {"result": _probe_surf_constants()}
         elif command == "get_render_status":

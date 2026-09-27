@@ -83,6 +83,24 @@ and what's explicitly out of scope.
 - `lw_get_transform` - position/rotation/scale via `LWItemInfo.param()`.
 - `lw_get_surface_info` - color, diffuse, luminosity, specularity,
   glossiness, reflection, transparency, smoothing via `LWSurfaceFuncs`.
+- **Node graphs** (ROADMAP3.md item 2) - `lw_get_surface_nodes(surface)`
+  lists every node in a surface's graph (confirmed live: even a
+  "Standard"-material surface never manually node-edited already has an
+  implicit "Surface"/"Input"/"Standard (1)" graph - LightWave's nodal
+  architecture underlies every surface). `lw_get_node_inputs(surface,
+  node)` lists a node's real parameter names (confirmed live: all 27
+  real Principled BSDF parameters, matching the UI exactly) - but not
+  values, since `LWNodeInputFuncs.evaluate_scalar/evaluate_vector` both
+  need shading context this connector can't supply outside a render.
+  `lw_get_node_channel(surface, node, channel)` reads a parameter's
+  actual keyframe data - confirmed live end to end (Roughness read back
+  as `0.1`, matching the UI's "10.0%") - but **only for parameters that
+  already have an envelope**; a never-touched parameter has no value
+  reachable this way, a real, confirmed, honestly-documented limitation.
+  See `PLAN.md` "Node Editor / PrincipledBSDF nodes" for the full
+  nine-step staged investigation, including a genuine dead end
+  (`LWBSDFFuncs` turned out to be a shader-plugin-authoring API, not a
+  way to read an existing node's parameters).
 - `lw_get_hierarchy` - every item's parent, plus IK target/goal/pole,
   by name. Useful before rigging on top of something already parented.
   **Now also walks bone chains within each object** (`LWItemInfo.first(

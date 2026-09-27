@@ -647,6 +647,77 @@ def lw_get_channels(name: str) -> str:
 
 
 @mcp.tool()
+def lw_get_surface_nodes(surface: str = "CONNECTOR") -> str:
+    """List every node in a surface's node graph (ROADMAP3.md item 2) -
+    e.g. "Surface", "Input", "Standard (1)", "Principled BSDF (1)" for a
+    surface with a Principled BSDF added. Each entry has node_name (the
+    specific instance, with a "(N)" suffix when more than one of the
+    same type exists) and server_user_name (the plain node-type name,
+    e.g. "Principled BSDF", without that suffix) - use server_user_name
+    to find a node type regardless of instance count, node_name to
+    address one specific instance in lw_get_node_inputs/
+    lw_get_node_channel.
+
+    Confirmed live: even a "Standard"-material surface that was never
+    manually node-edited already has an implicit 3-node graph ("Surface"/
+    "Input"/"Standard (1)") - LightWave's nodal architecture underlies
+    every surface, not just ones built by hand in the Node Editor."""
+    return json.dumps(_query("get_surface_nodes", surface))
+
+
+@mcp.tool()
+def lw_get_node_inputs(surface: str = "CONNECTOR", node: str = "Principled BSDF (1)") -> str:
+    """List a specific node's input parameter names (ROADMAP3.md item 2)
+    - e.g. Principled BSDF's "Color"/"Roughness"/"Metallic"/etc. `node`
+    must match a node_name from lw_get_surface_nodes exactly. Confirmed
+    live to correctly enumerate all 27 real Principled BSDF parameters,
+    exactly matching the Surface Editor panel.
+
+    Does NOT report each input's current value - LightWave's
+    LWNodeInputFuncs.evaluate_scalar/evaluate_vector both failed live
+    needing extra shading context this connector has no way to supply
+    outside an active render. To read a specific parameter's actual
+    value, add an envelope to it in the UI (Graph Editor, or the node's
+    own envelope button) first, then use lw_get_node_channel - a
+    parameter with no envelope has no value reachable through this
+    connector today; that's a confirmed, honest limitation, not a
+    placeholder."""
+    return json.dumps(_query("get_node_inputs", "%s|%s" % (surface, node)))
+
+
+@mcp.tool()
+def lw_get_node_channel(surface: str = "CONNECTOR", node: str = "Principled BSDF (1)",
+                         channel: str = "Roughness") -> str:
+    """Read a node parameter's real keyframe data (ROADMAP3.md item 2) -
+    frame/time, value, and interpolation shape, the same shape
+    lw_get_channels already reports for item transform channels. `node`
+    must match lw_get_surface_nodes' node_name, `channel` must match one
+    of lw_get_node_inputs' parameter names.
+
+    This was the core question of a full staged investigation (see
+    PLAN.md "Node Editor / PrincipledBSDF nodes" for the complete
+    writeup): the real path mirrors ROADMAP2.md item 9's item-channel
+    discovery almost exactly. LWSurfaceFuncs().chanGrp(surf) is a
+    surface's own top-level channel group; one nextGroup() hop reaches a
+    "Nodes" container; a second nextGroup() hop within "Nodes", matched
+    by name, reaches the specific node's own group; nextChannel() within
+    THAT group finds the parameter - but ONLY once a human (or a future
+    write tool) has explicitly added an envelope to it. An un-enveloped
+    parameter's group has zero channels (confirmed live: not a crash,
+    legitimately empty), and the exact same parameter appears the
+    instant an envelope is added. Once found, channelEnvelope()/
+    nextKey()/keyGet() are the identical, already-proven-safe calls
+    lw_get_channels already uses.
+
+    Confirmed live end to end: after enveloping Principled BSDF's
+    "Roughness", this correctly read back value 0.1 at frame 0, matching
+    the UI's "10.0%" exactly. Reports "channel not found" for any
+    parameter that hasn't been enveloped - the honest current boundary,
+    not a bug."""
+    return json.dumps(_query("get_node_channel", "%s|%s|%s" % (surface, node, channel)))
+
+
+@mcp.tool()
 def lw_probe_surf() -> str:
     """DIAGNOSTIC, temporary: lists SURF_* constants from lwsdk, routed
     through lw_mcp_ring.py. Will be replaced by lw_get_surface_info."""

@@ -53,45 +53,64 @@ checking Cmd History against a real UI click first.
    investigation.
 
 2. **Node Editor / surface & light node graphs, especially PrincipledBSDF
-   nodes.** Prioritized explicitly, given real interest in driving
-   PBR-style shading, despite this area's real structural complexity
-   (discussed below) making "deliberately last" the initial instinct -
-   LightWave 2019's Surface Editor node graph includes a "Principled BSDF" node
-   (base color, roughness, metallic, specular, etc. - the same
-   physically-based shading model most modern renderers converged on),
-   reachable today only by hand via the Surface Editor's "Edit Node
-   Graph" button (already seen in this project's `ROADMAP2.md` item 8
-   screenshots).
+   nodes - DONE for reading, a real limitation found and honestly
+   documented.** Shipped three tools: `lw_get_surface_nodes(surface)`
+   (list every node in a surface's graph), `lw_get_node_inputs(surface,
+   node)` (list a specific node's parameter names), and
+   `lw_get_node_channel(surface, node, channel)` (read a parameter's
+   actual keyframe data).
 
-   Confirmed via this roadmap's own command-list survey: there is NO
-   native Command Port command for node graph editing at all (only
-   `NodeDisplacement`/`NodeDisplacementOrder`/`NodeEdges` exist, none of
-   which touch the graph itself) - this will need the SDK's node
-   API directly, the same architectural shift `ROADMAP2.md` item 8
-   required for flat surface properties (`LWSurfaceFuncs` instead of a
-   Command Port command), likely one level deeper still: LightWave's C
-   SDK exposes node graph construction through classes conventionally
-   named around `LWNodeFuncs`/`LWNodeInputFuncs`/`LWNodeOutputFuncs` (or
-   whatever this specific SWIG build actually calls them - **do not
-   trust that name, or any other generic LWSDK recollection, without
-   live confirmation**, since this project has already found this
-   build's Python bindings diverge from generic docs multiple times).
-   `LWSurfaceFuncs` itself has `getNodeEditor()` (already seen in an
-   earlier introspection dump, never called) as a likely entry point
-   into whatever this build's real node object model is.
+   Confirmed via this roadmap's own command-list survey up front: there
+   is NO native Command Port command for node graph editing at all -
+   this needed the SDK's node API directly, the same architectural shift
+   `ROADMAP2.md` item 8 required for flat surface properties, one level
+   deeper. A live `dir(lwsdk)` scan (zero risk, no SDK calls) confirmed a
+   real, substantial node API exists in this build:
+   `LWNodeFuncs`/`LWNodeEditorFuncs`/`LWNodeInputFuncs`/
+   `LWNodeOutputFuncs`/`LWNodeUtilityFuncs`, plus `LWBSDFFuncs`
+   specifically - which turned out to be a *shader-plugin-authoring* API
+   (building custom BSDF rendering math), not a way to read an existing
+   node's UI parameters, a real dead end for this specific goal spotted
+   before any code was written around it.
 
-   **Start exactly the way item 8 started**: a live, read-only
-   `dir(lwsdk)` scan filtered for "Node"/"Shader"/"BSDF"/"Principled",
-   plus `dir()` on whatever `getNodeEditor()` returns, before writing
-   any real code - this is genuinely new, unmapped territory for this
-   connector, one level more structurally complex than item 8's flat
-   `setFlt()` calls (a node graph has nodes, sockets, and connections
-   between them, not just scalar properties), so treat it with at least
-   the same staged, explicitly-approved caution item 8 and item 9 both
-   required, probably more given the added structural complexity. A
-   good first concrete goal once the real API is mapped: read
-   (`lw_get_surface_info`-style) an existing PrincipledBSDF node's
-   parameters on a real surface, before attempting to write/create one.
+   Explored in nine separate, explicitly-approved staged steps (the same
+   discipline `ROADMAP2.md` items 8/9 established for genuinely new SDK
+   territory - dir()-only recon first, then one live call at a time,
+   asking before each new untested call): `LWSurfaceFuncs().
+   getNodeEditor(surf)` (confirmed safe), `LWNodeEditorFuncs`'s
+   `numberOfNodes`/`nodeByIndex` to enumerate nodes (found a surprise:
+   even a plain "Standard"-material surface already has an implicit
+   3-node graph - LightWave's nodal architecture underlies every
+   surface, not just hand-built ones), `LWNodeInputFuncs`'s
+   `numInputs`/`byIndex` to enumerate a node's 27 real parameter names
+   (exact match to the UI panel) - but `evaluate_scalar`/
+   `evaluate_vector` both failed needing 2 more arguments than expected,
+   a real dead end for reading a parameter's *value* this way (these
+   look like render-time calls needing shading context this connector
+   can't supply outside an active render).
+
+   **The real path mirrors `ROADMAP2.md` item 9's keyframe discovery
+   almost exactly.** `LWSurfaceFuncs().chanGrp(surf)` is a surface's own
+   channel group; one `nextGroup()` hop reaches a "Nodes" container; a
+   second `nextGroup()` hop within "Nodes" reaches a specific node's own
+   group; `nextChannel()` within that group finds a parameter - but
+   **only once a human has explicitly added an envelope to it** (via the
+   Graph Editor or the node's own envelope button). Confirmed live:
+   `chanGrp(surf)` alone and an un-enveloped node's group both
+   legitimately have zero channels (never a crash, always confirmed
+   empty first), and the exact channel appears the instant an envelope
+   is added - then `channelEnvelope()`/`nextKey()`/`keyGet()`, the
+   identical already-proven-safe calls from item 9, correctly read back
+   the real value (`0.1`, matching the UI's "10.0%" for Roughness
+   exactly).
+
+   **Confirmed, honest limitation**: only *enveloped* parameters are
+   readable today - a fresh, never-touched Principled BSDF parameter has
+   no value reachable through this connector, only a name. Writing
+   (creating envelopes/keys, or connecting nodes) was out of scope for
+   this pass, following the same "confirm read before write" discipline
+   item 8 used. See `PLAN.md` "Node Editor / PrincipledBSDF nodes" for
+   the complete nine-step investigation.
 
 3. **Render Globals / GI / quality settings.** Right now this connector
    can trigger a render (`lw_render_frame`/`lw_render_scene`) and read
