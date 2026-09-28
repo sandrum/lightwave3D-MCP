@@ -1598,6 +1598,47 @@ def lw_toggle_bone_flag(item: str, flag: str) -> str:
 
 
 @mcp.tool()
+def lw_set_morph(item: str, target: str = None, amount: float = None) -> str:
+    """Set an object's Morph target/amount (ROADMAP3.md item 7, the
+    classic object-to-object morph - assigns a whole other item's shape
+    as a blend target, distinct from vmap-based Endomorphs on a single
+    object). Wraps MorphTarget(itemid)/MorphAmount(morph), both already
+    correctly taking real arguments in the stub. `target` is resolved to
+    a numeric ID like `lw_set_goal`/`lw_set_parent` (this command family
+    shares the same "wants a numeric ID, not a name" quirk).
+
+    Real precondition confirmed live: `MorphAmount` alone pops "This
+    option only applies when the current object has a morph target" -
+    LightWave's own error dialog, not a stub bug. Set `target` first (or
+    in the same call - `target` is applied before `amount` here) to
+    satisfy it. Confirmed live end to end: sending `MorphTarget` then
+    `MorphAmount(0.5)` no longer raised the error and both logged
+    cleanly. No visible geometry change was possible to confirm further
+    in this test scene, since the morph target used
+    (`BoneTestObject`, a Null) has no real mesh to blend toward - a
+    limitation of the test rig, not the command."""
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
+    lw = _layout()
+    sent = []
+    try:
+        lw.SelectItem(item_id)
+        if target is not None:
+            target_id, target_resp = _resolve_item_id(target)
+            if not target_id:
+                return json.dumps({"error": "could not resolve target: %s" % target, "detail": target_resp})
+            lw.MorphTarget(target_id)
+            sent.append("MorphTarget")
+        if amount is not None:
+            lw.MorphAmount(amount)
+            sent.append("MorphAmount")
+        return json.dumps({"result": "set %s on %s (id %s)" % (sent, item, item_id)})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
 def lw_include_light(light: str, obj: str) -> str:
     """Add an object to a light's inclusion list (Light Properties >
     Objects tab, "Include" mode - unchecked "Exclude" column) - the

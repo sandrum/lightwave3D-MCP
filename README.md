@@ -266,6 +266,21 @@ and what's explicitly out of scope.
   since this test rig's bones have no real mesh/vmap to match against.
   The muscle/joint-compensation family was surveyed but not wrapped this
   pass. See `PLAN.md` "Deeper bone rigging" for the full investigation.
+- **Morph/Endomorph control** (ROADMAP3.md item 7, the last item on
+  `ROADMAP3.md`) - `lw_set_morph(item, target=, amount=)`, wrapping
+  `MorphTarget`/`MorphAmount` (the classic object-to-object morph,
+  distinct from vmap-based Endomorphs). No dedicated UI panel was ever
+  found for this (not a Motion Modifier, no "Deform" tab in Object
+  Properties) - found instead by sending `MorphAmount` directly and
+  reading LightWave's own error dialog ("This option only applies when
+  the current object has a morph target"), the same technique already
+  used for `ObjGIRadiosityTolerance`/Fog preconditions. Confirmed live
+  end to end through the actual wrapped tool: `target`/`amount` both
+  logged cleanly with no error once a target was assigned first. See
+  `PLAN.md` "Morph/Endomorph control" for the full investigation.
+
+**`ROADMAP3.md` is now fully complete (all 7 items)** - see its own
+"Status" section for a summary of the whole roadmap.
 
 **Modeler**
 - `modeler_run_command` - same pattern as `lw_run_command` but for

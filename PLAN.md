@@ -2478,3 +2478,67 @@ this session's plain-Null test rig. Left for a future, dedicated
 session.
 
 `ROADMAP3.md` item 6 is closed for the scoped subset.
+
+## Morph/Endomorph control (ROADMAP3.md item 7)
+
+Goal: `MorphAmount(morph)`/`MorphTarget(itemid)` - the classic
+object-to-object morph, assigning a whole other item's shape as a blend
+target for the current object, distinct from vmap-based Endomorphs
+baked into a single object's own geometry. Checked stub signatures
+first as usual: both already correctly wrapped with real arguments, no
+repeat of the missing-`*args` bug class.
+
+**The UI hunt came up empty, twice, before the real technique paid
+off.** First guess: a Motion Modifier, since Motion Options already had
+an "Add Modifier" dropdown for other per-item behaviors (Follower,
+Effector, etc., seen while confirming this) - opened it on `connector_01`
+and scanned the full alphabetical list live; no "Morph" entry anywhere
+in it. Second guess: an Object Properties tab, on the theory that
+Endomorphs are usually reached through a Deform-style tab in other
+LightWave versions - checked the actual tab set in this install
+(Primitive/Render/Appearance/Lights/Global/FX/Instancer) and confirmed
+no "Deform" tab exists at all. Also hit a real interruption during this
+phase: LightWave itself was accidentally closed and had to be reopened
+and the scene reloaded mid-investigation - re-verified `lw_ping`/
+`lw_get_scene_info` before continuing, confirming the connector and
+scene state were both intact afterward.
+
+**Found it by sending the command directly and reading LightWave's own
+error dialog** - the same technique that already worked for
+`ObjGIRadiosityTolerance` (item 3) and the Fog/Volumetrics precondition
+(item 4), now proving itself again as a reliable fallback whenever a
+dedicated panel can't be found by browsing alone. `MorphAmount(0.5)`
+alone popped: "This option only applies when the current object has a
+morph target." This confirms both that the command is real and exactly
+what precondition gates it, without ever needing to find where a
+"morph target" would normally be assigned through the UI.
+
+**Satisfied the precondition and confirmed end to end.** Sent
+`MorphTarget("10000000")` (using `BoneTestObject`'s numeric ID as an
+arbitrary real item to serve as the target) directly via `lw_run_command`
+first, then resent `MorphAmount(0.5)` - no error dialog this time, both
+commands logged cleanly in Cmd History. No visible geometry change was
+possible to confirm further, since `BoneTestObject` is a plain Null
+with no real mesh to blend toward - a limitation of the test rig, not
+evidence either way about the command's correctness.
+
+Shipped `lw_set_morph(item, target=, amount=)`, resolving `target` to a
+numeric ID the same way `lw_set_goal`/`lw_set_parent` do (this command
+family shares the identical "wants a numeric ID, not a name" quirk).
+Re-verified through the actual wrapped tool by name (not raw
+`lw_run_command`) after a Claude Desktop restart:
+`lw_set_morph(item="connector_01", target="BoneTestObject", amount=0.7)`
+correctly logged `SelectItem 10000001` / `MorphTarget 10000000` /
+`MorphAmount 0.7`, no error, confirming the wrapper and its numeric-ID
+resolution work correctly together.
+
+`SaveEndomorph(name)`/`UseMorphedPositions()` were surveyed (real
+`*args` signature confirmed for the former) but not tested live or
+wrapped this pass - a real vmap-based Endomorph save/use workflow needs
+actual mesh geometry with real vertex data to test meaningfully, which
+this session's Null-based and simple-loaded-object test rigs don't
+provide well. Left for a future, dedicated session with a richer test
+object.
+
+`ROADMAP3.md` item 7 is closed - the last item on this roadmap. All 7
+items are now done.

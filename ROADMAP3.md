@@ -292,13 +292,60 @@ checking Cmd History against a real UI click first.
    groundwork with no new resolution work needed. See `PLAN.md` "Deeper
    bone rigging" for the full investigation.
 
-7. **Morph/Endomorph control.** Small but genuinely new: `MorphAmount(morph)`
-   and `MorphTarget(itemid)` (both confirmed `*args`-taking), plus
-   `SaveEndomorph`/`UseMorphedPositions`. Lets automation drive morph
-   target blending on an object - a distinct capability from anything
-   shipped in either prior roadmap. Lower priority than the items above
-   since it's a narrower, single-purpose feature rather than a whole
-   category, but cheap to add once picked up.
+7. **Morph/Endomorph control - DONE.** Shipped `lw_set_morph(item,
+   target=, amount=)`, wrapping `MorphTarget(itemid)`/`MorphAmount
+   (morph)` - the classic object-to-object morph (assigning a whole
+   other item's shape as a blend target), distinct from vmap-based
+   Endomorphs on a single object.
+
+   Real UI location took some searching - not a Motion Modifier (the
+   "Add Modifier" dropdown in Motion Options has no "Morph" entry) and
+   not an Object Properties tab (no "Deform" tab exists in this
+   install's Primitive/Render/Appearance/Lights/Global/FX/Instancer
+   set). Found instead by sending the command directly and reading
+   LightWave's own error dialog, the same technique that has already
+   worked repeatedly this project: `MorphAmount` alone popped "This
+   option only applies when the current object has a morph target" -
+   confirming both that the command is real and exactly what
+   precondition gates it, without ever finding a dedicated panel for it.
+
+   `target` resolved to a numeric ID like `lw_set_goal`/`lw_set_parent`
+   (same "wants a numeric ID, not a name" quirk as that whole command
+   family). Confirmed live end to end: sending `MorphTarget` then
+   `MorphAmount(0.7)` no longer raised the error, both logged cleanly.
+   No visible geometry change was possible to confirm further given the
+   test scene's morph target (`BoneTestObject`, a Null) has no real mesh
+   to blend toward - a limitation of the test rig, not the command.
+   `SaveEndomorph`/`UseMorphedPositions` were surveyed but not tested or
+   wrapped this pass - a real vmap-based Endomorph workflow needs actual
+   mesh geometry to meaningfully test, better suited to a future session
+   with a richer test object. See `PLAN.md` "Morph/Endomorph control"
+   for the full investigation.
+
+## Status: all 7 items done
+
+Item 2 (Node graphs) was the deepest investigation on this roadmap -
+nine explicitly-approved staged steps, one genuine dead end spotted from
+method names alone (`LWBSDFFuncs`) before wasting live-call budget on
+it, and a final answer that mirrored `ROADMAP2.md` item 9's keyframe
+discovery almost exactly. Item 3 (render globals) surfaced a new,
+concrete example of this project's "one-way, no delivery guarantee"
+Command Port caveat actually manifesting as a wrong logged value, not
+just a theoretical risk. Item 4 (scene environment) found a real,
+still-unresolved `FogColor` write gap, documented honestly rather than
+hidden. Item 5 (visibility flags) found both a genuine stub bug
+(`UnseenByAlphaChannel`) and that it wasn't even the boolean its name
+suggested. Item 6 (bone rigging) found the genuinely separate "Bones
+for &lt;object&gt;" panel, distinct from both Motion Options and Item
+Properties. Item 7 (morph) found its real precondition purely through
+LightWave's own error dialog, without ever locating a dedicated UI
+panel for it at all - proof that this project's "when in doubt, send it
+and read the error" methodology still works even when the UI hunt comes
+up empty. Combined with `ROADMAP.md` and `ROADMAP2.md`, this connector
+now covers scene management, item creation/loading, hierarchy/IK/bone
+rigging, cameras, lights, surfaces (flat and node-based), selection,
+animation/keyframes, render quality/GI, scene environment/atmosphere,
+per-object visibility, and object-to-object morphing.
 
 ## Not investigated this pass
 
