@@ -316,10 +316,27 @@ and what's explicitly out of scope.
   confirmed genuine argument-less toggles via the same definitive
   arg-count test described above; `weight_map_only` has a real
   precondition, LightWave's own error dialog: "This option only applies
-  when using a weight map". The muscle/joint-compensation family was
+  when using a weight map". `BoneStrengthMultiply` maps to "Multiply
+  Strength by Rest Length" (confirmed via a later full-panel
+  screenshot). The muscle/joint-compensation family was
   surveyed but not wrapped this pass. See `PLAN.md` "Deeper bone
   rigging" and "Follow-up sweep: closing the easy/moderate open items"
   for the full investigation.
+- `lw_save_endomorph(item, name)` and `lw_toggle_use_morphed_positions()`
+  (ROADMAP3.md item 6 follow-up) - wrap `SaveEndomorph(name)`/
+  `UseMorphedPositions()`. `SaveEndomorph` has a real, confirmed
+  precondition found via LightWave's own error dialog: "Null objects
+  are automatically saved with the scene" - it refuses Null objects
+  outright, so the actual end-to-end bake onto a real mesh is left
+  unconfirmed against this project's Null-based test rig.
+  `UseMorphedPositions` is confirmed a genuine argument-less toggle via
+  the arg-count test, but its real UI checkbox couldn't be located
+  anywhere in LightWave 2019.1.5 (checked the full Bones panel, Motion
+  Options, General Options, and Object Properties) - a web search hit
+  describing it turned out to be for LightWave 2025's documentation,
+  which may not reflect this build. Shipped as a bare toggle with that
+  caveat. See `PLAN.md` "Follow-up sweep: closing the easy/moderate
+  open items" for the full investigation.
 - **Morph/Endomorph control** (ROADMAP3.md item 7, the last item on
   `ROADMAP3.md`) - `lw_set_morph(item, target=, amount=)`, wrapping
   `MorphTarget`/`MorphAmount` (the classic object-to-object morph,

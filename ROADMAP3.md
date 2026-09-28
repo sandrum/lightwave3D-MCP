@@ -311,7 +311,28 @@ checking Cmd History against a real UI click first.
    bare - stronger evidence than any UI observation, since it directly
    probes the wrapped method's real signature. `BoneWeightMapOnly` also
    revealed a real precondition via LightWave's own error dialog: "This
-   option only applies when using a weight map."
+   option only applies when using a weight map." A later full-panel
+   screenshot of the Bones panel also resolved an earlier open
+   question: `BoneStrengthMultiply` maps to the "Multiply Strength by
+   Rest Length" checkbox, confirmed checked after the toggle was
+   flipped.
+
+   `SaveEndomorph(name)`/`UseMorphedPositions()` are now also shipped,
+   as `lw_save_endomorph(item, name)`/`lw_toggle_use_morphed_positions()`.
+   `SaveEndomorph` has a real, confirmed precondition found via
+   LightWave's own error dialog: "Null objects are automatically saved
+   with the scene" - it refuses Null objects outright, so the actual
+   end-to-end bake (a new named Endomorph with correct deformed
+   positions) is not independently confirmed against this Null-based
+   test rig, only that the command exists and enforces this
+   precondition. `UseMorphedPositions` is confirmed a genuine
+   argument-less toggle via the definitive arg-count test, but its real
+   UI checkbox could not be located anywhere in LightWave 2019.1.5 -
+   checked the full Bones panel, Motion Options, General Options, and
+   Object Properties, none show it. A web search surfaced a matching
+   description, but only in LightWave 2025's documentation, which may
+   not reflect this build's UI. Shipped as a bare toggle with that
+   caveat.
 
    The muscle/joint-compensation family (`BoneJointComp*`/
    `BoneMuscleFlex*`/`BoneTwist*`/`BoneBulge*`) was surveyed but not

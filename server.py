@@ -1656,11 +1656,10 @@ def lw_toggle_bone_flag(item: str, flag: str) -> str:
     confirmed live via LightWave's own error dialog: "This option only
     applies when using a weight map" - call after lw_set_bone's
     `weight_map_name` has assigned a real map. `BoneStrengthMultiply`
-    logged cleanly with no error or precondition; its exact UI checkbox
-    wasn't independently pinned down (a candidate, "Multiply Strength by
-    Rest Length", didn't visibly change, so this may map to a different
-    field not covered by this session's screenshots) - the toggle itself
-    is still confirmed genuine via the same definitive arg-count test."""
+    maps to the "Multiply Strength by Rest Length" checkbox - confirmed
+    live via a later full-panel screenshot showing it checked after
+    this toggle was flipped, resolving what an earlier pass had left as
+    an unpinned candidate."""
     item_id, id_resp = _resolve_item_id(item)
     if not item_id:
         return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
@@ -1719,6 +1718,66 @@ def lw_set_morph(item: str, target: str = None, amount: float = None) -> str:
             lw.MorphAmount(amount)
             sent.append("MorphAmount")
         return json.dumps({"result": "set %s on %s (id %s)" % (sent, item, item_id)})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_save_endomorph(item: str, name: str) -> str:
+    """Bake `item`'s current deformed point positions into a new
+    Endomorph vmap named `name`. Wraps the native SaveEndomorph(name)
+    command - `item` is selected via SelectItem first, matching every
+    other per-item command in this file.
+
+    Real, confirmed precondition found via LightWave's own error
+    dialog: "Null objects are automatically saved with the scene" -
+    SaveEndomorph refuses Null objects outright; only a real mesh
+    object can have an Endomorph baked onto it. This project's current
+    test rigs (e.g. BoneTestObject) are Nulls, so the actual successful
+    bake - a new named Endomorph appearing with correct deformed
+    positions - is NOT independently confirmed end to end, only that
+    the command exists, takes a name argument, and enforces this real
+    precondition. Left for a future session with a real mesh object
+    (loaded via lw_load_object) that has some actual point deformation
+    (bones/Morph Mixer) applied to bake."""
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
+    lw = _layout()
+    try:
+        lw.SelectItem(item_id)
+        lw.SaveEndomorph(name)
+        return json.dumps({"result": "sent SaveEndomorph %s on %s (id %s)" % (name, item, item_id)})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_toggle_use_morphed_positions() -> str:
+    """Flip "Use Morphed Positions" - per LightWave's own (much later,
+    2025-version) documentation, this lets bone deformation apply AFTER
+    morphs instead of before, and is documented there as not supported
+    with Limited Bones. Wraps the native UseMorphedPositions() command.
+
+    Confirmed live to be a genuine argument-less TOGGLE via the
+    definitive arg-count test (passing an explicit argument raises a
+    clean Python "takes 1 positional argument but 2 were given" error
+    from the stub). Its real UI checkbox could NOT be located in
+    LightWave 2019.1.5 - checked the Bones panel (confirmed via
+    screenshot to be the full panel: Bone Active/Maya Style
+    Joints/Use Weight Map Only/Weight Normalization/Multiply Strength
+    by Rest Length/Limited Range/Joint Compensation/Joint Comp for
+    Parent/Muscle Flexing/Parental Muscle Flexing/Muscle Bulge/
+    Parental Muscle Bulge/Twist - no "Use Morphed Positions" among
+    them), Motion Options, General Options, and Object Properties -
+    none show it. The 2025 documentation describing this checkbox may
+    not reflect 2019.1.5's UI, or it may be gated behind a real
+    Endomorph plus active bones this project's Null-based test rig
+    can't provide. Shipped as a bare toggle with no way to read state
+    back or visually confirm its effect - use with that caveat."""
+    try:
+        _layout().UseMorphedPositions()
+        return json.dumps({"result": "toggled UseMorphedPositions"})
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)})
 

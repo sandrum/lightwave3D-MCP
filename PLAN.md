@@ -2675,8 +2675,48 @@ real UI change; the other twenty-one type strings are inferred from
 the panel's own visible labels and shipped with that caveat rather than
 claimed as independently confirmed.
 
-Remaining open items (moderate/hard tier:
-`SaveEndomorph`/`UseMorphedPositions`, the bone muscle/joint-compensation
+**`SaveEndomorph`/`UseMorphedPositions`.** Definitive arg-count test
+confirmed `UseMorphedPositions` is a genuine argument-less toggle
+(explicit-argument call raised the stub's own arg-count `TypeError`).
+Hunting for its real UI checkbox took several rounds: a web search
+surfaced "Use Morphed Positions" as a Bone Properties checkbox that
+lets bone deformation apply after morphs instead of before - but this
+turned out to be from LightWave 2025's own documentation
+(docs.lightwave3d.com/2025/bone-properties.html), not necessarily
+accurate for 2019.1.5. Checked the actual 2019.1.5 Bones panel via a
+full-panel screenshot (every checkbox: Bone Active, Maya Style Joints,
+Use Weight Map Only, Weight Normalization, Multiply Strength by Rest
+Length, Limited Range, Joint Compensation, Joint Comp for Parent,
+Muscle Flexing, Parental Muscle Flexing, Muscle Bulge, Parental Muscle
+Bulge, Twist) - no "Use Morphed Positions" anywhere. Also checked
+Motion Options, General Options, and Object Properties (no "Deform"
+tab exists in this build - Object Properties just lists modifier
+entries like Morphing/Bones/Subdivision) - still nothing. Concluded
+this checkbox likely doesn't exist as such in 2019.1.5, or is gated
+behind a state (a real Endomorph plus active bones) this Null-based
+test rig can't produce, and shipped `lw_toggle_use_morphed_positions()`
+as a confirmed-genuine bare toggle with that UI-location caveat spelled
+out, rather than continuing to chase a moving target.
+
+That same full-panel Bones screenshot incidentally resolved an earlier
+open question from this sweep: `BoneStrengthMultiply` does map to
+"Multiply Strength by Rest Length" (visibly checked after the toggle
+had been flipped) - an earlier pass had left this as an unpinned
+candidate because it "didn't visibly change" in a narrower screenshot;
+this fuller one shows it did.
+
+`SaveEndomorph(name)` was tested by sending it directly against
+`BoneTestObject` - it immediately popped a real LightWave error
+dialog: "Null objects are automatically saved with the scene."
+`BoneTestObject` is a Null, so this is a genuine, confirmed
+precondition (SaveEndomorph refuses Nulls outright), not a stub bug.
+Shipped as `lw_save_endomorph(item, name)` with this precondition
+documented, but the actual successful bake - a new named Endomorph
+appearing with correct deformed positions on a real mesh - is left
+unconfirmed for a future session with a real loaded mesh object that
+has genuine point deformation (bones or Morph Mixer) applied to it.
+
+Remaining open items (moderate/hard tier: the bone muscle/joint-compensation
 family, `EnableRadiosity1`, the `ColorSpaceOutput`/`RenderAlgorithm`/
 `RenderMode`/`Antialiasing` families, the `FogColor` and
 `ObjGIRadiosityTolerance` mode gaps, Node Editor writing, and reading
