@@ -2716,9 +2716,69 @@ appearing with correct deformed positions on a real mesh - is left
 unconfirmed for a future session with a real loaded mesh object that
 has genuine point deformation (bones or Morph Mixer) applied to it.
 
-Remaining open items (moderate/hard tier: the bone muscle/joint-compensation
-family, `EnableRadiosity1`, the `ColorSpaceOutput`/`RenderAlgorithm`/
-`RenderMode`/`Antialiasing` families, the `FogColor` and
-`ObjGIRadiosityTolerance` mode gaps, Node Editor writing, and reading
-un-enveloped node parameters) are left for a future session, roughly in
-the difficulty order already established.
+**The bone muscle/joint-compensation family.** The stub revealed a
+clean pattern before any live testing was needed: `BoneJointComp()`/
+`BoneJointCompParent()`/`BoneMuscleFlex()`/`BoneMuscleFlexParent()`/
+`BoneBulge()`/`BoneBulgeParent()`/`BoneTwist()` are all bare toggles,
+each paired with an amount setter -
+`BoneJointCompAmounts(self, parent)`/`BoneMuscleFlexAmounts(self,
+parent)` bundle both sides into one call, while
+`BoneBulgeAmount`/`BoneBulgeParentAmount`/`BoneTwistAmount` are each
+independent single-argument setters. This exactly matched what the
+Bones panel's "Bone Displacement"/"Parent Displacement" section (seen
+in an earlier screenshot from the `UseMorphedPositions` search) already
+showed: seven rows, each a percentage plus what looked like its own
+toggle button.
+
+Verified the whole family live in one pass: sent `BoneJointComp()`
+then `BoneJointCompAmounts(0.3, 0.6)` - a screenshot confirmed "Joint
+Compensation" checked and reading 30.0%, "Joint Comp for Parent"
+reading 60.0% but still UNCHECKED (I never called
+`BoneJointCompParent()`) - proving these two rows are genuinely
+independent toggles, and that the Amounts command sets both numeric
+fields regardless of either checkbox's state. Then sent `BoneTwist()`
+alone: it immediately popped a real LightWave error dialog, "This
+option does not apply to the current bone type" - a genuine
+precondition, consistent with the "Twist" row already appearing grayed
+out in every screenshot of this panel (this test rig's bones are
+Z-axis type). Then sent `BoneMuscleFlex()`, `BoneMuscleFlexAmounts(0.4,
+0.7)`, `BoneBulge()`, `BoneBulgeAmount(0.55)`, `BoneBulgeParent()`,
+`BoneBulgeParentAmount(0.8)` together and checked the result: Bulge
+behaved exactly like Joint Comp (both `bulge` and `bulge_parent`
+showed checked, because I'd explicitly called both `BoneBulge()` AND
+`BoneBulgeParent()` this time - not a contradiction, just the natural
+result of toggling both), amounts read 55.0%/80.0% exactly. But Muscle
+Flex showed a real asymmetry: both "Muscle Flexing" AND "Parental
+Muscle Flexing" appeared checked despite only calling
+`BoneMuscleFlex()` - never `BoneMuscleFlexParent()`. Suspecting a
+misread, asked for a zoomed screenshot specifically of those two rows;
+the user confirmed both genuinely were checked. This means
+`BoneMuscleFlex()` controls both checkboxes together, unlike the
+joint-comp/bulge pairs - documented as a real, confirmed asymmetry
+rather than assumed to be identical to its siblings.
+
+Shipped as seven new `lw_toggle_bone_flag` flags (`joint_comp`/
+`joint_comp_parent`/`muscle_flex`/`muscle_flex_parent`/`bulge`/
+`bulge_parent`/`twist`) plus a new `lw_set_bone_deform(item, ...)` tool
+bundling the five amount setters with the same "send self/parent
+together, defaulting the omitted one to 0.0" shape lw_set_camera-style
+tools in this file already use for genuinely paired native commands.
+
+Along the way, revisited `UseMorphedPositions` (shipped in the
+previous item's follow-up pass with a "couldn't find its UI checkbox"
+caveat) with the Bones-panel screenshots gathered during this same
+investigation - and separately, the earlier restart-verification call
+to `lw_toggle_use_morphed_positions()` had left an error dialog sitting
+unseen on screen: "Use Morphed Positions not supported with the
+current bone mode." This is close enough to the 2025 documentation's
+"not supported with Limited Bones" that it upgrades the earlier
+caveat - the feature and its precondition are both real in 2019.1.5,
+just gated behind a bone mode this test rig doesn't have, not absent
+from the UI as originally assumed. Updated that tool's docstring
+accordingly.
+
+Remaining open items (moderate/hard tier: `EnableRadiosity1`, the
+`ColorSpaceOutput`/`RenderAlgorithm`/`RenderMode`/`Antialiasing`
+families, the `FogColor` and `ObjGIRadiosityTolerance` mode gaps, Node
+Editor writing, and reading un-enveloped node parameters) are left for
+a future session, roughly in the difficulty order already established.

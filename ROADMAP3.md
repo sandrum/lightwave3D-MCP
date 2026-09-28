@@ -326,24 +326,45 @@ checking Cmd History against a real UI click first.
    positions) is not independently confirmed against this Null-based
    test rig, only that the command exists and enforces this
    precondition. `UseMorphedPositions` is confirmed a genuine
-   argument-less toggle via the definitive arg-count test, but its real
-   UI checkbox could not be located anywhere in LightWave 2019.1.5 -
-   checked the full Bones panel, Motion Options, General Options, and
-   Object Properties, none show it. A web search surfaced a matching
-   description, but only in LightWave 2025's documentation, which may
-   not reflect this build's UI. Shipped as a bare toggle with that
-   caveat.
+   argument-less toggle via the definitive arg-count test; its own
+   checkbox couldn't be found as a visible UI element anywhere in
+   LightWave 2019.1.5 (checked the full Bones panel, Motion Options,
+   General Options, and Object Properties), but calling it live DID pop
+   a real error dialog: "Use Morphed Positions not supported with the
+   current bone mode" - closely matching the 2025 documentation's "not
+   supported with Limited Bones" claim, confirming the feature and its
+   precondition are both genuinely real in 2019.1.5, just gated behind
+   a bone mode this test rig's bones don't have.
 
-   The muscle/joint-compensation family (`BoneJointComp*`/
-   `BoneMuscleFlex*`/`BoneTwist*`/`BoneBulge*`) was surveyed but not
-   wrapped this pass - real, but a narrower organic-deformation feature
-   better suited to a dedicated session with a real mesh to test weight
-   maps against, rather than this Null-based test rig. Bones already had
-   a working numeric-ID resolution path from `ROADMAP2.md` item 7
-   (`_get_bones` reports each bone's own `id`, `_resolve_item_id` passes
-   numeric strings straight through) - this item builds directly on that
-   groundwork with no new resolution work needed. See `PLAN.md` "Deeper
-   bone rigging" for the full investigation.
+   **DONE - the muscle/joint-compensation family** (`BoneJointComp*`/
+   `BoneMuscleFlex*`/`BoneTwist*`/`BoneBulge*`) is now also shipped, as
+   `lw_toggle_bone_flag`'s seven new flags (`joint_comp`/
+   `joint_comp_parent`/`muscle_flex`/`muscle_flex_parent`/`bulge`/
+   `bulge_parent`/`twist`) plus `lw_set_bone_deform(item, joint_comp=,
+   joint_comp_parent=, muscle_flex=, muscle_flex_parent=, bulge=,
+   bulge_parent=, twist=)`. Confirmed live end to end via the Bones
+   panel's "Bone Displacement"/"Parent Displacement" section:
+   `BoneJointComp()` + `BoneJointCompAmounts(0.3, 0.6)` showed "Joint
+   Compensation: 30.0%"/"Joint Comp for Parent: 60.0%" exactly, with
+   only the "Joint Compensation" checkbox toggled on - confirming
+   `joint_comp`/`joint_comp_parent` are genuinely independent
+   checkboxes. Same independence confirmed for `bulge`/`bulge_parent`
+   (`BoneBulge()`+`BoneBulgeParent()` both explicitly toggled, both
+   showed checked; amounts `0.55`/`0.8` matched exactly). A real
+   asymmetry found for `muscle_flex`: toggling only `BoneMuscleFlex()`
+   (never calling `BoneMuscleFlexParent()`) checked BOTH "Muscle
+   Flexing" AND "Parental Muscle Flexing" simultaneously - confirmed
+   via a zoomed screenshot, not just a general read - unlike the
+   joint-comp/bulge pairs. `twist` (`BoneTwist()`) has a real
+   precondition, confirmed live via LightWave's own error dialog: "This
+   option does not apply to the current bone type" - consistent with
+   its row appearing grayed out for this test rig's Z-axis bones.
+   Bones already had a working numeric-ID resolution path from
+   `ROADMAP2.md` item 7 (`_get_bones` reports each bone's own `id`,
+   `_resolve_item_id` passes numeric strings straight through) - this
+   item builds directly on that groundwork with no new resolution work
+   needed. See `PLAN.md` "Deeper bone rigging" and "Follow-up sweep:
+   closing the easy/moderate open items" for the full investigation.
 
 7. **Morph/Endomorph control - DONE.** Shipped `lw_set_morph(item,
    target=, amount=)`, wrapping `MorphTarget(itemid)`/`MorphAmount

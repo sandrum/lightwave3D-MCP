@@ -291,7 +291,11 @@ and what's explicitly out of scope.
   strength=, rest_length=, rest_position=, rest_rotation=,
   weight_map_name=, falloff_type=, min_range=, max_range=)` and
   `lw_toggle_bone_flag(item, flag)` (`flag` is `"active"`,
-  `"limited_range"`, `"weight_map_only"`, or `"strength_multiply"`).
+  `"limited_range"`, `"weight_map_only"`, `"strength_multiply"`,
+  `"joint_comp"`, `"joint_comp_parent"`, `"muscle_flex"`,
+  `"muscle_flex_parent"`, `"bulge"`, `"bulge_parent"`, or `"twist"`) and
+  `lw_set_bone_deform(item, joint_comp=, joint_comp_parent=,
+  muscle_flex=, muscle_flex_parent=, bulge=, bulge_parent=, twist=)`.
   `item` must be a bone's numeric ID (from
   `lw_get_hierarchy`'s bone `id` field). Found the real UI location - a
   "Bones for &lt;object&gt;" panel reachable via the Properties button
@@ -318,10 +322,18 @@ and what's explicitly out of scope.
   precondition, LightWave's own error dialog: "This option only applies
   when using a weight map". `BoneStrengthMultiply` maps to "Multiply
   Strength by Rest Length" (confirmed via a later full-panel
-  screenshot). The muscle/joint-compensation family was
-  surveyed but not wrapped this pass. See `PLAN.md` "Deeper bone
-  rigging" and "Follow-up sweep: closing the easy/moderate open items"
-  for the full investigation.
+  screenshot). The muscle/joint-compensation family
+  (`joint_comp`/`joint_comp_parent`/`muscle_flex`/`muscle_flex_parent`/
+  `bulge`/`bulge_parent`/`twist` on `lw_toggle_bone_flag`, plus
+  `lw_set_bone_deform` for their amounts) is now also confirmed live:
+  `joint_comp`/`joint_comp_parent` and `bulge`/`bulge_parent` are each
+  genuinely independent checkboxes, but `muscle_flex` checks BOTH
+  "Muscle Flexing" AND "Parental Muscle Flexing" together - a real,
+  confirmed asymmetry, not a bug. `twist` has a real precondition,
+  LightWave's own error dialog: "This option does not apply to the
+  current bone type" (this test rig's bones are Z-axis type). See
+  `PLAN.md` "Deeper bone rigging" and "Follow-up sweep: closing the
+  easy/moderate open items" for the full investigation.
 - `lw_save_endomorph(item, name)` and `lw_toggle_use_morphed_positions()`
   (ROADMAP3.md item 6 follow-up) - wrap `SaveEndomorph(name)`/
   `UseMorphedPositions()`. `SaveEndomorph` has a real, confirmed
@@ -330,11 +342,15 @@ and what's explicitly out of scope.
   outright, so the actual end-to-end bake onto a real mesh is left
   unconfirmed against this project's Null-based test rig.
   `UseMorphedPositions` is confirmed a genuine argument-less toggle via
-  the arg-count test, but its real UI checkbox couldn't be located
-  anywhere in LightWave 2019.1.5 (checked the full Bones panel, Motion
-  Options, General Options, and Object Properties) - a web search hit
-  describing it turned out to be for LightWave 2025's documentation,
-  which may not reflect this build. Shipped as a bare toggle with that
+  the arg-count test; its own checkbox isn't visible anywhere in
+  LightWave 2019.1.5's UI (checked the full Bones panel, Motion
+  Options, General Options, and Object Properties), but calling it live
+  DID pop a real error dialog, "Use Morphed Positions not supported
+  with the current bone mode" - closely matching a web search hit's
+  LightWave 2025 documentation ("not supported with Limited Bones"),
+  confirming the feature and precondition are genuinely real in
+  2019.1.5 too, just gated behind a bone mode this test rig doesn't
+  have. Shipped as a bare toggle with that
   caveat. See `PLAN.md` "Follow-up sweep: closing the easy/moderate
   open items" for the full investigation.
 - **Morph/Endomorph control** (ROADMAP3.md item 7, the last item on

@@ -1637,11 +1637,13 @@ def lw_set_bone(item: str, strength: float = None, rest_length: float = None,
 @mcp.tool()
 def lw_toggle_bone_flag(item: str, flag: str) -> str:
     """Flip a bone's argument-less toggle flag (ROADMAP3.md item 6).
-    `flag` is `"active"`, `"limited_range"`, `"weight_map_only"`, or
-    `"strength_multiply"`. `item` must be a bone's numeric ID (see
-    lw_set_bone's docstring for why).
+    `flag` is `"active"`, `"limited_range"`, `"weight_map_only"`,
+    `"strength_multiply"`, `"joint_comp"`, `"joint_comp_parent"`,
+    `"muscle_flex"`, `"muscle_flex_parent"`, `"bulge"`, `"bulge_parent"`,
+    or `"twist"`. `item` must be a bone's numeric ID (see lw_set_bone's
+    docstring for why).
 
-    All four confirmed live to be genuine argument-less TOGGLES (a
+    The first four confirmed live to be genuine argument-less TOGGLES (a
     definitive test, not just a UI guess: passing an explicit argument
     to any of them raises a clean Python arg-count error from the stub
     itself, e.g. "takes 1 positional argument but 2 were given" -
@@ -1659,7 +1661,28 @@ def lw_toggle_bone_flag(item: str, flag: str) -> str:
     maps to the "Multiply Strength by Rest Length" checkbox - confirmed
     live via a later full-panel screenshot showing it checked after
     this toggle was flipped, resolving what an earlier pass had left as
-    an unpinned candidate."""
+    an unpinned candidate.
+
+    The remaining seven are the muscle/joint-compensation family's own
+    enable checkboxes (see lw_set_bone_deform's docstring for the
+    matching amount setters). All confirmed live via the Bones panel's
+    "Bone Displacement"/"Parent Displacement" section: `joint_comp`
+    ("Joint Compensation") and `bulge`/`bulge_parent` ("Muscle
+    Bulge"/"Parental Muscle Bulge") are each genuinely independent
+    checkboxes - toggling one leaves the other's checked state alone,
+    confirmed by toggling only `joint_comp` and seeing only that row
+    checked. `muscle_flex` (`BoneMuscleFlex`) is NOT independent of its
+    parent counterpart the same way - confirmed live that toggling only
+    `muscle_flex` checked BOTH "Muscle Flexing" AND "Parental Muscle
+    Flexing" simultaneously, unlike the joint-comp/bulge pairs;
+    `muscle_flex_parent` (`BoneMuscleFlexParent`) was not independently
+    re-tested given this, and may be redundant with `muscle_flex` or
+    control something else not covered by this session's screenshots.
+    `twist` (`BoneTwist`) has a real precondition, confirmed live via
+    LightWave's own error dialog: "This option does not apply to the
+    current bone type" - consistent with its "Twist" row appearing
+    grayed out for this test rig's Z-axis bones; a different Bone Type
+    may be required."""
     item_id, id_resp = _resolve_item_id(item)
     if not item_id:
         return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
@@ -1668,15 +1691,80 @@ def lw_toggle_bone_flag(item: str, flag: str) -> str:
         "limited_range": "BoneLimitedRange",
         "weight_map_only": "BoneWeightMapOnly",
         "strength_multiply": "BoneStrengthMultiply",
+        "joint_comp": "BoneJointComp",
+        "joint_comp_parent": "BoneJointCompParent",
+        "muscle_flex": "BoneMuscleFlex",
+        "muscle_flex_parent": "BoneMuscleFlexParent",
+        "bulge": "BoneBulge",
+        "bulge_parent": "BoneBulgeParent",
+        "twist": "BoneTwist",
     }.get(flag)
     if not command:
         return json.dumps({"error": "flag must be one of 'active', 'limited_range', "
-                                     "'weight_map_only', 'strength_multiply', got %r" % flag})
+                                     "'weight_map_only', 'strength_multiply', 'joint_comp', "
+                                     "'joint_comp_parent', 'muscle_flex', 'muscle_flex_parent', "
+                                     "'bulge', 'bulge_parent', 'twist', got %r" % flag})
     lw = _layout()
     try:
         lw.SelectItem(item_id)
         getattr(lw, command)()
         return json.dumps({"result": "toggled %s on %s (id %s)" % (command, item, item_id)})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_set_bone_deform(item: str, joint_comp: float = None, joint_comp_parent: float = None,
+                        muscle_flex: float = None, muscle_flex_parent: float = None,
+                        bulge: float = None, bulge_parent: float = None,
+                        twist: float = None) -> str:
+    """Set the muscle/joint-compensation family's amount fields (Bones
+    panel, "Bone Displacement"/"Parent Displacement" section) - the
+    counterpart to lw_toggle_bone_flag's `joint_comp`/`joint_comp_parent`/
+    `muscle_flex`/`muscle_flex_parent`/`bulge`/`bulge_parent`/`twist`
+    enable checkboxes, which gate whether each of these has any visible
+    effect. `item` must be a bone's numeric ID (see lw_set_bone's
+    docstring for why). All amounts are 0.0-1.0 (percent/100).
+
+    `joint_comp`/`joint_comp_parent` are sent TOGETHER via the native
+    BoneJointCompAmounts(self, parent) - it takes both at once, so
+    passing only one sends 0.0 for the other; call again with both
+    explicit values if you don't want to reset the omitted side.
+    Confirmed live: `joint_comp=0.3, joint_comp_parent=0.6` showed
+    "Joint Compensation: 30.0%"/"Joint Comp for Parent: 60.0%" exactly.
+    `muscle_flex`/`muscle_flex_parent` work the same way via
+    BoneMuscleFlexAmounts(self, parent) - confirmed live with
+    `muscle_flex=0.4, muscle_flex_parent=0.7` showing "40.0%"/"70.0%".
+    `bulge`/`bulge_parent`/`twist` are each independent single-argument
+    setters (BoneBulgeAmount/BoneBulgeParentAmount/BoneTwistAmount) -
+    confirmed live for bulge (`0.55`/`0.8` matched exactly); `twist` has
+    a real precondition, LightWave's own error dialog "This option does
+    not apply to the current bone type" (this test rig's bones are
+    Z-axis type - a different Bone Type may be required, not
+    independently confirmed working end to end)."""
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
+    lw = _layout()
+    sent = []
+    try:
+        lw.SelectItem(item_id)
+        if joint_comp is not None or joint_comp_parent is not None:
+            lw.BoneJointCompAmounts(joint_comp or 0.0, joint_comp_parent or 0.0)
+            sent.append("BoneJointCompAmounts")
+        if muscle_flex is not None or muscle_flex_parent is not None:
+            lw.BoneMuscleFlexAmounts(muscle_flex or 0.0, muscle_flex_parent or 0.0)
+            sent.append("BoneMuscleFlexAmounts")
+        if bulge is not None:
+            lw.BoneBulgeAmount(bulge)
+            sent.append("BoneBulgeAmount")
+        if bulge_parent is not None:
+            lw.BoneBulgeParentAmount(bulge_parent)
+            sent.append("BoneBulgeParentAmount")
+        if twist is not None:
+            lw.BoneTwistAmount(twist)
+            sent.append("BoneTwistAmount")
+        return json.dumps({"result": "set %s on %s (id %s)" % (sent, item, item_id)})
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)})
 
@@ -1762,19 +1850,17 @@ def lw_toggle_use_morphed_positions() -> str:
     Confirmed live to be a genuine argument-less TOGGLE via the
     definitive arg-count test (passing an explicit argument raises a
     clean Python "takes 1 positional argument but 2 were given" error
-    from the stub). Its real UI checkbox could NOT be located in
-    LightWave 2019.1.5 - checked the Bones panel (confirmed via
-    screenshot to be the full panel: Bone Active/Maya Style
-    Joints/Use Weight Map Only/Weight Normalization/Multiply Strength
-    by Rest Length/Limited Range/Joint Compensation/Joint Comp for
-    Parent/Muscle Flexing/Parental Muscle Flexing/Muscle Bulge/
-    Parental Muscle Bulge/Twist - no "Use Morphed Positions" among
-    them), Motion Options, General Options, and Object Properties -
-    none show it. The 2025 documentation describing this checkbox may
-    not reflect 2019.1.5's UI, or it may be gated behind a real
-    Endomorph plus active bones this project's Null-based test rig
-    can't provide. Shipped as a bare toggle with no way to read state
-    back or visually confirm its effect - use with that caveat."""
+    from the stub). Its own checkbox could not be located as a visible
+    UI element in LightWave 2019.1.5 (checked the full Bones panel,
+    Motion Options, General Options, and Object Properties - none show
+    it), BUT calling it live DID pop a real LightWave error dialog:
+    "Use Morphed Positions not supported with the current bone mode." -
+    this closely matches the 2025 documentation's "not supported with
+    Limited Bones" claim, confirming the feature and its precondition
+    are both real in 2019.1.5 too, just gated behind a bone mode this
+    test rig's bones don't have and with no separate checkbox exposed
+    in this build's UI (it may only appear once that mode is active).
+    Shipped as a bare toggle with no way to read state back."""
     try:
         _layout().UseMorphedPositions()
         return json.dumps({"result": "toggled UseMorphedPositions"})
