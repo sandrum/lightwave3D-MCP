@@ -853,15 +853,11 @@ def lw_set_backdrop(color: list = None, zenith_color: list = None, sky_color: li
     when it's on - see lw_toggle_gradient_backdrop). Each is [r, g, b],
     0.0-1.0.
 
-    `color` and `sky_color` confirmed live: `BackdropColor(1, 0, 0)`
-    correctly showed a red swatch (255/0/0); `SkyColor(0, 1, 0)`
-    correctly showed green, both with zero precondition.
-    `zenith_color`/`ground_color`/`nadir_color` (ZenithColor/GroundColor/
-    NadirColor) were NOT independently tested live this session - they
-    share the identical `(red, green, blue)` 3-arg signature already
-    confirmed twice for `BackdropColor`/`SkyColor` in this same panel,
-    so treat them as high-confidence by pattern, not independently
-    verified."""
+    All five confirmed live with zero precondition: `BackdropColor(1, 0,
+    0)` showed red; `SkyColor(0, 1, 0)` showed green; with Gradient
+    Backdrop on, `ZenithColor(1, 1, 0)`/`GroundColor(1, 0, 1)`/
+    `NadirColor(0, 1, 1)` sent together correctly showed yellow/magenta/
+    cyan respectively, exactly matching."""
     lw = _layout()
     sent = []
     try:
@@ -925,6 +921,33 @@ def lw_toggle_volumetrics() -> str:
     try:
         _layout().EnableVolumetrics()
         return json.dumps({"result": "toggled EnableVolumetrics"})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_toggle_volumetric_lights() -> str:
+    """Flip the scene-wide "Enable Volumetric Lights" toggle
+    (ROADMAP3.md item 4/6). Wraps EnableVolumetricLights - confirmed
+    live to be a genuine argument-less TOGGLE via the definitive test
+    (passing an explicit argument raises a clean Python arg-count error
+    from the stub: "takes 1 positional argument but 2 were given").
+
+    Worth noting as a methodology finding: Cmd History displayed this
+    particular toggle's calls as "EnableVolumetricLights 0"/"...1"
+    alternating with each click, even though no argument was ever
+    actually sent - LightWave apparently echoes some toggle commands'
+    resulting boolean state into Cmd History for readability, purely as
+    a display convention unrelated to what's on the wire. Do not treat a
+    numeric suffix in Cmd History alone as proof a command takes an
+    argument - the arg-count test above is the reliable signal, and it
+    confirms this one doesn't. No way to read current state back, so
+    this flips rather than sets. Distinct from lw_toggle_volumetrics'
+    scene Volumetrics/Fog panel and from lw_set_light's
+    volumetric_samples/volumetric_intensity, which are per-light."""
+    try:
+        _layout().EnableVolumetricLights()
+        return json.dumps({"result": "toggled EnableVolumetricLights"})
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)})
 
@@ -1062,13 +1085,21 @@ def lw_set_camera(camera: str, zoom_factor: float = None, f_stop: float = None,
 
 @mcp.tool()
 def lw_set_light(light: str, intensity: float = None, color: list = None,
-                  falloff_type: int = None, cone_angle: float = None) -> str:
+                  falloff_type: int = None, cone_angle: float = None,
+                  volumetric_samples: int = None, volumetric_intensity: float = None) -> str:
     """Set light properties - ROADMAP2.md item 5, the write-side
     counterpart to lw_get_light_info. Wraps LightIntensity/LightColor
     (color is [r, g, b], each 0.0-1.0)/LightFalloffType/LightConeAngle,
     following lw_set_camera's bundled-optional-params shape. Same
     numeric-ID SelectItem fix as lw_set_camera/lw_set_target. Confirmed
     live: intensity and color take effect immediately.
+
+    `volumetric_samples`/`volumetric_intensity` (ROADMAP3.md item 4,
+    Light Properties > Basic > "Volumetric Samples"/"Volumetric
+    Intensity", gated by "Affect Volumetrics") confirmed live with zero
+    precondition beyond that checkbox already being on:
+    `volumetric_samples=8` showed "8"; `volumetric_intensity=0.5` showed
+    "50.0%", both exact matches.
 
     falloff_type write confirmed live via UI screenshot (Light
     Properties showed the new "Intensity Falloff" setting immediately)
@@ -1120,6 +1151,12 @@ def lw_set_light(light: str, intensity: float = None, color: list = None,
         if cone_angle is not None:
             lw.LightConeAngle(cone_angle)
             sent.append("LightConeAngle")
+        if volumetric_samples is not None:
+            lw.LightVolumetricSamples(volumetric_samples)
+            sent.append("LightVolumetricSamples")
+        if volumetric_intensity is not None:
+            lw.LightVolumetricIntensity(volumetric_intensity)
+            sent.append("LightVolumetricIntensity")
         return json.dumps({"result": "set %s on %s (id %s)" % (sent, light, light_id)})
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)})
@@ -1511,25 +1548,27 @@ def lw_set_bone(item: str, strength: float = None, rest_length: float = None,
     TOP of the Bones panel, above "Current Bone" - it applies to every
     bone on the object, not just the selected one), everything else is
     per-bone. `rest_position`/`rest_rotation` are [x,y,z]/[h,p,b]
-    triples (untested this session - see below).
+    triples.
 
     Confirmed live on a real bone (Bone1): `strength=0.5` showed
     "Strength: 50.0%"; `rest_length=2` showed "Rest Length: 2m";
     `falloff_type=2` changed the object-wide dropdown from "Inverse
     Distance ^16" to "Inverse Distance ^2" (exact enum values for other
-    dropdown entries not confirmed). `weight_map_name` sent cleanly (no
-    error, logged correctly) but couldn't be visually confirmed - this
-    test rig's bones live on a plain Null with no real mesh/vmap data,
-    so there was no actual weight map for the name to match; treat this
-    as likely-correct-by-signature rather than fully confirmed.
-    `rest_position`/`rest_rotation`/`min_range`/`max_range` were not
-    tested live this session - `min_range`/`max_range` map to the
-    "Limited Range" Min/Max fields, gated by the same precondition
-    lw_toggle_bone_flag's "limited_range" flag controls (confirmed live
-    that those fields are grayed out until it's checked, matching the
-    DOF/Motion-Blur precondition shape from earlier roadmaps) - all four
-    share the same confirmed-`*args` signature shape as the tested
-    properties above, shipped by pattern-confidence."""
+    dropdown entries not confirmed). `min_range=0.5`/`max_range=3`
+    correctly showed "Min: 500mm"/"Max: 3m" once `lw_toggle_bone_flag`'s
+    "limited_range" was enabled first (these fields are grayed out
+    otherwise, matching the DOF/Motion-Blur precondition shape from
+    earlier roadmaps). `rest_position=[1,2,3]`/`rest_rotation=[10,20,30]`
+    confirmed live via a real UI discovery: clicking the "Rest Position"/
+    "Rest Rotation" buttons (they look like plain buttons, not value
+    fields) opens a "Set Bone Rest Position/Rotation" requester
+    pre-populated with the already-written value - X:1m/Y:2m/Z:3m and
+    Heading:10/Pitch:20/Bank:30 respectively, both exact matches.
+    `weight_map_name` sent cleanly (no error, logged correctly) but
+    couldn't be visually confirmed - this test rig's bones live on a
+    plain Null with no real mesh/vmap data, so there was no actual
+    weight map for the name to match; treat this as likely-correct-by-
+    signature rather than fully confirmed."""
     item_id, id_resp = _resolve_item_id(item)
     if not item_id:
         return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
@@ -1568,26 +1607,43 @@ def lw_set_bone(item: str, strength: float = None, rest_length: float = None,
 
 @mcp.tool()
 def lw_toggle_bone_flag(item: str, flag: str) -> str:
-    """Flip BoneActive or BoneLimitedRange for a bone (ROADMAP3.md item
-    6). `flag` is `"active"` or `"limited_range"`. `item` must be a
-    bone's numeric ID (see lw_set_bone's docstring for why).
+    """Flip a bone's argument-less toggle flag (ROADMAP3.md item 6).
+    `flag` is `"active"`, `"limited_range"`, `"weight_map_only"`, or
+    `"strength_multiply"`. `item` must be a bone's numeric ID (see
+    lw_set_bone's docstring for why).
 
-    Both confirmed live to be genuine argument-less TOGGLES, same shape
-    and same limitation as every other confirmed toggle in this
-    connector (lw_toggle_ik_flag, lw_toggle_object_visibility): no way
-    to read current state back, so this flips rather than sets.
-    `BoneActive` (Bone Active checkbox) defaulted to unchecked on a
-    freshly-created bone in this test rig - a bone can exist and be
+    All four confirmed live to be genuine argument-less TOGGLES (a
+    definitive test, not just a UI guess: passing an explicit argument
+    to any of them raises a clean Python arg-count error from the stub
+    itself, e.g. "takes 1 positional argument but 2 were given" -
+    proving the real command underneath truly takes none). No way to
+    read current state back for any of them, so this flips rather than
+    sets. `BoneActive` (Bone Active checkbox) defaulted to unchecked on
+    a freshly-created bone in this test rig - a bone can exist and be
     parented into a chain while still "inactive". `BoneLimitedRange`
     gates the "Limited Range" Min/Max fields lw_set_bone's `min_range`/
     `max_range` write to - confirmed live those fields are grayed out
-    until this is checked."""
+    until this is checked. `BoneWeightMapOnly` has a real precondition,
+    confirmed live via LightWave's own error dialog: "This option only
+    applies when using a weight map" - call after lw_set_bone's
+    `weight_map_name` has assigned a real map. `BoneStrengthMultiply`
+    logged cleanly with no error or precondition; its exact UI checkbox
+    wasn't independently pinned down (a candidate, "Multiply Strength by
+    Rest Length", didn't visibly change, so this may map to a different
+    field not covered by this session's screenshots) - the toggle itself
+    is still confirmed genuine via the same definitive arg-count test."""
     item_id, id_resp = _resolve_item_id(item)
     if not item_id:
         return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
-    command = {"active": "BoneActive", "limited_range": "BoneLimitedRange"}.get(flag)
+    command = {
+        "active": "BoneActive",
+        "limited_range": "BoneLimitedRange",
+        "weight_map_only": "BoneWeightMapOnly",
+        "strength_multiply": "BoneStrengthMultiply",
+    }.get(flag)
     if not command:
-        return json.dumps({"error": "flag must be 'active' or 'limited_range', got %r" % flag})
+        return json.dumps({"error": "flag must be one of 'active', 'limited_range', "
+                                     "'weight_map_only', 'strength_multiply', got %r" % flag})
     lw = _layout()
     try:
         lw.SelectItem(item_id)

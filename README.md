@@ -160,7 +160,8 @@ and what's explicitly out of scope.
   correctly satisfies the precondition and all three shutter properties
   read back their previously-set values. See `PLAN.md` "Camera property
   writes" for the full investigation.
-- `lw_set_light(light, intensity=, color=, falloff_type=, cone_angle=)`
+- `lw_set_light(light, intensity=, color=, falloff_type=, cone_angle=,
+  volumetric_samples=, volumetric_intensity=)`
   (ROADMAP2.md item 5) - the write-side counterpart to
   `lw_get_light_info`. Same shape and numeric-ID `SelectItem` pattern as
   `lw_set_camera`. Confirmed live: `intensity`/`color` take effect
@@ -179,7 +180,12 @@ and what's explicitly out of scope.
   `lw_run_command` directly for those two. Also confirmed live:
   "Visible to Camera" is disabled in the UI for Point lights, only
   usable on Spot/Distant. See `PLAN.md` "Light property writes" for the
-  full investigation.
+  full investigation. `volumetric_samples`/`volumetric_intensity`
+  (ROADMAP3.md item 4, gated by "Affect Volumetrics") confirmed live
+  with zero precondition beyond that checkbox already being on. See
+  also `lw_toggle_volumetric_lights()`, the scene-wide "Enable
+  Volumetric Lights" toggle - distinct from these per-light values and
+  from `lw_toggle_volumetrics`' scene Volumetrics/Fog panel.
 - `lw_render_frame(frame=None)`, `lw_render_scene()`, `lw_abort_render()`
   - one-way, fire-and-forget like every command here.
 - `lw_get_render_status()` - the actual point of this group: real
@@ -229,18 +235,40 @@ and what's explicitly out of scope.
 - **Scene environment/atmosphere** (ROADMAP3.md item 4) -
   `lw_set_backdrop(color=, zenith_color=, sky_color=, ground_color=,
   nadir_color=)`, `lw_toggle_gradient_backdrop()`,
-  `lw_toggle_volumetrics()`, `lw_set_fog(fog_type=, min_distance=,
+  `lw_toggle_volumetrics()`, `lw_toggle_volumetric_lights()`,
+  `lw_set_fog(fog_type=, min_distance=,
   max_distance=, min_amount=, max_amount=, color=)`. `Backdrop()`
   (despite the central-looking name) turned out to just be a panel-opener
   like `SurfaceEditor` - opening Effects > Backdrop logged it bare, not a
-  setting. `GradientBackdrop` confirmed a genuine toggle;
-  `BackdropColor`/`SkyColor` confirmed live with real color swatches
-  (red, then green). Fog lives under Render Properties > Volumetrics
+  setting. `GradientBackdrop` confirmed a genuine toggle; all five
+  backdrop colors confirmed live with real color swatches -
+  `BackdropColor`/`SkyColor` (red, then green), and with Gradient
+  Backdrop on, `zenith_color`/`ground_color`/`nadir_color` sent together
+  correctly showed yellow/magenta/cyan. Fog lives under Render
+  Properties > Volumetrics
   (not the "Legacy Volumetrics" Effects tab, which turned out to be an
   unrelated plugin-based system - Ground Fog/HyperVoxels/PixieDust) -
   `EnableVolumetrics` confirmed a genuine toggle that gates the *entire*
   Fog panel as a precondition, same shape as DOF/Motion Blur; `FogType`
-  confirmed live with enum value `1` = "Linear".
+  confirmed live with enum value `1` = "Linear". `lw_toggle_volumetric_lights()`
+  wraps the scene-wide `EnableVolumetricLights` toggle, confirmed genuine
+  via a new definitive test (see "Methodology" note below), distinct
+  from per-light `volumetric_samples`/`volumetric_intensity` on
+  `lw_set_light` and from this section's scene Volumetrics/Fog panel.
+
+  **Methodology finding**: `EnableVolumetricLights` initially looked
+  suspicious because Cmd History logged it as `EnableVolumetricLights
+  0`/`1` alternating with each bare call, resembling the
+  `UnseenByAlphaChannel` missing-argument bug from item 5. A more
+  definitive test resolved it: passing an explicit argument to the
+  wrapped stub raised a Python arg-count `TypeError`
+  ("takes 1 positional argument but 2 were given"), proving the stub -
+  and by inference the real command - genuinely takes none. The Cmd
+  History suffix turned out to be LightWave's own display convention
+  for echoing a toggle's resulting boolean state, not evidence of a
+  real argument on the wire. A numeric suffix in Cmd History alone is
+  **not** reliable proof a command takes an argument; the arg-count
+  test is.
 
   **Real, unresolved gap**: `FogColor` is accepted and logged cleanly in
   Cmd History both before and after satisfying the Volumetrics
@@ -251,8 +279,9 @@ and what's explicitly out of scope.
 - **Deeper bone rigging** (ROADMAP3.md item 6) - `lw_set_bone(item,
   strength=, rest_length=, rest_position=, rest_rotation=,
   weight_map_name=, falloff_type=, min_range=, max_range=)` and
-  `lw_toggle_bone_flag(item, flag)` (`flag` is `"active"` or
-  `"limited_range"`). `item` must be a bone's numeric ID (from
+  `lw_toggle_bone_flag(item, flag)` (`flag` is `"active"`,
+  `"limited_range"`, `"weight_map_only"`, or `"strength_multiply"`).
+  `item` must be a bone's numeric ID (from
   `lw_get_hierarchy`'s bone `id` field). Found the real UI location - a
   "Bones for &lt;object&gt;" panel reachable via the Properties button
   while a bone is current, distinct from both Motion Options (IK only)
@@ -264,8 +293,22 @@ and what's explicitly out of scope.
   inactive, confirming a bone can exist and be parented while still
   off. `weight_map_name` sent cleanly but couldn't be visually confirmed
   since this test rig's bones have no real mesh/vmap to match against.
-  The muscle/joint-compensation family was surveyed but not wrapped this
-  pass. See `PLAN.md` "Deeper bone rigging" for the full investigation.
+  `min_range=0.5`/`max_range=3` confirmed live ("Min: 500mm"/"Max: 3m")
+  once `limited_range` was toggled on first (grayed out otherwise, same
+  precondition shape as DOF/Motion Blur). `rest_position=[1,2,3]`/
+  `rest_rotation=[10,20,30]` confirmed live via a UI discovery: the
+  "Rest Position"/"Rest Rotation" fields look like plain buttons, not
+  value fields, but clicking one opens a "Set Bone Rest
+  Position"/"...Rotation" requester pre-populated with the
+  already-written value - a reusable confirmation technique for any
+  other button-styled field. `weight_map_only`/`strength_multiply`
+  confirmed genuine argument-less toggles via the same definitive
+  arg-count test described above; `weight_map_only` has a real
+  precondition, LightWave's own error dialog: "This option only applies
+  when using a weight map". The muscle/joint-compensation family was
+  surveyed but not wrapped this pass. See `PLAN.md` "Deeper bone
+  rigging" and "Follow-up sweep: closing the easy/moderate open items"
+  for the full investigation.
 - **Morph/Endomorph control** (ROADMAP3.md item 7, the last item on
   `ROADMAP3.md`) - `lw_set_morph(item, target=, amount=)`, wrapping
   `MorphTarget`/`MorphAmount` (the classic object-to-object morph,

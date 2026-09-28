@@ -2542,3 +2542,110 @@ object.
 
 `ROADMAP3.md` item 7 is closed - the last item on this roadmap. All 7
 items are now done.
+
+## Follow-up sweep: closing the easy/moderate open items
+
+After `ROADMAP3.md` was fully done, reviewed the accumulated list of
+"surveyed but not independently tested" and "shipped by pattern-
+confidence" items across all 7 items, roughly ordered by expected
+effort, and worked through the easy tier live.
+
+**Backdrop: `ZenithColor`/`GroundColor`/`NadirColor`.** Sent all three
+together (Gradient Backdrop already enabled from earlier work) -
+Zenith showed yellow (255/255/0), Ground showed magenta (255/0/255),
+Nadir showed cyan (0/255/255), all exact matches, no reordering issues
+this time despite being sent as one parallel batch (unlike item 3's
+earlier finding - each targeted a genuinely different field, so even
+had reordering occurred it couldn't have corrupted any single field's
+final value the way `RadiosityInterpolation` was corrupted before).
+
+**Bones: `BoneMinRange`/`BoneMaxRange`/`BoneRestPosition`/
+`BoneRestRotation`.** Re-enabled Limited Range first (it had been left
+toggled off at the end of item 6's original session).
+`BoneMinRange(0.5)`/`BoneMaxRange(3)` showed "Min: 500mm"/"Max: 3m"
+correctly. `BoneRestPosition`/`BoneRestRotation` produced a genuinely
+useful UI discovery: they look like plain, inert-looking buttons in the
+Bones panel, not value fields - but clicking either one opens a real
+"Set Bone Rest Position"/"Set Bone Rest Rotation" requester,
+pre-populated with whatever value is already set. Sent
+`BoneRestPosition(1, 2, 3)` then clicked the button: the requester
+showed X:1m, Y:2m, Z:3m exactly. Sent `BoneRestRotation(10, 20, 30)`
+then clicked its button: Heading:10.0, Pitch:20.0, Bank:30.0, also
+exact. This is a reusable technique for any other "button-style" field
+in this SDK - the button isn't just an action trigger, it's a live
+requester reflecting current state, giving a clean confirmation path
+even when a field isn't a simple inline text box.
+
+**`EnableVolumetricLights` - confirmed genuine, but with a real,
+important methodology correction.** Sent the bare command three times
+via `lw_run_command` with no arguments each time. Cmd History showed
+`EnableVolumetricLights 0`, then `1`, then `0` - alternating, as if a
+real toggle's resulting state were being appended as an argument. This
+looked, at first glance, exactly like the `UnseenByAlphaChannel`
+discovery from `ROADMAP3.md` item 5 (a command that looked like a
+simple toggle but turned out to secretly take an argument). Rather
+than assume this pattern repeated and start editing the stub, ran the
+actual definitive test instead: sent `EnableVolumetricLights` WITH an
+explicit argument (`[1]`) and confirmed it raised
+`"Layout.EnableVolumetricLights() takes 1 positional argument but 2
+were given"` - the same error shape a genuinely bare-only stub method
+always produces when called with too many arguments. This proves the
+wrapped method itself only accepts zero arguments, meaning none of the
+three earlier bare calls could possibly have sent a real argument
+either - the `0`/`1`/`0` suffixes in Cmd History must be a LightWave
+display convention (echoing some toggle commands' resulting boolean
+state into the log for human readability) rather than evidence of what
+was actually transmitted over the wire.
+
+This is a genuinely important, generalizable finding for this
+project's whole toggle-verification methodology going forward: **a
+numeric suffix appearing in Cmd History is not, by itself, reliable
+proof that a command takes an argument.** Only some toggle-shaped
+commands get this echo treatment (most confirmed toggles this project
+has tested - `UnaffectedByIK`, `GradientBackdrop`, `EnableRadiosity0`,
+`BoneActive`, etc. - have always logged completely bare, with nothing
+after the command name at all), so this was the first time the
+distinction actually mattered. The reliable, definitive test going
+forward is: does passing an explicit argument to the wrapped stub raise
+a Python arg-count `TypeError`? If yes, the stub (and, by inference,
+the real command) is genuinely argument-less; if the extra argument is
+silently accepted instead, that's the real signal a stub fix is needed
+- not whatever Cmd History happens to display.
+
+Also confirmed via the same technique: `BoneWeightMapOnly` and
+`BoneStrengthMultiply` (bone rigging) are both genuine toggles.
+`BoneWeightMapOnly` additionally popped a real LightWave error dialog,
+"This option only applies when using a weight map" - a real
+precondition, consistent with this test rig never having had a real
+weight map assigned (matching `BoneWeightMapName`'s own earlier
+unconfirmed-by-necessity finding).
+
+**Per-light `LightVolumetricSamples`/`LightVolumetricIntensity`.**
+Opened Light Properties for `Light`, confirmed "Volumetric Samples: 2"/
+"Volumetric Intensity: 100.0%" already visible (gated by "Affect
+Volumetrics", already checked). Sent `LightVolumetricSamples(8)`/
+`LightVolumetricIntensity(0.5)` - showed "8"/"50.0%", both exact,
+zero precondition beyond the checkbox already being on.
+
+**Shipped all of the above as real tool updates**, not just new
+findings: extended `lw_set_backdrop`'s docstring to drop the "not
+independently tested" caveat for the three gradient colors; extended
+`lw_set_bone`'s docstring the same way for rest position/rotation/min/
+max range; added `"weight_map_only"`/`"strength_multiply"` as two more
+`lw_toggle_bone_flag` flag options; added `volumetric_samples`/
+`volumetric_intensity` parameters to `lw_set_light`; and added a new
+tool, `lw_toggle_volumetric_lights`, wrapping `EnableVolumetricLights`
+with its methodology finding documented directly in the tool's own
+docstring so a future session doesn't have to rediscover it. Re-tested
+`lw_toggle_volumetric_lights`, `lw_set_light(volumetric_samples=10)`,
+and `lw_toggle_bone_flag(flag="strength_multiply")` through the actual
+wrapped tools after a Claude Desktop restart - all three returned clean
+success.
+
+Remaining open items (moderate/hard tier: `ContentTypeDirectory`,
+`SaveEndomorph`/`UseMorphedPositions`, the bone muscle/joint-compensation
+family, `EnableRadiosity1`, the `ColorSpaceOutput`/`RenderAlgorithm`/
+`RenderMode`/`Antialiasing` families, the `FogColor` and
+`ObjGIRadiosityTolerance` mode gaps, Node Editor writing, and reading
+un-enveloped node parameters) are left for a future session, roughly in
+the difficulty order already established.

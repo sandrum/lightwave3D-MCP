@@ -175,10 +175,9 @@ checking Cmd History against a real UI click first.
    just a panel-opener, matching `SurfaceEditor`/`ItemProperties` -
    opening Effects > Backdrop itself logged a bare `Backdrop`, not a
    setting to wrap. `GradientBackdrop` confirmed a genuine argument-less
-   toggle. `BackdropColor`/`SkyColor` confirmed live with correct color
-   swatches (red, then green); `ZenithColor`/`GroundColor`/`NadirColor`
-   share the identical confirmed 3-arg signature but weren't
-   independently tested this pass.
+   toggle. All five backdrop colors confirmed live: `BackdropColor`/
+   `SkyColor` first (red, then green), then `ZenithColor`/`GroundColor`/
+   `NadirColor` together (yellow/magenta/cyan), all exact matches.
 
    `EnableVolumetrics` confirmed a genuine toggle, and confirmed to gate
    the *entire* Fog panel as a real precondition - Fog settings sent
@@ -198,11 +197,19 @@ checking Cmd History against a real UI click first.
    just a UI redraw lag like `FogType` briefly appeared to have) but
    explicitly flagged as unconfirmed, not proven working.
 
-   Per-light `LightVolumetricSamples`/`LightVolumetricIntensity` (natural
-   extensions to `lw_set_light`) and `EnableVolumetricLights` were
-   surveyed but not wrapped this pass - left for a future session rather
-   than further extending an already-large item. See `PLAN.md` "Scene
-   environment/atmosphere" for the complete investigation.
+   Per-light `LightVolumetricSamples`/`LightVolumetricIntensity` (now
+   added to `lw_set_light`) and `EnableVolumetricLights` (now
+   `lw_toggle_volumetric_lights`) were confirmed live in a follow-up
+   sweep: Light Properties showed "Volumetric Samples: 8"/"Volumetric
+   Intensity: 50.0%" exactly matching. `EnableVolumetricLights` also
+   surfaced a real methodology finding - Cmd History displayed its calls
+   as `EnableVolumetricLights 0`/`1` alternating even though no argument
+   was ever sent, apparently LightWave's own convention for echoing some
+   toggles' resulting state into the log for readability. The reliable
+   test remains whether an explicit argument raises a stub arg-count
+   error (it does here), not what Cmd History happens to display. See
+   `PLAN.md` "Scene environment/atmosphere" for the complete
+   investigation.
 
 5. **Per-object render-visibility flags - DONE, plus a real stub bug and
    a genuine surprise finding.** Shipped `lw_toggle_object_visibility(
@@ -253,7 +260,8 @@ checking Cmd History against a real UI click first.
    than wrapping all of them. Shipped `lw_set_bone(item, strength=,
    rest_length=, rest_position=, rest_rotation=, weight_map_name=,
    falloff_type=, min_range=, max_range=)` and `lw_toggle_bone_flag(item,
-   flag)` (`flag` is `"active"` or `"limited_range"`).
+   flag)` (`flag` is `"active"`, `"limited_range"`, `"weight_map_only"`,
+   or `"strength_multiply"`).
 
    Found the real UI location: Modify tab > Properties button (while a
    bone is the current item) opens a "Bones for &lt;object&gt;" panel -
@@ -273,17 +281,30 @@ checking Cmd History against a real UI click first.
    a bone can exist and be parented into a chain while still inactive).
    `BoneWeightMapName` was sent and logged cleanly but couldn't be
    visually confirmed - this test rig's bones live on a plain Null with
-   no real mesh/vmap data to match against. `BoneRestPosition`/
-   `BoneRestRotation`/`BoneMinRange`/`BoneMaxRange` share the same
-   confirmed-`*args` signature shape as the tested properties but
-   weren't independently live-tested - shipped by pattern-confidence,
-   consistent with this project's approach for lower-priority members of
-   an already-proven-correct command family.
+   no real mesh/vmap data to match against.
+
+   `BoneRestPosition`/`BoneRestRotation`/`BoneMinRange`/`BoneMaxRange`
+   were confirmed live in a follow-up sweep, including a real UI
+   discovery: "Rest Position"/"Rest Rotation" look like plain buttons in
+   the panel (not value fields), but clicking either opens a "Set Bone
+   Rest Position/Rotation" requester pre-populated with the value
+   already written - `[1,2,3]`/`[10,20,30]` sent, X:1m/Y:2m/Z:3m and
+   Heading:10/Pitch:20/Bank:30 shown, both exact. `BoneMinRange(0.5)`/
+   `BoneMaxRange(3)` correctly showed "Min: 500mm"/"Max: 3m" once
+   Limited Range was re-enabled.
+
+   `BoneWeightMapOnly`/`BoneStrengthMultiply` also confirmed genuine
+   toggles in the same sweep, via a new definitive test worth carrying
+   forward: passing an explicit argument to a suspected toggle raises a
+   clean Python arg-count error from the stub itself if it's truly
+   bare - stronger evidence than any UI observation, since it directly
+   probes the wrapped method's real signature. `BoneWeightMapOnly` also
+   revealed a real precondition via LightWave's own error dialog: "This
+   option only applies when using a weight map."
 
    The muscle/joint-compensation family (`BoneJointComp*`/
-   `BoneMuscleFlex*`/`BoneTwist*`/`BoneBulge*`) and
-   `BoneWeightMapOnly`/`BoneStrengthMultiply` were surveyed but not
-   wrapped this pass - real, but narrower organic-deformation features
+   `BoneMuscleFlex*`/`BoneTwist*`/`BoneBulge*`) was surveyed but not
+   wrapped this pass - real, but a narrower organic-deformation feature
    better suited to a dedicated session with a real mesh to test weight
    maps against, rather than this Null-based test rig. Bones already had
    a working numeric-ID resolution path from `ROADMAP2.md` item 7
