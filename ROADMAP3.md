@@ -441,3 +441,111 @@ at all via the Command Port, their command names weren't found under
 the keywords searched this pass - would need its own, differently-
 keyworded survey before concluding they're out of reach the way Modeler
 writes are, rather than just not yet found.
+
+## Known misses - open gaps to revisit later
+
+Honest, still-unresolved gaps accumulated across `ROADMAP2.md`,
+`ROADMAP3.md`, and this session's follow-up sweep. None of these are
+guessed-at or silently swept aside - each is documented in the relevant
+tool's own docstring - but they're worth a consolidated list so a
+future session (with a richer test rig, a different LightWave install,
+or just fresh eyes) knows exactly where to start digging rather than
+re-discovering them from scratch.
+
+1. **Light falloff read-back bug** - `lw_get_light_info`'s
+   `falloff_type` always returns the scene-default value, never what
+   was just written via `lw_set_light`. Tried the two-argument
+   `(id, time)` channel-read shape used elsewhere in `_get_light_info`;
+   confirmed live it does NOT fix this. Still open in `lw_mcp_ring.py`.
+2. **`FogColor` never visibly updates** even after its
+   `EnableVolumetrics` precondition is satisfied, unlike every other
+   color command tested (`BackdropColor`/`SkyColor`/gradient colors all
+   worked). Genuinely ambiguous whether this is a real no-op or a redraw
+   quirk - never resolved either way.
+3. **`ObjGIRadiosityTolerance`'s precondition is never actually
+   satisfiable** in this install - the error message references a
+   "Monte Carlo Interpolated" GI mode that the Type dropdown never
+   offers as a selectable option, even after enabling GI and checking
+   "Interpolated". Shipped anyway since the argument itself is
+   confirmed correct.
+4. **An unexplained UI freeze** occurred once during `ROADMAP3.md` item
+   5 testing (Object Properties/Scene Editor/Cmd History/Master Plugins
+   windows stopped responding to mouse input while Cmd History kept
+   logging and the main window stayed clickable). Recovered via a full
+   LightWave restart with no corruption. Never root-caused - not
+   clearly attributable to either command being tested at the time,
+   plausibly cumulative session-length resource pressure instead. If it
+   recurs, especially isolated to one specific command, it deserves the
+   same staged investigation this project gave its two confirmed real
+   crashes (`LWChannelInfo`/`nextGroup`, `_TOPIC_RE`).
+5. **`SaveEndomorph`'s actual bake was never confirmed end to end** -
+   only that it enforces a real "Null objects are automatically saved
+   with the scene" precondition. Needs a real mesh object (via
+   `lw_load_object`) with genuine point deformation applied to bake a
+   verifiable Endomorph against.
+6. **`UseMorphedPositions`'s positive effect was never observed** -
+   confirmed a genuine toggle with a real "not supported with the
+   current bone mode" precondition, but no bone mode was ever found in
+   this test rig where the toggle actually succeeds and does something
+   visible.
+7. **`BoneWeightMapOnly`/`weight_map_name` never tested against a real
+   weight map** - this rig's bones live on a Null/simple object with no
+   real mesh vmap data, so both send cleanly but their actual
+   weight-map-driven behavior is unconfirmed.
+8. **`muscle_flex_parent` (`BoneMuscleFlexParent`)'s real UI mapping is
+   still uncertain** - toggling `muscle_flex` alone already checks BOTH
+   "Muscle Flexing" and "Parental Muscle Flexing", so `muscle_flex_
+   parent` produced no independently observable change of its own; it
+   may be redundant, or control something outside this session's
+   screenshots.
+9. **`twist` (`BoneTwist`/`BoneTwistAmount`) is blocked in this test
+   rig** - confirmed real precondition ("This option does not apply to
+   the current bone type"), but no Bone Type was ever tried where Twist
+   actually works.
+10. **`ContentTypeDirectory` only independently confirmed for
+    `"Objects"`** - the other twenty-one category strings (`"Scenes"`,
+    `"Images"`, etc.) are inferred from the Preferences > Paths panel's
+    own visible labels, never tested against a real UI change one by
+    one.
+11. **Node graph reading only covers enveloped (keyframed) parameters**
+    - a never-touched, un-enveloped parameter has no channel at all to
+    read via the current `lw_get_node_channel` approach; its current
+    value is an open gap (see "Remaining work" below).
+
+## Remaining work, ranked by usefulness
+
+Unlike the difficulty-based ranking used to work through this roadmap's
+open items, this list ranks what's left by how much real capability
+each would add to the connector, most valuable first:
+
+1. **Node Editor writing.** Reading node graphs already works
+   (`lw_get_surface_nodes`/`lw_get_node_inputs`/`lw_get_node_channel`),
+   but there's no way to create nodes, wire connections, or write a
+   node's parameter value. This is the single biggest capability gap
+   left in the connector - shading/texturing automation is one of the
+   most commonly wanted things in a 3D pipeline, and it needs the SDK's
+   node API directly (no native Command Port command for node editing
+   exists at all, confirmed by this roadmap's own survey).
+2. **`Antialiasing` family.** Practical, everyday render-quality control
+   (draft vs. final passes) - probably the single most commonly toggled
+   setting in an automated render pipeline, ahead of GI/radiosity
+   tuning which is comparatively set-and-forget.
+3. **`RenderAlgorithm`/`RenderMode` family.** Switching render engines
+   (e.g. VPR for fast preview vs. a final-quality mode) programmatically
+   - useful for automating a preview-then-final workflow.
+4. **`ColorSpaceOutput` family.** Color management/OCIO-style output
+   control matters for accurate pipeline integration, but is a more
+   specialized need than AA or render-mode switching.
+5. **Reading un-enveloped node parameters.** A completeness item for
+   the already-shipped node-reading tools - useful, but narrower than
+   any capability above since the enveloped-parameter path already
+   covers the common case (any parameter someone has actually
+   keyframed).
+6. **`ObjGIRadiosityTolerance`'s unreachable precondition mode.**
+   Chasing down why "Monte Carlo Interpolated" never appears as a
+   selectable Type in this install - polish on an already-shipped tool,
+   not new capability.
+7. **`FogColor`'s dead swatch.** The narrowest, most cosmetic item left
+   - a single atmospheric-effect color property that may just need a
+   different write approach (or may be a genuine no-op); low practical
+   impact either way.
