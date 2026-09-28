@@ -1,14 +1,346 @@
-# Claude ↔ LightWave 2019 MCP connector (proof of concept)
+# Claude ↔ LightWave 2019 MCP connector
 
-Built on LightWave 2019's official Command Port (`lwsdk.LWCommandPort`).
-**Both writes and reads are proven working end to end**, confirmed live
-through the real `lw_ping` (returned `"pong"`) and `lw_get_scene_info`
-(correctly returned the live scene's actual items) MCP tools - see
-`PLAN.md` for the full log, including several confirmed dead ends before
-each working mechanism was found, and `ROADMAP.md` for what's been built
-and what's explicitly out of scope.
+A Model Context Protocol (MCP) server that gives Claude direct, live control
+over a running LightWave 2019 session - both Layout and, for writes only,
+Modeler - via LightWave's official Command Port. **Both writes and reads are
+proven working end to end**, confirmed live through the real `lw_ping`
+(returned `"pong"`) and `lw_get_scene_info` (correctly returned the live
+scene's actual items) MCP tools - see `PLAN.md` for the full build log,
+including every confirmed dead end before each working mechanism was found,
+and `ROADMAP.md`/`ROADMAP2.md`/`ROADMAP3.md` for what's been built, in order,
+and why.
 
-## What works right now
+## What is an MCP?
+
+If MCP is a new term for you: a Model Context Protocol server wraps a program
+or API in a way that lets an AI assistant like Claude call it directly, in
+response to plain-English requests, instead of you writing and running a
+script by hand. This connector wraps LightWave's own Command Port so you can
+ask Claude to build a scene, rig a character, adjust lighting, or kick off a
+render - and have it actually happen in a running LightWave session - without
+leaving the chat.
+
+## Features
+
+- **Full scene management** - create/load/save objects and scenes, manage
+  LightWave's Content Directory and per-content-type sub-paths.
+- **Item hierarchy & IK** - parenting, targets, goals, poles, and chain-level
+  IK options (goal strength, IK/FK blending, full-time IK).
+- **Bone rigging** - rest pose, weight maps, limited range, the full
+  muscle/joint-compensation family, and Endomorph baking.
+- **Cameras & lights** - resolution, depth of field, motion blur, falloff,
+  volumetrics, and per-light object inclusion/exclusion lists.
+- **Surfaces & node graphs** - read and write flat surface properties, plus
+  introspect a surface's actual node graph (e.g. every PrincipledBSDF
+  parameter).
+- **Render automation** - trigger frame/scene renders, track real completion
+  state (not a time-based guess), and configure GI/radiosity/thread/tile
+  settings.
+- **Scene environment** - backdrop and gradient-backdrop colors, fog,
+  volumetric lighting.
+- **Animation** - keyframe creation with real interpolated motion, plus full
+  envelope/channel reading for anything already keyframed.
+- **Selection management** - build and query a real multi-item selection.
+- **Generic passthrough** - `lw_run_command`/`modeler_run_command` reach any
+  of the ~800 Layout / ~60 Modeler native commands directly, for anything not
+  wrapped in a dedicated tool yet.
+- **Extensively live-verified** - every tool here was confirmed against a
+  real, running LightWave 2019.1.5 session (screenshots, Cmd History, and
+  LightWave's own error dialogs as ground truth), never assumed from static
+  SDK docs alone. See `PLAN.md` for the full investigation log and `README`'s
+  own "Detailed Tool Notes" section below for the honest caveats that came
+  out of it.
+
+## Installation
+
+### Prerequisites
+
+- LightWave 3D 2019.1.5 (Layout, and optionally Modeler)
+- Python 3.x
+- Claude Desktop
+
+### Quick Start
+
+**1. Enable the Command Port (once per Layout session)**
+
+Utilities → Plugins → Add Plugins → select `lw_enable_command_port.py`.
+It runs automatically on load (it's a "single-shot" plug-in) - the title
+bar should change to show `(CP: 9735)`.
+
+**2. Enable the read path (once per Layout session)**
+
+Utilities → Plugins → Add Plugins → select `lw_mcp_ring.py`. Then
+Utilities → Master Plugins → "Add Layout or Scene Master" dropdown →
+select "LW MCP Ring4" (listed as "Claude MCP Command Port Ring listener")
+→ make sure its "On" checkbox is ticked. Unlike step 1, this one needs
+both the Add Plugins step and this activation step.
+
+If `lw_ping` times out even after this, LightWave's Master Plugin
+activation is known to be flaky in this environment - remove the
+listener from the Master Plugins list, re-add the file via Add Plugins,
+and reselect it from the dropdown. This has been needed after nearly
+every fresh Layout launch throughout development; treat it as expected
+friction, not a bug.
+
+**3. Enable render completion signaling (once per Layout session,
+optional - only needed for `lw_get_render_status`)**
+
+Utilities → Plugins → Add Plugins → select `lw_mcp_render_monitor.py`
+(needs re-adding each fresh Layout session, same as `lw_mcp_ring.py` -
+the Render Display dropdown can visually keep showing "LW MCP Render
+Monitor" as a leftover preference even when the underlying plug-in
+class isn't actually loaded this session, which looks like it worked
+but silently doesn't). Then Render → Render Properties → General tab →
+"Render Display" dropdown → select "LW MCP Render Monitor" - or script
+it: `lw_run_command("SetRenderDisplay", ["LW MCP Render Monitor"])`
+(this command does take an argument over the network; an earlier
+version of this doc claimed it didn't, based on a wrapped-method bug
+now fixed). If Add Plugins reports the plug-in can't be added/is
+locked, it's because it's currently the active Render Display - switch
+the display away first (e.g. to "Image Viewer"), reload, then switch
+back.
+
+**4. Enable Modeler's Command Port (once per Modeler session, optional -
+only needed for `modeler_run_command`)**
+
+Modeler uses a different mechanism than Layout - not
+`LWCommandPort().enable()`, but `ModCommand()` + executing a command
+called `ENABLECOMMANDPORT`. In Modeler: Utilities → Plugins → Add
+Plugins → select `lw_enable_modeler_command_port.py` (this only
+*registers* it - Modeler treats single-file plug-ins differently than
+Layout). Then Utilities → Additional → find and click
+`lw_enable_modeler_command_port` in the list to actually run it. Title
+bar should change to show `(CP: 9736)`. Note: the script may report
+"failure" internally (a real bug in this SDK build's `ModCommand.
+execute()` return code, not an actual failure) - trust the title bar,
+not any printed result.
+
+**5. Install the MCP server's dependency**
+
+```
+pip install "mcp[cli]" --break-system-packages
+```
+
+**6. Point Claude Desktop at `server.py`**
+
+In `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "lightwave": {
+      "command": "python",
+      "args": ["C:\\Users\\sandr\\IdeaProjects\\LightwaveMCP\\server.py"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop.
+
+**7. Test**
+
+With Layout running and steps 1-2 done, ask Claude to create a Null
+item, then ask it to ping LightWave or get scene info. Check Layout -
+the Null should appear immediately, and the ping/scene-info replies
+should reflect the live scene.
+
+If you ever see writes silently stop working (success responses but
+nothing appears in Layout), suspect a hung or duplicate Layout process
+first - Windows can end up running more than one `Layout.exe`
+simultaneously, with the MCP query listener bound to a stale one while
+the visible window is a different, disconnected process. Check the
+Scene Editor (Utilities → Editors → Scene Editor) against query
+responses to catch this; a clean restart of all Layout processes
+reliably fixes it.
+
+## Available Tools
+
+**Connection & diagnostics**
+
+| Tool | Description |
+| --- | --- |
+| `lw_ping()` | Round-trip check that the read path (`LWComRing`) is alive. |
+| `lw_run_command(command, args=)` | Send any of the ~800 native Layout commands directly - generic passthrough. |
+| `modeler_run_command(command, args=)` | Send any native Modeler command directly, over Modeler's own Command Port. |
+| `modeler_ping()` | Always times out - Modeler has no working read path (confirmed dead end). |
+| `modeler_get_object_info()` | Always times out - same Modeler read-path limitation. |
+
+**Scene management**
+
+| Tool | Description |
+| --- | --- |
+| `lw_get_scene_info()` | Get the current scene's name, filename, and full item list. |
+| `lw_create_null(name=)` | Create a Null item in the current scene. |
+| `lw_load_object(filename)` | Load a real mesh object (`.lwo`) into the scene. |
+| `lw_save_object(name, filename)` | Save one object to its own file. |
+| `lw_save_scene_as(filename)` | Save the current scene to a file. |
+| `lw_load_scene(filename)` | Load a scene file, replacing the current scene. |
+| `lw_clear_scene()` | Clear the scene back to its default empty state. |
+| `lw_set_content_directory(path)` | Set LightWave's base Content Directory. |
+| `lw_set_content_type_directory(content_type, dirname)` | Set a per-content-type sub-path ("Objects", "Scenes", "Images", etc.). |
+
+**Item queries & hierarchy**
+
+| Tool | Description |
+| --- | --- |
+| `lw_get_item_id(name)` | Resolve an item's name to its plain numeric ID. |
+| `lw_get_transform(name)` | Get an item's position/rotation/scale at the live playhead. |
+| `lw_get_hierarchy()` | Get every item's parent, IK target/goal/pole, and bone chains. |
+| `lw_get_channels(name)` | Get an item's full keyframe/envelope structure. |
+| `lw_get_current_time()` | Get the live playhead's frame and time (seconds). |
+| `lw_probe_channels(name)` | Diagnostic: raw channel-group introspection. |
+
+**Selection**
+
+| Tool | Description |
+| --- | --- |
+| `lw_get_selection()` | Get every item's name/type and current selected state. |
+| `lw_add_to_selection(item)` | Add an item to the current multi-selection. |
+| `lw_remove_from_selection(item)` | Remove an item from the current multi-selection. |
+
+**Hierarchy & IK**
+
+| Tool | Description |
+| --- | --- |
+| `lw_set_parent(child, parent)` | Reparent one item to another. |
+| `lw_set_target(item, target)` | Set an item's IK/camera/light target. |
+| `lw_set_goal(item, goal)` | Set an item's IK goal. |
+| `lw_set_pole(item, pole)` | Set an item's IK pole. |
+| `lw_set_ik_options(item, goal_strength=, ik_fk_blending=)` | Set chain-level IK numeric properties. |
+| `lw_toggle_ik_flag(item, flag)` | Flip "Full-time IK" or "Unaffected by IK". |
+
+**Cameras**
+
+| Tool | Description |
+| --- | --- |
+| `lw_get_camera_info(name=)` | Get resolution, focal length, f-stop, FOV, and shutter properties. |
+| `lw_set_camera(camera, zoom_factor=, f_stop=, aperture_height=, shutter_open=, shutter_efficiency=, rolling_shutter=)` | Set a camera's zoom, DOF, and motion-blur shutter properties. |
+| `lw_set_camera_resolution(width, height)` | Set the scene's render resolution. |
+
+**Lights**
+
+| Tool | Description |
+| --- | --- |
+| `lw_get_light_info(name=)` | Get a light's type, falloff, color, intensity, and range. |
+| `lw_set_light(light, intensity=, color=, falloff_type=, cone_angle=, volumetric_samples=, volumetric_intensity=)` | Set a light's intensity, color, falloff, cone angle, and volumetrics. |
+| `lw_include_light(light, obj)` / `lw_exclude_light(light, obj)` | Manage a light's object inclusion/exclusion list. |
+| `lw_include_object_light(obj, light)` / `lw_exclude_object_light(obj, light)` | Same relationship, set from the object's own side. |
+
+**Surfaces & node graphs**
+
+| Tool | Description |
+| --- | --- |
+| `lw_get_surface_info(name)` | Get a surface's color/diffuse/luminosity/specularity/glossiness/etc. |
+| `lw_set_surface(surface, color=, diffuse=, luminosity=, specularity=, glossiness=, reflection=, transparency=, smoothing=)` | Write a surface's flat properties. |
+| `lw_get_surface_nodes(surface=)` | List every node in a surface's node graph. |
+| `lw_get_node_inputs(surface=, node=)` | List a specific node's real parameter names. |
+| `lw_get_node_channel(surface=, node=, channel=)` | Read a node parameter's actual keyframe data. |
+| `lw_probe_surf()` | Diagnostic: list `SURF_*` constants from the SDK. |
+
+**Bones & rigging**
+
+| Tool | Description |
+| --- | --- |
+| `lw_set_bone(item, strength=, rest_length=, rest_position=, rest_rotation=, weight_map_name=, falloff_type=, min_range=, max_range=)` | Set a bone's rigging properties. |
+| `lw_toggle_bone_flag(item, flag)` | Flip a bone's toggle flag (`active`, `limited_range`, `weight_map_only`, `strength_multiply`, `joint_comp`, `joint_comp_parent`, `muscle_flex`, `muscle_flex_parent`, `bulge`, `bulge_parent`, `twist`). |
+| `lw_set_bone_deform(item, joint_comp=, joint_comp_parent=, muscle_flex=, muscle_flex_parent=, bulge=, bulge_parent=, twist=)` | Set the muscle/joint-compensation family's amount fields. |
+| `lw_set_morph(item, target=, amount=)` | Set an object-to-object Morph target/amount. |
+| `lw_save_endomorph(item, name)` | Bake an object's current deformed positions into a new Endomorph vmap. |
+| `lw_toggle_use_morphed_positions()` | Flip "Use Morphed Positions". |
+
+**Object visibility**
+
+| Tool | Description |
+| --- | --- |
+| `lw_toggle_object_visibility(item, flag)` | Flip a render-visibility flag (`unseen_by_rays`, `unseen_by_camera`, `unseen_by_radiosity`, `unaffected_by_fog`). |
+| `lw_set_alpha_channel_mode(item, mode)` | Set an object's Alpha Channel dropdown mode. |
+
+**Render & render globals**
+
+| Tool | Description |
+| --- | --- |
+| `lw_render_frame(frame=)` | Render a single frame. |
+| `lw_render_scene()` | Render the full configured frame range. |
+| `lw_abort_render()` | Abort an in-progress render. |
+| `lw_get_render_status()` | Get real render completion state and progress, not a time-based guess. |
+| `lw_set_render_globals(threads=, tile_size=)` | Set render thread count / tile size. |
+| `lw_toggle_global_illumination()` | Flip "Enable GI". |
+| `lw_set_gi_interpolated(enabled)` | Set GI's "Interpolated" mode. |
+| `lw_set_gi_radiosity_tolerance(degrees)` | Set GI's Angular Tolerance. |
+
+**Scene environment**
+
+| Tool | Description |
+| --- | --- |
+| `lw_set_backdrop(color=, zenith_color=, sky_color=, ground_color=, nadir_color=)` | Set the flat backdrop color and the four gradient-backdrop stops. |
+| `lw_toggle_gradient_backdrop()` | Flip "Gradient Backdrop". |
+| `lw_toggle_volumetrics()` | Flip the scene's "Enable Volumetrics" (Fog panel gate). |
+| `lw_toggle_volumetric_lights()` | Flip the scene-wide "Enable Volumetric Lights". |
+| `lw_set_fog(fog_type=, min_distance=, max_distance=, min_amount=, max_amount=, color=)` | Set scene fog type, distance range, and amount. |
+
+**Animation**
+
+| Tool | Description |
+| --- | --- |
+| `lw_set_keyframe(name, frame, position=, rotation=, scale=)` | Create a keyframe for an item at a given frame. |
+
+See "Detailed Tool Notes" below for what each tool's confirmed-live
+behavior, real preconditions, and honest open caveats actually are - the
+table above is a quick reference, not the full story.
+
+## Example Workflow
+
+A typical Claude conversation might do this, one tool call per step:
+
+```
+lw_create_null(name="Anchor")
+lw_set_keyframe(name="Anchor", frame=0, position=[0, 0, 0])
+lw_set_keyframe(name="Anchor", frame=30, position=[0, 5, 0])
+
+lw_load_object(filename="C:/scenes/props/crate.lwo")
+lw_set_surface(surface="Crate", color=[0.6, 0.4, 0.2], diffuse=0.8)
+
+lw_set_camera_resolution(width=1920, height=1080)
+lw_render_frame(frame=15)
+lw_get_render_status()
+```
+
+You don't write this yourself - you'd just ask Claude in plain English
+("create a Null that moves up over a second, load this crate object, give
+it a brown surface, and render frame 15"), and Claude calls the underlying
+tools shown above.
+
+## Protocol Details
+
+- **Claude ↔ MCP server**: stdio (standard input/output), the standard
+  local MCP transport - Claude Desktop launches `server.py` as a
+  subprocess.
+- **MCP server ↔ LightWave (writes)**: LightWave's official Command Port
+  (`lwsdk.LWCommandPort`), a plain UDP, one-way, fire-and-forget channel -
+  there is no delivery or ordering guarantee, and no confirmation
+  LightWave actually accepted a given command, only that it was sent.
+  Layout listens on `9735`, Modeler on `9736` by default.
+- **MCP server ↔ LightWave (reads)**: the native Command Port is
+  write-only, so reads go through a custom Master plug-in
+  (`lw_mcp_ring.py`, class `LWComRing`) that this repo installs into
+  Layout - see Installation step 2.
+
+## LightWave Command Port
+
+| Component | Purpose |
+| --- | --- |
+| Layout | Scene orchestration, hierarchy/IK/bone rigging, cameras, lights, surfaces, animation, rendering. |
+| Modeler | Mesh editing - writes only; reads are a confirmed dead end (see the Modeler notes above). |
+
+## Detailed Tool Notes (confirmed-live findings & caveats)
+
+Everything below is the full, honest write-up behind the tool table above -
+what was actually confirmed live against a running LightWave 2019.1.5
+session (screenshots, Cmd History, and LightWave's own error dialogs as
+ground truth), every real precondition found, and every gap that's still
+open rather than papered over. See `PLAN.md` for the complete build log
+this is distilled from.
 
 **Layout writes**
 - `lw_create_null` - sends `AddNull`, confirmed to create a real item.
@@ -85,7 +417,7 @@ and what's explicitly out of scope.
   writes. See `PLAN.md` "Multi-item / bulk selection investigation" for
   the full investigation.
 
-**Layout reads** (all via `LWComRing`, see Setup step 2)
+**Layout reads** (all via `LWComRing`, see Installation step 2)
 - `lw_ping`, `lw_get_scene_info` - round trip + live item list.
 - `lw_get_selection` - every item's name/type/selected state.
 - `lw_get_camera_info`, `lw_get_light_info` - resolution, focal length,
@@ -201,10 +533,10 @@ and what's explicitly out of scope.
   - one-way, fire-and-forget like every command here.
 - `lw_get_render_status()` - the actual point of this group: real
   completion state (`rendering: true/false`, resolution, `frame_count`)
-  read from `lwsdk.IFrameBuffer` callbacks (see Setup step 3), not a
-  guess based on elapsed time. Confirmed live: resolution set, render
-  triggered, status correctly went `true` -> `false` with matching
-  numbers. **Multi-frame `RenderScene` progress tracking is now
+  read from `lwsdk.IFrameBuffer` callbacks (see Installation step 3),
+  not a guess based on elapsed time. Confirmed live: resolution set,
+  render triggered, status correctly went `true` -> `false` with
+  matching numbers. **Multi-frame `RenderScene` progress tracking is now
   confirmed live too** - `frame_count` correctly climbs across a
   multi-frame render rather than stalling or jumping straight to done.
   One real subtlety found along the way: the real per-frame signal is
@@ -373,11 +705,13 @@ and what's explicitly out of scope.
   `PLAN.md` "Morph/Endomorph control" for the full investigation.
 
 **`ROADMAP3.md` is now fully complete (all 7 items)** - see its own
-"Status" section for a summary of the whole roadmap.
+"Status" section for a summary of the whole roadmap, plus its "Known
+misses" and "Remaining work, ranked by usefulness" sections for what's
+left and where to look first.
 
 **Modeler**
 - `modeler_run_command` - same pattern as `lw_run_command` but for
-  Modeler's separate Command Port mechanism (see Setup step 4).
+  Modeler's separate Command Port mechanism (see Installation step 4).
   Confirmed live: `command="new"` created a real new object layer.
 - Modeler **reads are a confirmed dead end** - `modeler_ping` and
   `modeler_get_object_info` will always time out. Modeler has no
@@ -513,101 +847,6 @@ attributable to either (both had already logged cleanly beforehand) -
 see `PLAN.md` "Per-object render-visibility flags" for the honest
 writeup.
 
-## Setup
-
-**1. Enable the Command Port (once per Layout session)**
-
-Utilities → Plugins → Add Plugins → select `lw_enable_command_port.py`.
-It runs automatically on load (it's a "single-shot" plug-in) - the title
-bar should change to show `(CP: 9735)`.
-
-**2. Enable the read path (once per Layout session)**
-
-Utilities → Plugins → Add Plugins → select `lw_mcp_ring.py`. Then
-Utilities → Master Plugins → "Add Layout or Scene Master" dropdown →
-select "LW MCP Ring4" (listed as "Claude MCP Command Port Ring listener")
-→ make sure its "On" checkbox is ticked. Unlike step 1, this one needs
-both the Add Plugins step and this activation step.
-
-If `lw_ping` times out even after this, LightWave's Master Plugin
-activation is known to be flaky in this environment - remove the
-listener from the Master Plugins list, re-add the file via Add Plugins,
-and reselect it from the dropdown. This has been needed after nearly
-every fresh Layout launch throughout development; treat it as expected
-friction, not a bug.
-
-**3. Enable render completion signaling (once per Layout session,
-optional - only needed for `lw_get_render_status`)**
-
-Utilities → Plugins → Add Plugins → select `lw_mcp_render_monitor.py`
-(needs re-adding each fresh Layout session, same as `lw_mcp_ring.py` -
-the Render Display dropdown can visually keep showing "LW MCP Render
-Monitor" as a leftover preference even when the underlying plug-in
-class isn't actually loaded this session, which looks like it worked
-but silently doesn't). Then Render → Render Properties → General tab →
-"Render Display" dropdown → select "LW MCP Render Monitor" - or script
-it: `lw_run_command("SetRenderDisplay", ["LW MCP Render Monitor"])`
-(this command does take an argument over the network; an earlier
-version of this doc claimed it didn't, based on a wrapped-method bug
-now fixed). If Add Plugins reports the plug-in can't be added/is
-locked, it's because it's currently the active Render Display - switch
-the display away first (e.g. to "Image Viewer"), reload, then switch
-back.
-
-**4. Enable Modeler's Command Port (once per Modeler session, optional -
-only needed for `modeler_run_command`)**
-
-Modeler uses a different mechanism than Layout - not
-`LWCommandPort().enable()`, but `ModCommand()` + executing a command
-called `ENABLECOMMANDPORT`. In Modeler: Utilities → Plugins → Add
-Plugins → select `lw_enable_modeler_command_port.py` (this only
-*registers* it - Modeler treats single-file plug-ins differently than
-Layout). Then Utilities → Additional → find and click
-`lw_enable_modeler_command_port` in the list to actually run it. Title
-bar should change to show `(CP: 9736)`. Note: the script may report
-"failure" internally (a real bug in this SDK build's `ModCommand.
-execute()` return code, not an actual failure) - trust the title bar,
-not any printed result.
-
-**5. Install the MCP server's dependency**
-
-```
-pip install "mcp[cli]" --break-system-packages
-```
-
-**6. Point Claude Desktop at `server.py`**
-
-In `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "lightwave": {
-      "command": "python",
-      "args": ["C:\\Users\\sandr\\IdeaProjects\\LightwaveMCP\\server.py"]
-    }
-  }
-}
-```
-
-Restart Claude Desktop.
-
-**7. Test**
-
-With Layout running and steps 1-2 done, ask Claude to create a Null
-item, then ask it to ping LightWave or get scene info. Check Layout -
-the Null should appear immediately, and the ping/scene-info replies
-should reflect the live scene.
-
-If you ever see writes silently stop working (success responses but
-nothing appears in Layout), suspect a hung or duplicate Layout process
-first - Windows can end up running more than one `Layout.exe`
-simultaneously, with the MCP query listener bound to a stale one while
-the visible window is a different, disconnected process. Check the
-Scene Editor (Utilities → Editors → Scene Editor) against query
-responses to catch this; a clean restart of all Layout processes
-reliably fixes it.
-
 ## Files
 
 - `lw_enable_command_port.py` — run once inside Layout. Enables Layout writes. Working.
@@ -622,3 +861,18 @@ reliably fixes it.
 - `lw_mcp_diag.py`, `lw_mcp_diag2.py`, `lw_mcp_diag3.py`, `lw_diag_modeler_cp.py` — throwaway live-introspection probe plug-ins, not needed going forward.
 - `PLAN.md` — full build log: what's verified, what failed, what to try next.
 - `ROADMAP.md` — what's been built, in order, and why; the current state of every planned increment.
+
+## License
+
+Released under the MIT License - see [LICENSE](LICENSE).
+
+`lwcommandport/` is Copyright (c) LightWave Digital, LTD. All rights
+reserved - it's NewTek's/LightWave Digital's own Command Port client from
+the LightWave SDK, included here unmodified except for the specific bug
+fixes documented in `PLAN.md`, under its own original terms rather than
+this repo's MIT license.
+
+## Support
+
+For issues with this connector, open an issue at
+[github.com/sandrum/lightwaveMCP](https://github.com/sandrum/lightwaveMCP/issues).
