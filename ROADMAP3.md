@@ -45,11 +45,22 @@ checking Cmd History against a real UI click first.
    outside whatever Content Directory LightWave started with.
 
    `ContentTypeDirectory(type, dirname)` (a per-content-type sub-path)
-   and `CreateContentPath`/`RecentContentDirs` were surveyed but not
-   wrapped - the first needs a `type` argument whose real values were
-   never confirmed live, and the other two look like one-shot UI actions
-   (opening a dialog/menu) rather than pure setters worth automating.
-   See `PLAN.md` "Content Directory management" for the full
+   is now also shipped, as `lw_set_content_type_directory(content_type,
+   dirname)`. Found the real UI - Preferences > Paths tab, a list of
+   buttons ("Scenes"/"Objects"/"Images"/etc.) each opening a path
+   editor for that content type. Confirmed live that `content_type` is
+   the literal panel label string (tested with `"Objects"`): sending
+   `ContentTypeDirectory("Objects", "TestObjDir")` changed the
+   "Objects" button's own label to "TestObjDir" - these buttons double
+   as a live display of the current sub-path rather than fixed
+   captions, so no separate read-back is needed. Reverting with
+   `("Objects", "Objects")` correctly restored the original label. The
+   other content-type strings are inferred from the visible panel
+   labels, not independently tested. `CreateContentPath`/
+   `RecentContentDirs` remain unwrapped - both still look like one-shot
+   UI actions (opening a dialog/menu) rather than pure setters worth
+   automating. See `PLAN.md` "Content Directory management" and
+   "Follow-up sweep: closing the easy/moderate open items" for the full
    investigation.
 
 2. **Node Editor / surface & light node graphs, especially PrincipledBSDF

@@ -197,15 +197,44 @@ def lw_set_content_directory(path: str) -> str:
     before loading from a path outside whatever Content Directory
     LightWave started with.
 
-    ContentTypeDirectory(type, dirname) (a per-content-type sub-path,
-    e.g. just Objects or just Scenes) and CreateContentPath/
+    See lw_set_content_type_directory for the per-content-type sub-path
+    counterpart (Objects/Scenes/Images/etc.). CreateContentPath/
     RecentContentDirs also exist in the command list but weren't wrapped
-    here - the first needs a `type` argument whose real values were
-    never confirmed live, and the other two look like one-shot UI
-    actions (opening a dialog/menu) rather than pure setters."""
+    here - both look like one-shot UI actions (opening a dialog/menu)
+    rather than pure setters."""
     try:
         _layout().ContentDirectory(path)
         return json.dumps({"result": "sent ContentDirectory %s" % path})
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_set_content_type_directory(content_type: str, dirname: str) -> str:
+    """Set a per-content-type sub-path under the base Content Directory
+    (Preferences > Paths tab, the "Scenes"/"Objects"/"Images"/etc. button
+    list). Wraps the native ContentTypeDirectory(type, dirname) command.
+
+    `content_type` must exactly match one of the panel's own labels:
+    "Scenes", "Hierarchies", "Objects", "Images", "Envelopes", "Motions",
+    "Previews", "Animations", "Surfaces", "Nodes", "Shaders", "Dynamics",
+    "Rigs", "Sounds", "Lights", "Radiosity", "Color Tables", "Image
+    Cache", "Vert Cache", "Grid Cache", "Output Directory", or "Backup
+    Directory" - confirmed live only for "Objects", the rest are
+    inferred from the visible panel labels, not independently tested.
+
+    Confirmed live: `content_type_directory("Objects", "TestObjDir")`
+    changed the "Objects" row's own button label from "Objects" to
+    "TestObjDir" - these buttons double as a live display of the
+    current sub-path (not fixed captions), giving a built-in
+    confirmation mechanism with no separate read-back needed. Reverting
+    with `("Objects", "Objects")` correctly restored the "Objects"
+    label. `dirname` can be given as an absolute path; LightWave
+    displays only the portion beyond the base Content Directory when
+    it's a sub-path of it."""
+    try:
+        _layout().ContentTypeDirectory(content_type, dirname)
+        return json.dumps({"result": "sent ContentTypeDirectory %s %s" % (content_type, dirname)})
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)})
 

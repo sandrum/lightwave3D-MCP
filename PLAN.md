@@ -2642,7 +2642,40 @@ and `lw_toggle_bone_flag(flag="strength_multiply")` through the actual
 wrapped tools after a Claude Desktop restart - all three returned clean
 success.
 
-Remaining open items (moderate/hard tier: `ContentTypeDirectory`,
+**`ContentTypeDirectory` (per-content-type sub-path).** Found the real
+UI first: Preferences > Paths tab, a list of buttons - "Scenes",
+"Hierarchies", "Objects", "Images", "Envelopes", "Motions", "Previews",
+"Animations", "Surfaces", "Nodes", "Shaders", "Dynamics", "Rigs",
+"Sounds", "Lights", "Radiosity", "Color Tables", "Image Cache", "Vert
+Cache", "Grid Cache", "Output Directory", "Backup Directory" - each
+presumably a `ContentTypeDirectory(type, dirname)` target. Tested the
+most likely hypothesis directly rather than guessing an enum: `type` is
+the literal panel label string. Sent
+`ContentTypeDirectory("Objects", "C:\...\TestObjDir")` via
+`lw_run_command` - Cmd History logged `ContentTypeDirectory Objects
+C:\...\TestObjDir`, and a screenshot of the Paths tab showed the
+"Objects" button's own label had changed to "TestObjDir". This was a
+genuinely useful discovery beyond just confirming the argument shape:
+these per-type buttons double as a *live display* of the current
+sub-path, not fixed captions - the same "button is also a live state
+readout" pattern already found for bone Rest Position/Rotation earlier
+in this sweep, now confirmed a second time in an unrelated panel.
+Reverted with `("Objects", "Objects")` and confirmed via screenshot the
+label went back to "Objects" exactly.
+
+Shipped as `lw_set_content_type_directory(content_type, dirname)`,
+then re-verified through the actual wrapped tool after a Claude
+Desktop restart (not just the raw `lw_run_command` probe): called it
+with `("Objects", "ToolVerify")`, confirmed via Cmd History
+(`ContentTypeDirectory Objects ToolVerify`, identical shape to the
+already-visually-confirmed raw test) that the tool dispatches
+correctly, then reverted to `("Objects", "Objects")` again to leave the
+test rig clean. Only `"Objects"` was exercised end-to-end against a
+real UI change; the other twenty-one type strings are inferred from
+the panel's own visible labels and shipped with that caveat rather than
+claimed as independently confirmed.
+
+Remaining open items (moderate/hard tier:
 `SaveEndomorph`/`UseMorphedPositions`, the bone muscle/joint-compensation
 family, `EnableRadiosity1`, the `ColorSpaceOutput`/`RenderAlgorithm`/
 `RenderMode`/`Antialiasing` families, the `FogColor` and

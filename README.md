@@ -49,6 +49,17 @@ and what's explicitly out of scope.
   `lw_get_scene_info` confirming every item came back intact. Call once
   per session before loading from a path outside whatever Content
   Directory LightWave started with.
+- `lw_set_content_type_directory(content_type, dirname)` (ROADMAP3.md
+  item 1 follow-up) - wraps `ContentTypeDirectory(type, dirname)`, the
+  per-content-type sub-path buttons in Preferences > Paths ("Scenes",
+  "Objects", "Images", etc.). Confirmed live for `"Objects"`:
+  `content_type` is the literal panel label string, and sending a new
+  `dirname` visibly changes that button's own label to the new
+  sub-path - a live state readout, not a fixed caption, the same
+  pattern found for bone Rest Position/Rotation. The other twenty-one
+  type strings are inferred from the panel's visible labels, not
+  independently tested. See `PLAN.md` "Follow-up sweep: closing the
+  easy/moderate open items" for the full investigation.
 - `lw_set_keyframe(name, frame, position, rotation, scale)` - wraps the
   common by-hand animation sequence (select, go to frame, set
   transform, create key) into one call. Confirmed live: two keyframes
