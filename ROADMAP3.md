@@ -151,7 +151,16 @@ checking Cmd History against a real UI click first.
    following `lw_set_camera`'s Motion-Blur-gated-shutter-properties
    precedent, with the gap honestly documented rather than papered over.
 
-   `EnableRadiosity1` and the whole `RenderAlgorithm`/`RenderMode`/
+   **`EnableRadiosity1` - DONE, definitively resolved.** Calling it live
+   popped LightWave's own error dialog: "Unknown command:
+   'EnableRadiosity1'" - proof, not a guess, that this command doesn't
+   exist in LightWave 2019.1.5's command parser at all, despite being
+   defined in the bundled lwcommandport stub (likely generated against a
+   different LightWave version). Left permanently unwrapped since
+   there's nothing real underneath it. See `PLAN.md` "Follow-up sweep:
+   closing the easy/moderate open items" for the full investigation.
+
+   The whole `RenderAlgorithm`/`RenderMode`/
    `Antialiasing` family/`ColorSpaceOutput` family were surveyed but not
    tested or wrapped this pass - no clear UI correspondence was found
    for most of them under VPR (LightWave's other render engines/AA

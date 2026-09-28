@@ -807,10 +807,13 @@ def lw_toggle_global_illumination() -> str:
     rather than sets.
 
     A sibling command, EnableRadiosity1, was found in the same survey
-    but never independently confirmed live - the "Type" dropdown next
-    to "Enable GI" only offered "Monte Carlo" in this install, no
-    second mode to toggle it against, so it's left unwrapped rather
-    than guessed at."""
+    and definitively resolved this follow-up sweep: calling it live
+    popped LightWave's own error dialog, "Unknown command:
+    'EnableRadiosity1'" - proof, not a guess, that this command simply
+    doesn't exist in LightWave 2019.1.5's command parser at all, despite
+    being defined in the bundled lwcommandport stub (likely generated
+    against a different LightWave version). Left permanently unwrapped -
+    there is nothing real underneath it to wrap."""
     try:
         _layout().EnableRadiosity0()
         return json.dumps({"result": "toggled EnableRadiosity0 (Enable GI)"})

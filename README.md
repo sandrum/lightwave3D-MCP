@@ -229,7 +229,13 @@ and what's explicitly out of scope.
   error dialog references a "Monte Carlo Interpolated" mode this
   install's Type dropdown never actually offered as a selectable option
   - shipped anyway since the argument itself is confirmed correct,
-  documented honestly rather than hidden.
+  documented honestly rather than hidden. `EnableRadiosity1` (a sibling
+  of the wrapped `EnableRadiosity0`) is definitively resolved as
+  non-existent: calling it live popped LightWave's own error dialog,
+  "Unknown command: 'EnableRadiosity1'" - proof, not a guess, that
+  2019.1.5's command parser doesn't recognize it at all despite the
+  bundled stub defining it (likely generated against a different
+  LightWave version). Left permanently unwrapped.
 
   **Real operational finding**: sending several of these tools together
   in one parallel batch caused `RadiosityInterpolation` to log the wrong

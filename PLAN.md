@@ -2777,7 +2777,24 @@ just gated behind a bone mode this test rig doesn't have, not absent
 from the UI as originally assumed. Updated that tool's docstring
 accordingly.
 
-Remaining open items (moderate/hard tier: `EnableRadiosity1`, the
+**`EnableRadiosity1` - definitively resolved, a new category of
+finding for this project.** Every prior "surveyed but not confirmed"
+command in this project turned out to be either a genuine toggle, a
+real stub bug (missing `*args`), or gated behind a real precondition.
+This one is different: the definitive arg-count test first confirmed
+it's a genuine bare command (passing an argument raised the stub's own
+arg-count `TypeError`), but sending it bare produced LightWave's own
+error dialog - not a precondition message, but "Unknown command:
+'EnableRadiosity1'". LightWave's command parser itself doesn't
+recognize this command name at all in 2019.1.5, despite
+`lwcommandport`'s stub defining it correctly. The stub was very likely
+generated against a different LightWave version whose command set
+included this command and 2019.1.5's doesn't (or never did) - either
+way, there's no real command underneath to wrap, so `lw_toggle_
+global_illumination`'s docstring was updated to state this
+conclusively rather than leaving it as an open "not confirmed" gap.
+
+Remaining open items (moderate/hard tier: the
 `ColorSpaceOutput`/`RenderAlgorithm`/`RenderMode`/`Antialiasing`
 families, the `FogColor` and `ObjGIRadiosityTolerance` mode gaps, Node
 Editor writing, and reading un-enveloped node parameters) are left for
