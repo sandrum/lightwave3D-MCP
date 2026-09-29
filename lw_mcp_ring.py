@@ -712,6 +712,85 @@ def _add_node(surf_name, node_type):
     }
 
 
+def _connect_nodes(surf_name, from_node_name, to_node_name, input_name, output_name):
+    """Node Editor writing, step 2 - wire one node's output socket into
+    another node's input socket via LWNodeEditorFuncs.connect(output,
+    input). Both handles were confirmed obtainable, read-only, by
+    lw_probe_connect_handles before this first live connect call:
+
+    - Output: LWNodeOutputFuncs first(node)/next(out). NOT byIndex -
+      byIndex(node, 0) returned no handle on a Principled BSDF whose
+      output count is 1, so first/next is the reliable path here (the
+      reverse of the input side).
+    - Input: LWNodeInputFuncs numInputs/byIndex on the target node,
+      matched by name - the path already proven by lw_get_node_inputs.
+      The root "Surface" node lists an unnamed entry at index 0 before
+      Material/Normal/Bump/Displacement/Clip; skipped naturally by the
+      name match. LWNodeEditorFuncs.getInputByName(root, "Material")
+      accepted its arguments but returned None, so it isn't used.
+
+    to_node_name "Surface" resolves via getRootNodeID rather than the
+    node list. output_name empty means the node's first output."""
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+    nif = lwsdk.LWNodeInputFuncs()
+    nof = lwsdk.LWNodeOutputFuncs()
+
+    from_node = None
+    to_node = nef.getRootNodeID(editor) if to_node_name == "Surface" else None
+    for i in range(min(nef.numberOfNodes(editor), _MAX_NODES_PER_EDITOR)):
+        node = nef.nodeByIndex(editor, i)
+        name = nf.nodeName(node)
+        if name == from_node_name:
+            from_node = node
+        if to_node is None and name == to_node_name:
+            to_node = node
+    if from_node is None:
+        return {"error": "node not found: %s" % from_node_name}
+    if to_node is None:
+        return {"error": "node not found: %s" % to_node_name}
+
+    output = None
+    output_names = []
+    out = nof.first(from_node)
+    while out is not None and len(output_names) < _MAX_INPUTS_PER_NODE:
+        output_names.append(nof.name(out))
+        if output is None and (not output_name or nof.name(out) == output_name):
+            output = out
+        out = nof.next(out)
+    if output is None:
+        return {"error": "output not found on %s: %s (available: %s)"
+                         % (from_node_name, output_name or "<first>", output_names)}
+
+    target_input = None
+    input_names = []
+    for i in range(min(nif.numInputs(to_node), _MAX_INPUTS_PER_NODE)):
+        inp = nif.byIndex(to_node, i)
+        name = nif.name(inp)
+        input_names.append(name)
+        if name == input_name:
+            target_input = inp
+            break
+    if target_input is None:
+        return {"error": "input not found on %s: %s (available: %s)"
+                         % (to_node_name, input_name, input_names)}
+
+    try:
+        rc = nef.connect(output, target_input)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+    return {
+        "surface": surf_name,
+        "from": "%s.%s" % (from_node_name, nof.name(output)),
+        "to": "%s.%s" % (to_node_name, input_name),
+        "connect_returned": rc if isinstance(rc, (int, float, bool, type(None))) else repr(rc),
+    }
+
+
 def _resolve_name(ii, item_id):
     """None for LWITEM_NULL (no relationship set), otherwise the item's
     name. Isolated so a bad/unexpected ID degrades to None instead of
@@ -904,6 +983,123 @@ def _probe_node_write_sigs():
     return result
 
 
+def _probe_node_output_enum():
+    """DIAGNOSTIC, temporary: safe, zero-risk, UNFILTERED dir() dump of
+    LWNodeOutputFuncs/LWNodeFuncs/LWNodeEditorFuncs, looking for the
+    output-side equivalent of LWNodeInputFuncs.numInputs/byIndex (which
+    the read investigation already proved enumerates a node's INPUT
+    sockets). Needed before LWNodeEditorFuncs.connect(output, input) can
+    be tested live - connect's 2 arguments are presumably output/input
+    socket handles, not node handles, and there is currently no known
+    way to obtain a node's own output handle to pass as the first one."""
+    result = {}
+    for cls_name in ("LWNodeOutputFuncs", "LWNodeFuncs", "LWNodeEditorFuncs"):
+        cls = getattr(lwsdk, cls_name)
+        result[cls_name] = sorted(n for n in dir(cls()) if not n.startswith("_"))
+    return result
+
+
+def _probe_connect_handles(surf_name, target_node_name):
+    """DIAGNOSTIC, temporary: step 3 of the Node Editor writing
+    investigation - obtain (but do NOT use) both handles
+    LWNodeEditorFuncs.connect(output, input) presumably needs, without
+    ever calling connect itself. Reuses an existing node rather than
+    adding one, so it mutates nothing.
+
+    Stage 1 is the zero-arg TypeError signature capture already used by
+    _probe_node_write_sigs, for every enumeration method involved, so
+    the argument counts are on record even if a stage-2 call fails.
+    Stage 2 makes the real, read-only calls: enumerate the target
+    node's outputs via LWNodeOutputFuncs (numInputs - apparently the
+    output count despite its name - plus byIndex, and separately
+    first/next), then find the root Surface node via getRootNodeID and
+    its "Material" input both via the already-proven LWNodeInputFuncs
+    numInputs/byIndex path and via LWNodeEditorFuncs.getInputByName.
+    Every call is individually wrapped so one failure doesn't hide the
+    rest; handles are reported only as None/not-None (SWIG objects
+    aren't JSON-serializable)."""
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+    nif = lwsdk.LWNodeInputFuncs()
+    nof = lwsdk.LWNodeOutputFuncs()
+    result = {"signatures": {}, "outputs_by_index": [], "outputs_by_first_next": []}
+
+    sig_targets = {
+        "LWNodeOutputFuncs": (nof, ["numInputs", "byIndex", "first", "next", "name", "type", "node"]),
+        "LWNodeEditorFuncs": (nef, ["getRootNodeID", "getInputByName", "getInputByIndex",
+                                    "getInputNodeID", "numInputs"]),
+    }
+    for cls_name, (instance, method_names) in sig_targets.items():
+        cls_result = {}
+        for method_name in method_names:
+            try:
+                getattr(instance, method_name)()
+                cls_result[method_name] = "no error raised"
+            except Exception as exc:  # noqa: BLE001
+                cls_result[method_name] = str(exc)
+        result["signatures"][cls_name] = cls_result
+
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        result["error"] = "surface not found: %s" % surf_name
+        return result
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+
+    target_node = None
+    available = []
+    for i in range(min(nef.numberOfNodes(editor), _MAX_NODES_PER_EDITOR)):
+        node = nef.nodeByIndex(editor, i)
+        available.append(nf.nodeName(node))
+        if nf.nodeName(node) == target_node_name:
+            target_node = node
+    if target_node is None:
+        result["error"] = "node not found: %s (available: %s)" % (target_node_name, available)
+        return result
+
+    try:
+        out_count = nof.numInputs(target_node)
+        result["output_count"] = out_count
+        for i in range(min(out_count, _MAX_INPUTS_PER_NODE)):
+            out = nof.byIndex(target_node, i)
+            result["outputs_by_index"].append(
+                {"handle": out is not None, "name": nof.name(out), "type": nof.type(out)})
+    except Exception as exc:  # noqa: BLE001
+        result["outputs_by_index_error"] = str(exc)
+
+    try:
+        out = nof.first(target_node)
+        while out is not None and len(result["outputs_by_first_next"]) < _MAX_INPUTS_PER_NODE:
+            result["outputs_by_first_next"].append(nof.name(out))
+            out = nof.next(out)
+    except Exception as exc:  # noqa: BLE001
+        result["outputs_by_first_next_error"] = str(exc)
+
+    root = None
+    try:
+        root = nef.getRootNodeID(editor)
+        result["root"] = None if root is None else {
+            "node_name": nf.nodeName(root), "server_user_name": nf.serverUserName(root)}
+    except Exception as exc:  # noqa: BLE001
+        result["root_error"] = str(exc)
+
+    if root is not None:
+        try:
+            names = []
+            for i in range(min(nif.numInputs(root), _MAX_INPUTS_PER_NODE)):
+                inp = nif.byIndex(root, i)
+                names.append(nif.name(inp))
+            result["root_inputs"] = names
+            result["material_via_byIndex"] = "Material" in names
+        except Exception as exc:  # noqa: BLE001
+            result["root_inputs_error"] = str(exc)
+        try:
+            inp = nef.getInputByName(root, "Material")
+            result["material_via_getInputByName"] = None if inp is None else nif.name(inp)
+        except Exception as exc:  # noqa: BLE001
+            result["material_via_getInputByName_error"] = str(exc)
+    return result
+
+
 def _probe_node_write():
     """DIAGNOSTIC, temporary: safe dir() scan (zero risk - Python
     introspection on freshly-constructed objects, nothing live touched)
@@ -1050,12 +1246,24 @@ def _handle_query(text):
         elif command == "add_node":
             surf_an, _, type_an = arg.partition("|")
             payload = {"result": _add_node(surf_an or "CONNECTOR", type_an or "Principled BSDF")}
+        elif command == "connect_nodes":
+            parts_cn = (arg.split("|") + [""] * 5)[:5]
+            payload = {"result": _connect_nodes(parts_cn[0] or "CONNECTOR",
+                                                parts_cn[1] or "Principled BSDF (1)",
+                                                parts_cn[2] or "Surface",
+                                                parts_cn[3] or "Material",
+                                                parts_cn[4])}
         elif command == "probe_surf":
             payload = {"result": _probe_surf_constants()}
         elif command == "probe_node_write":
             payload = {"result": _probe_node_write()}
         elif command == "probe_node_write_sigs":
             payload = {"result": _probe_node_write_sigs()}
+        elif command == "probe_node_output_enum":
+            payload = {"result": _probe_node_output_enum()}
+        elif command == "probe_connect_handles":
+            surf_pc, _, node_pc = arg.partition("|")
+            payload = {"result": _probe_connect_handles(surf_pc or "CONNECTOR", node_pc or "Principled BSDF (1)")}
         elif command == "get_render_status":
             payload = {"result": _get_render_status()}
         elif command == "get_hierarchy":

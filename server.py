@@ -783,6 +783,33 @@ def lw_probe_node_write_sigs() -> str:
 
 
 @mcp.tool()
+def lw_probe_node_output_enum() -> str:
+    """DIAGNOSTIC, temporary: safe, zero-risk, UNFILTERED dir() dump of
+    LWNodeOutputFuncs/LWNodeFuncs/LWNodeEditorFuncs, looking for the
+    output-side equivalent of LWNodeInputFuncs.numInputs/byIndex (the
+    proven way to enumerate a node's INPUT sockets from the read
+    investigation). Needed before LWNodeEditorFuncs.connect(output,
+    input) can be tested live - its 2 arguments are presumably output/
+    input socket handles, not node handles, and there is currently no
+    known way to obtain a node's own output handle to pass as the
+    first one."""
+    return json.dumps(_query("probe_node_output_enum"))
+
+
+@mcp.tool()
+def lw_probe_connect_handles(surface: str = "CONNECTOR", node: str = "Principled BSDF (1)") -> str:
+    """DIAGNOSTIC, temporary: obtain (but never use) both handles
+    LWNodeEditorFuncs.connect(output, input) presumably needs, without
+    calling connect. Mutates nothing - inspects an existing node
+    (`node` is a node_name from lw_get_surface_nodes). Captures zero-arg
+    TypeError signatures of the enumeration methods, enumerates the
+    node's outputs via LWNodeOutputFuncs byIndex and first/next, and
+    finds the root Surface node's "Material" input via getRootNodeID +
+    both LWNodeInputFuncs.byIndex and LWNodeEditorFuncs.getInputByName."""
+    return json.dumps(_query("probe_connect_handles %s|%s" % (surface, node)))
+
+
+@mcp.tool()
 def lw_add_node(surface: str = "CONNECTOR", node_type: str = "Principled BSDF") -> str:
     """Create a new node in a surface's node graph (Node Editor writing,
     step 1 - ROADMAP3.md item 2 follow-up). Wraps LWNodeEditorFuncs().
@@ -828,6 +855,46 @@ def lw_add_node(surface: str = "CONNECTOR", node_type: str = "Principled BSDF") 
     session. See PLAN.md "Node Editor writing" for the full staged
     investigation."""
     return json.dumps(_query("add_node", "%s|%s" % (surface, node_type)))
+
+
+# DELIBERATELY NOT REGISTERED as an MCP tool: connect freezes Layout
+# (confirmed three times, including with no editors open and the
+# viewport in Wireframe - see docstring + PLAN.md "Node Editor
+# writing"). Re-add @mcp.tool() only once a non-freezing call sequence
+# is found.
+def lw_connect_nodes(surface: str = "CONNECTOR", from_node: str = "Principled BSDF (1)",
+                     to_node: str = "Surface", input_name: str = "Material",
+                     output_name: str = "") -> str:
+    """Wire one node's output into another node's input in a surface's
+    node graph (Node Editor writing, step 2). Wraps
+    LWNodeEditorFuncs.connect(output, input).
+
+    `from_node`/`to_node` are node_name values from lw_get_surface_nodes
+    (e.g. "Principled BSDF (1)"); `to_node="Surface"` is the root output
+    node. `input_name` is an input on `to_node` as listed by
+    lw_get_node_inputs (for "Surface": Material, Normal, Bump,
+    Displacement, Clip). `output_name` selects an output on `from_node`
+    by name; empty means its first output (Principled BSDF has exactly
+    one, "Material"). Unknown node/socket names return an error listing
+    what's available rather than guessing.
+
+    **CRITICAL, confirmed live twice: the connection takes effect, then
+    Layout's UI freezes and must be killed from Task Manager.** Run 1
+    (Node Editor open): the Surface Editor's Material field changed from
+    "(none)" to "Principled BSDF" - the connection is real - but the
+    Node Editor never drew the wire and Layout stopped responding, while
+    lw_ping still answered "pong" (the UI hung, not the ring listener).
+    Run 2 (Node Editor closed, Surface Editor still open, viewport in
+    Textured Shaded Solid): same freeze - so it is not the Node Editor
+    failing to refresh. Run 3 (Surface and Node Editors both closed,
+    viewport in Wireframe): Layout froze immediately, before anything
+    was reopened - so connect itself causes the freeze, not a redraw
+    of the edited surface afterwards. Root cause unknown. A manual connection made in
+    the Node Editor UI does not freeze, so the SDK-side connect likely
+    leaves some bookkeeping undone (or triggers a redraw that loops).
+    """
+    return json.dumps(_query("connect_nodes", "%s|%s|%s|%s|%s"
+                             % (surface, from_node, to_node, input_name, output_name)))
 
 
 @mcp.tool()

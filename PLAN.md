@@ -2936,3 +2936,54 @@ are left in place as reusable diagnostic tools for that follow-up work
 rather than removed, since the investigation is genuinely unfinished,
 unlike `_probe_add_node` which is now fully superseded by the
 permanent tool.
+
+### Step 2: `connect` - works, then freezes Layout (tool pulled)
+
+Output-socket enumeration, the open sub-question above, was answered
+with two read-only probes before any connect call:
+
+- `LWNodeOutputFuncs` exposes `first`/`next`/`byIndex`/`numInputs`
+  (apparently the output count despite the name)/`name`/`type`/`node`.
+  On a Principled BSDF, `numInputs` reports 1 output, but
+  `byIndex(node, 0)` returns no handle; `first(node)` returns it
+  (named "Material"). Use `first`/`next` for outputs.
+- `LWNodeEditorFuncs.getRootNodeID(editor)` returns the "Surface"
+  node. `LWNodeInputFuncs.byIndex` on it gives
+  `[null, Material, Normal, Bump, Displacement, Clip]`, but the UI
+  shows six inputs ending in OpenGL - so input `byIndex` on the root
+  looks 1-based (index 0 empty, last input missed). The Principled
+  BSDF's own 27 inputs enumerated correctly from 0, so this is not
+  yet understood; match inputs by name, not position.
+- `LWNodeEditorFuncs.getInputByName(root, "Material")` accepts the
+  arguments but returns None - probably expects a different first
+  argument. Unused.
+
+`lw_connect_nodes` (Principled BSDF (1).Material -> Surface.Material on
+CONNECTOR) was then run live twice. Both times `connect` returned None
+with no exception, and the first run confirmed the connection is real:
+the Surface Editor's Material field changed from "(none)" to
+"Principled BSDF". But both times Layout's UI then froze completely
+and had to be killed from Task Manager - while `lw_ping` kept
+answering "pong", so the UI hung, not the ring listener. Run 1 had the
+Node Editor open (it never drew the wire; a blank white window appeared
+at Layout's top-left); run 2 had it closed, ruling out a stale Node
+Editor as the cause. The Surface Editor was open and the viewport was
+in Textured Shaded Solid both times. Making the same connection by hand
+in the Node Editor does not freeze.
+
+A third, isolating run closed both the Surface Editor and the Node
+Editor and switched the viewport to Wireframe before calling connect.
+Layout froze immediately anyway - the UI stopped responding and Alt+Tab
+could no longer bring its window forward - before any editor was
+reopened. So connect itself triggers the freeze; it is not a redraw or
+re-evaluation of the edited surface by an open editor or shaded
+viewport afterwards.
+
+`lw_connect_nodes` is therefore kept in `server.py` for reference but
+deliberately NOT registered as an MCP tool, with the freeze documented
+in its docstring. Remaining untested ideas: check
+`LWNodeInputFuncs.connectedOutput` right after connect to see whether
+the link is half-made (only useful if a freeze can be avoided long
+enough to read it); or avoid `connect` entirely by building the graph
+by hand once, saving it as a node preset, and applying it via
+`LWNodeEditorFuncs.load`.
