@@ -655,6 +655,63 @@ def _get_node_channel(surf_name, node_name, channel_name):
     return {"surface": surf_name, "node": node_name, "channel": channel_name, "keys": keys}
 
 
+def _add_node(surf_name, node_type):
+    """Node Editor writing, step 1 (ROADMAP3.md follow-up) - create a
+    new node in a surface's node graph. Wraps LWNodeEditorFuncs().
+    addNode(editor, node_type), found via a staged dir()-first
+    investigation mirroring ROADMAP3.md item 2's read-side approach:
+    dir() scans of LWNodeFuncs/LWNodeEditorFuncs/LWNodeInputFuncs/
+    LWNodeOutputFuncs for write-suggestive method names, then zero-arg
+    calls to read each candidate's real argument count from its Python
+    TypeError (the same safe technique already used for evaluate_scalar/
+    evaluate_vector), before this first real scene-mutating call.
+
+    CRITICAL, confirmed live: an invalid node_type freezes Layout.
+    node_type must be an exact server_user_name string already
+    confirmed to exist via lw_get_surface_nodes on a real node instance
+    (e.g. "Principled BSDF", "Standard") - NOT a category name from the
+    Node Editor's own "Add Node" browser panel ("Constant" is a
+    CATEGORY heading there, not a real node type) and not a guess.
+    Confirmed the hard way: addNode(editor, "Constant") popped a real,
+    modal "Plug-in Missing: No plug-in of type NodeHandler found with
+    name Constant. Would you like to load it from disk?" dialog that
+    froze Layout's whole main thread - indistinguishable from a crash
+    until a human clicked "No", after which Layout recovered cleanly.
+    Same failure shape as the Content Directory dialog from
+    ROADMAP2.md item 3.
+
+    Confirmed live end to end (with a valid type): addNode(editor,
+    "Principled BSDF") against CONNECTOR's node editor created a real,
+    visible node in the Node Editor UI. Returns the new node's own
+    node_name/server_user_name so the caller can address it immediately
+    in lw_get_node_inputs/lw_get_node_channel without a separate
+    lw_get_surface_nodes round-trip. The new node is added unconnected
+    - it does NOT automatically wire into the Surface node's Material
+    input; see lw_connect_nodes for that (not yet shipped). NodeID
+    handles like the one this returns internally are not JSON-
+    serializable SWIG objects, so only the node's name/type are
+    reported back, matching lw_get_surface_nodes' own shape."""
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    surf = surf_ids[0]
+    sf = lwsdk.LWSurfaceFuncs()
+    editor = sf.getNodeEditor(surf)
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+    try:
+        new_node = nef.addNode(editor, node_type)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+    if new_node is None:
+        return {"error": "addNode returned no node - unrecognized node_type? %s" % node_type}
+    return {
+        "surface": surf_name,
+        "node_name": nf.nodeName(new_node),
+        "server_user_name": nf.serverUserName(new_node),
+    }
+
+
 def _resolve_name(ii, item_id):
     """None for LWITEM_NULL (no relationship set), otherwise the item's
     name. Isolated so a bad/unexpected ID degrades to None instead of
@@ -814,6 +871,78 @@ def _probe_surf_constants():
     return sorted(names)
 
 
+def _probe_node_write_sigs():
+    """DIAGNOSTIC, temporary: step 2 of the Node Editor writing
+    investigation. Calls each write-candidate method found by
+    _probe_node_write with zero arguments and captures the resulting
+    Python TypeError message - the same safe signature-discovery
+    technique already used for LWNodeInputFuncs.evaluate_scalar/
+    evaluate_vector in the read-side investigation (a bad argument
+    count fails in Python before any native LightWave call happens, so
+    this cannot touch scene state)."""
+    candidates = {
+        "LWNodeEditorFuncs": ["addNode", "connect", "destroyNode", "setXY", "reset"],
+        "LWNodeFuncs": ["setNodeColor", "setNodeColor3", "setNodePreviewType"],
+        "LWNodeInputFuncs": ["create", "createCustom", "destroy", "disconnect", "connectedOutput"],
+        "LWNodeOutputFuncs": ["create", "createCustom", "destroy", "setValue"],
+    }
+    result = {}
+    for cls_name, method_names in candidates.items():
+        cls = getattr(lwsdk, cls_name)
+        instance = cls()
+        cls_result = {}
+        for method_name in method_names:
+            method = getattr(instance, method_name)
+            try:
+                method()
+                cls_result[method_name] = {"called_with_zero_args": "no error raised"}
+            except TypeError as exc:
+                cls_result[method_name] = {"type_error": str(exc)}
+            except Exception as exc:  # noqa: BLE001
+                cls_result[method_name] = {"other_error": str(exc)}
+        result[cls_name] = cls_result
+    return result
+
+
+def _probe_node_write():
+    """DIAGNOSTIC, temporary: safe dir() scan (zero risk - Python
+    introspection on freshly-constructed objects, nothing live touched)
+    of the node-related SDK classes already found during ROADMAP3.md
+    item 2's read-side investigation, filtered for write-suggestive
+    method names. Step 1 of a future Node Editor writing investigation -
+    following the exact same staged, dir()-first discipline that
+    investigation already used."""
+    write_keywords = (
+        "add", "create", "new", "insert", "remove", "delete", "destroy",
+        "connect", "disconnect", "link", "unlink", "wire", "clone",
+        "set", "assign", "attach", "detach",
+    )
+    classes = [
+        "LWNodeFuncs", "LWNodeEditorFuncs", "LWNodeInputFuncs",
+        "LWNodeOutputFuncs", "LWNodeUtilityFuncs", "LWNodeDrawFuncs",
+        "LWNodeMenuFuncs",
+    ]
+    result = {}
+    for cls_name in classes:
+        cls = getattr(lwsdk, cls_name, None)
+        if cls is None:
+            result[cls_name] = {"error": "class not found"}
+            continue
+        try:
+            instance = cls()
+            names = dir(instance)
+        except Exception as exc:  # noqa: BLE001
+            result[cls_name] = {"error": str(exc)}
+            continue
+        matches = sorted(
+            n for n in names
+            if not n.startswith("_")
+            and any(kw in n.lower() for kw in write_keywords)
+        )
+        result[cls_name] = matches
+    return result
+
+
 def _get_scene_info():
     scene = lwsdk.LWSceneInfo()
     iteminfo = lwsdk.LWItemInfo()
@@ -918,8 +1047,15 @@ def _handle_query(text):
             node_a = parts_gnc[1] if len(parts_gnc) > 1 and parts_gnc[1] else "Principled BSDF (1)"
             chan_a = parts_gnc[2] if len(parts_gnc) > 2 and parts_gnc[2] else "Roughness"
             payload = {"result": _get_node_channel(surf_a, node_a, chan_a)}
+        elif command == "add_node":
+            surf_an, _, type_an = arg.partition("|")
+            payload = {"result": _add_node(surf_an or "CONNECTOR", type_an or "Principled BSDF")}
         elif command == "probe_surf":
             payload = {"result": _probe_surf_constants()}
+        elif command == "probe_node_write":
+            payload = {"result": _probe_node_write()}
+        elif command == "probe_node_write_sigs":
+            payload = {"result": _probe_node_write_sigs()}
         elif command == "get_render_status":
             payload = {"result": _get_render_status()}
         elif command == "get_hierarchy":

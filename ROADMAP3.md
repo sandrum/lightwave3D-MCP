@@ -518,14 +518,45 @@ Unlike the difficulty-based ranking used to work through this roadmap's
 open items, this list ranks what's left by how much real capability
 each would add to the connector, most valuable first:
 
-1. **Node Editor writing.** Reading node graphs already works
-   (`lw_get_surface_nodes`/`lw_get_node_inputs`/`lw_get_node_channel`),
-   but there's no way to create nodes, wire connections, or write a
-   node's parameter value. This is the single biggest capability gap
-   left in the connector - shading/texturing automation is one of the
-   most commonly wanted things in a 3D pipeline, and it needs the SDK's
-   node API directly (no native Command Port command for node editing
-   exists at all, confirmed by this roadmap's own survey).
+1. **Node Editor writing - IN PROGRESS, node creation now done.**
+   Reading node graphs already worked
+   (`lw_get_surface_nodes`/`lw_get_node_inputs`/`lw_get_node_channel`);
+   this needed the SDK's node API directly, same as reading did (no
+   native Command Port command for node editing exists at all).
+   Staged the same dir()-first investigation the read side used: a safe
+   `dir()` scan found a real write API
+   (`LWNodeEditorFuncs.addNode/connect/destroyNode/setXY`,
+   `LWNodeOutputFuncs.create/setValue`, etc.); the zero-arg TypeError
+   technique confirmed real argument counts for all twelve candidates
+   without touching scene state. A real architectural finding along the
+   way: `setValue` exists only on `LWNodeOutputFuncs`, not
+   `LWNodeInputFuncs` - suggesting this API is shaped for *authoring
+   custom plugin node types*, not for directly setting an existing
+   built-in node's input parameter, echoing the earlier `LWBSDFFuncs`
+   dead end from the read investigation.
+
+   **Shipped `lw_add_node(surface, node_type)`** - confirmed live end
+   to end via a real UI screenshot: `addNode(editor, "Principled
+   BSDF")` created a genuine, visible node in the Node Editor.
+   `node_type` is the `server_user_name` string (e.g. "Principled
+   BSDF"), not the instance-suffixed `node_name`. The new node is added
+   disconnected - wiring (`connect`), removal (`destroyNode`), and
+   repositioning (`setXY`) all have confirmed real argument counts but
+   are not yet live-tested or wrapped.
+
+   **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
+   Tried `lw_add_node("CONNECTOR", "Constant")` next, assuming
+   "Constant" (a category heading in the Node Editor's own browser
+   panel) would work like "Principled BSDF" had - instead LightWave
+   popped a real, modal "Plug-in Missing" dialog and froze Layout's
+   whole main thread, indistinguishable from a crash until a human
+   clicked "No" to dismiss it (Layout then recovered cleanly, zero
+   corruption). Same failure shape as the Content Directory dialog from
+   `ROADMAP2.md` item 3. `node_type` must only ever be an exact
+   `server_user_name` string already confirmed via
+   `lw_get_surface_nodes` on a real existing node - never a category
+   name or a guess. See `PLAN.md` "Node Editor writing" for the full
+   staged investigation, including this incident.
 2. **`Antialiasing` family.** Practical, everyday render-quality control
    (draft vs. final passes) - probably the single most commonly toggled
    setting in an automated render pipeline, ahead of GI/radiosity

@@ -236,6 +236,7 @@ reliably fixes it.
 | `lw_get_surface_nodes(surface=)` | List every node in a surface's node graph. |
 | `lw_get_node_inputs(surface=, node=)` | List a specific node's real parameter names. |
 | `lw_get_node_channel(surface=, node=, channel=)` | Read a node parameter's actual keyframe data. |
+| `lw_add_node(surface=, node_type=)` | Create a new node (added disconnected). **`node_type` must be a confirmed-real `server_user_name`, never a guess - an invalid one freezes Layout with a blocking dialog.** |
 | `lw_probe_surf()` | Diagnostic: list `SURF_*` constants from the SDK. |
 
 **Bones & rigging**
@@ -444,6 +445,41 @@ this is distilled from.
   nine-step staged investigation, including a genuine dead end
   (`LWBSDFFuncs` turned out to be a shader-plugin-authoring API, not a
   way to read an existing node's parameters).
+
+  **Node Editor writing - in progress, node creation now done.**
+  `lw_add_node(surface=, node_type=)` wraps `LWNodeEditorFuncs().
+  addNode(editor, node_type)`, found via the same dir()-first staged
+  approach the read side used. Confirmed live end to end via a real UI
+  screenshot: `lw_add_node("CONNECTOR", "Principled BSDF")` created a
+  genuine, visible node in the Node Editor - `node_type` is the
+  `server_user_name` string (e.g. "Principled BSDF"), not the
+  instance-suffixed `node_name`. The new node is added disconnected -
+  wiring (`connect`), removal (`destroyNode`), and repositioning
+  (`setXY`) all have confirmed real argument counts (found via the
+  same zero-arg-TypeError technique used for `evaluate_scalar`) but
+  aren't live-tested or wrapped yet. A real architectural finding along
+  the way: the write API's `setValue` exists only on
+  `LWNodeOutputFuncs`, not `LWNodeInputFuncs` - suggesting it's shaped
+  for authoring custom plugin node types, not for directly setting an
+  existing built-in node's input parameter (echoing the `LWBSDFFuncs`
+  dead end above).
+
+  **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
+  Tried `lw_add_node("CONNECTOR", "Constant")` next, assuming "Constant"
+  (a category heading in the Node Editor's own "Add Node" browser
+  panel) would work like "Principled BSDF" had - instead LightWave
+  popped a real, modal "Plug-in Missing: No plug-in of type NodeHandler
+  found with name Constant" dialog and froze Layout's whole main
+  thread, indistinguishable from a crash from the outside until a
+  screenshot revealed the actual dialog underneath; clicking "No"
+  recovered Layout cleanly with zero corruption. The exact same failure
+  shape as the Content Directory dialog from `ROADMAP2.md` item 3 - a
+  genuinely blocking dialog a one-way command has no way to dismiss.
+  `node_type` must only ever be an exact `server_user_name` string
+  already confirmed via `lw_get_surface_nodes` on a real existing node
+  - never a category name from the Node Editor's browser UI, never a
+  guess, against a live, unattended session. See `PLAN.md` "Node Editor
+  writing" for the full staged investigation, including this incident.
 - `lw_get_hierarchy` - every item's parent, plus IK target/goal/pole,
   by name. Useful before rigging on top of something already parented.
   **Now also walks bone chains within each object** (`LWItemInfo.first(

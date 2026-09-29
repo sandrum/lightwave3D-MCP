@@ -2799,3 +2799,140 @@ Remaining open items (moderate/hard tier: the
 families, the `FogColor` and `ObjGIRadiosityTolerance` mode gaps, Node
 Editor writing, and reading un-enveloped node parameters) are left for
 a future session, roughly in the difficulty order already established.
+
+## Node Editor writing (ROADMAP3.md item 2 follow-up)
+
+After the moderate-tier sweep, reviewed `ROADMAP3.md`'s own "Remaining
+work, ranked by usefulness" list and picked the top item: Node Editor
+writing, the single biggest capability gap left in the connector
+(reading node graphs worked, but nothing could create nodes, wire
+connections, or write a parameter value).
+
+**Staged this exactly like the original node-reading investigation**,
+since it's the same unmapped SDK territory from a different angle:
+dir()-only introspection first (zero risk), then progressively riskier
+live calls, asking for explicit approval before each new category.
+
+**Step 1 - safe dir() scan, no live calls.** Added a temporary
+`lw_probe_node_write` tool that constructs fresh instances of every
+node-related class the read-side investigation already found
+(`LWNodeFuncs`/`LWNodeEditorFuncs`/`LWNodeInputFuncs`/
+`LWNodeOutputFuncs`/`LWNodeUtilityFuncs`/`LWNodeDrawFuncs`/
+`LWNodeMenuFuncs`) and filters their `dir()` output for write-
+suggestive keywords (add/create/new/insert/remove/delete/connect/
+disconnect/set/etc.). Confirmed live: a real, substantial write API
+exists - `LWNodeEditorFuncs.addNode/connect/destroyNode/setXY/reset`,
+`LWNodeFuncs.setNodeColor/setNodeColor3/setNodePreviewType`,
+`LWNodeInputFuncs.create/createCustom/destroy/disconnect/
+connectedOutput`, `LWNodeOutputFuncs.create/createCustom/destroy/
+setValue`.
+
+**Step 2, EXPLICITLY APPROVED - real argument counts via the zero-arg
+TypeError technique.** Added `lw_probe_node_write_sigs`, which calls
+each candidate with zero arguments and captures the resulting Python
+`TypeError` - the same safe signature-discovery trick that already
+worked for `evaluate_scalar`/`evaluate_vector` in the read
+investigation (a bad argument count fails in Python before any native
+LightWave call happens, so this cannot touch scene state). Confirmed
+live, real argument counts for all twelve candidates (subtracting the
+implicit `self`): `addNode` takes 2 args, `connect` takes 2,
+`destroyNode`/`reset` take 1 each, `setXY` takes 3;
+`setNodeColor`/`setNodePreviewType` take 2, `setNodeColor3` takes 4;
+`LWNodeOutputFuncs.create` takes 3, `createCustom` takes 5, `setValue`
+takes 2, `destroy` takes 1; `LWNodeInputFuncs.create` takes 5,
+`createCustom` takes 6, `disconnect`/`connectedOutput`/`destroy` take
+1 each.
+
+**A real, important architectural finding from the argument-count
+pattern alone, before any further live testing**: `setValue` exists
+only on `LWNodeOutputFuncs`, with no matching method on
+`LWNodeInputFuncs`. This strongly suggests the whole write API is
+shaped for *authoring custom plugin node types* (a plugin computes a
+result and pushes it via its own output's `setValue`) rather than for
+*directly setting an existing built-in node's default input parameter*
+like Roughness - echoing this project's earlier `LWBSDFFuncs` dead end
+from the read investigation (a real API, but for plugin authors, not
+for scripting an existing graph). This means the un-enveloped-
+parameter-read gap this project already carries forward likely has no
+write-side answer here either - `addNode`/`connect`/`destroyNode`/
+`setXY` still look like genuine graph-editing operations worth
+pursuing, just not a full solution to that specific older gap.
+
+**Step 3, EXPLICITLY APPROVED - the first real scene-mutating test.**
+Added `lw_probe_add_node(surface, node_type)`, calling
+`LWNodeEditorFuncs().addNode(editor, node_type)` against a real
+surface's node editor (the same `getNodeEditor()` call
+`_get_surface_nodes` already uses). Confirmed live end to end:
+`addNode(editor, "Principled BSDF")` against `CONNECTOR` succeeded,
+returned a real `NodeID`-typed handle, and - confirmed via a user
+screenshot of the actual Node Editor UI, not just a clean return value
+- a new "Principled BSDF (1)" node genuinely appeared in the graph.
+`node_type` is exactly the `server_user_name` string
+`lw_get_surface_nodes` already reports (e.g. "Principled BSDF"), not
+the instance-suffixed `node_name`. The new node is added disconnected
+- it does not automatically wire into the Surface node's Material
+input, confirmed by the same screenshot showing the surface still
+rendering through "Standard (1)" only.
+
+**Shipped `lw_add_node(surface, node_type)` as a permanent tool**,
+consolidating the temporary `_probe_add_node` diagnostic into
+permanent `_add_node` code in `lw_mcp_ring.py` (matching the project's
+established practice from the read investigation of removing `probe_*`
+scaffolding once a piece is solidly confirmed, rather than waiting for
+the entire write investigation to finish before shipping anything).
+
+**A real, serious finding immediately after shipping, found the hard
+way rather than guessed at: an invalid `node_type` freezes Layout.**
+Tried `lw_add_node("CONNECTOR", "Constant")` next, assuming "Constant"
+(a category heading visible in the Node Editor's own "Add Node"
+browser panel) would work the same way "Principled BSDF" had. Instead
+of a clean error, LightWave popped a real, modal "Plug-in Missing: No
+plug-in of type NodeHandler found with name Constant. Would you like
+to load it from disk?" dialog - and because it's modal, it froze
+Layout's entire main thread. The ring listener query timed out
+immediately after, which at first looked like the Master Plugin
+listener had silently deactivated again (a known flaky-activation
+issue this project has documented before) - but a screenshot of the
+actual frozen screen revealed the real cause: the dialog itself, not a
+listener problem, and the Master Plugins list still showed the ring
+listener correctly checked the whole time. The user reasonably
+described this as Layout "crashing" - a genuinely indistinguishable
+symptom from the outside (frozen, unresponsive, no visible cause) until
+that screenshot revealed the actual blocking dialog underneath.
+Dismissing it with "No" and restarting Layout/reloading plugins/
+restarting Claude Desktop fully recovered the session with zero
+corruption - confirmed via `lw_ping` succeeding again immediately
+after. This is the exact same failure shape as the Content Directory
+dialog from `ROADMAP2.md` item 3: a genuinely blocking dialog a
+one-way, fire-and-forget command has no way to dismiss on its own.
+
+**Lesson, now baked into `lw_add_node`'s own docstring as a CRITICAL
+warning**: `node_type` must only ever be an exact `server_user_name`
+string already confirmed to exist via `lw_get_surface_nodes` on a real
+node instance already present in a graph (e.g. "Principled BSDF",
+"Standard") - never a category name from the Node Editor's own browser
+UI, and never a guess, against a live, unattended session. The
+earlier, pre-incident version of this docstring had actually listed
+"Constant" as a plausible example value alongside "Principled BSDF"/
+"Standard" - purely an inference from the Node Editor's category list,
+never itself live-tested before being written down. That's a real
+methodology lesson for this specific investigation: this project's
+core discipline is "verify live before documenting as confirmed," and
+this slipped through only because it was offered as an *illustrative
+example* rather than a *specific confirmed claim* - worth remembering
+that even documentation-adjacent examples deserve the same live-first
+scrutiny as a stated fact, not just headline claims.
+
+**Remaining for a future session**: `connect(output, input)` (wiring
+one node's output socket to another node's input socket - the 2
+required arguments are presumably output/input handles, not node
+handles directly, meaning enumerating a node's OUTPUT sockets by name
+- the `LWNodeOutputFuncs` equivalent of `LWNodeInputFuncs.numInputs/
+byIndex` - is an open sub-question not yet answered), `destroyNode`
+(remove a node - 1 arg, presumably just the node handle, no editor
+context needed), and `setXY` (reposition a node in the graph view - 3
+args, presumably node/x/y). `lw_probe_node_write`/`lw_probe_node_write_sigs`
+are left in place as reusable diagnostic tools for that follow-up work
+rather than removed, since the investigation is genuinely unfinished,
+unlike `_probe_add_node` which is now fully superseded by the
+permanent tool.

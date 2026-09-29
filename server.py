@@ -754,6 +754,83 @@ def lw_probe_surf() -> str:
 
 
 @mcp.tool()
+def lw_probe_node_write() -> str:
+    """DIAGNOSTIC, temporary: safe dir() scan (zero risk) of the
+    node-related SDK classes found during ROADMAP3.md item 2's read-side
+    investigation (LWNodeFuncs/LWNodeEditorFuncs/LWNodeInputFuncs/
+    LWNodeOutputFuncs/LWNodeUtilityFuncs/LWNodeDrawFuncs/
+    LWNodeMenuFuncs), filtered for write-suggestive method names
+    (add/create/new/insert/remove/delete/connect/set/etc.). Step 1 of
+    the Node Editor writing investigation - no live SDK calls beyond
+    constructing fresh instances and introspecting them, following the
+    same staged discipline the read-side investigation used. Will be
+    removed once the real write API shape is known and permanent tools
+    are shipped."""
+    return json.dumps(_query("probe_node_write"))
+
+
+@mcp.tool()
+def lw_probe_node_write_sigs() -> str:
+    """DIAGNOSTIC, temporary: step 2 of the Node Editor writing
+    investigation. Calls each write-candidate method found by
+    lw_probe_node_write with zero arguments and captures the resulting
+    Python TypeError message - the same safe signature-discovery
+    technique already used for evaluate_scalar/evaluate_vector during
+    the read-side investigation. Cannot touch scene state: a bad
+    argument count fails in Python before any native LightWave call is
+    made."""
+    return json.dumps(_query("probe_node_write_sigs"))
+
+
+@mcp.tool()
+def lw_add_node(surface: str = "CONNECTOR", node_type: str = "Principled BSDF") -> str:
+    """Create a new node in a surface's node graph (Node Editor writing,
+    step 1 - ROADMAP3.md item 2 follow-up). Wraps LWNodeEditorFuncs().
+    addNode(editor, node_type), found via a staged dir()-first
+    investigation mirroring the original node-reading investigation:
+    dir() scans of the node SDK classes for write-suggestive method
+    names, then zero-arg calls to read each candidate's real argument
+    count from its own Python TypeError - the same safe technique
+    already used for evaluate_scalar/evaluate_vector - before this
+    first real scene-mutating call was made.
+
+    **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
+    `node_type` must be an exact server_user_name string already
+    confirmed to exist via lw_get_surface_nodes on a real node instance
+    (e.g. "Principled BSDF", "Standard") - NOT a category name from the
+    Node Editor's own "Add Node" browser panel (e.g. "Constant" is a
+    CATEGORY heading there, not a real node type name) and not a
+    guess. Confirmed live the hard way: `lw_add_node("CONNECTOR",
+    "Constant")` popped a real, modal "Plug-in Missing: No plug-in of
+    type NodeHandler found with name Constant. Would you like to load
+    it from disk?" dialog that froze Layout's entire main thread -
+    indistinguishable from a crash until a human clicked "No" to
+    dismiss it, at which point Layout recovered cleanly with no
+    corruption. This is the exact same failure shape as the Content
+    Directory dialog from ROADMAP2.md item 3: a genuinely blocking
+    dialog a one-way fire-and-forget command has no way to dismiss.
+    Only pass `node_type` values already proven real via
+    lw_get_surface_nodes' server_user_name field on an existing node -
+    never guess a new one against a live, unattended session.
+
+    Confirmed live end to end (with a valid type): `lw_add_node
+    ("CONNECTOR", "Principled BSDF")` created a real, visible node in
+    the Node Editor UI, confirmed via screenshot. Returns the new
+    node's own node_name/server_user_name so it can be addressed
+    immediately in lw_get_node_inputs/lw_get_node_channel without a
+    separate lw_get_surface_nodes round-trip.
+
+    The new node is added UNCONNECTED - it does not automatically wire
+    into the Surface node's Material input or anything else; wiring
+    nodes together (LWNodeEditorFuncs.connect) and repositioning them
+    (setXY) are confirmed to exist with real argument counts but not
+    yet live-tested or wrapped - natural next steps for a future
+    session. See PLAN.md "Node Editor writing" for the full staged
+    investigation."""
+    return json.dumps(_query("add_node", "%s|%s" % (surface, node_type)))
+
+
+@mcp.tool()
 def lw_set_camera_resolution(width: int, height: int) -> str:
     """Set the render resolution (ROADMAP.md item 6 camera setup half).
     Wraps the native FrameSize(width, height) command - this is a
