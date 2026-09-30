@@ -10,3 +10,7 @@ _mcp_response.json
 _mcp_ring_debug.log
 _mcp_render_status.json
 _mcp_render_debug.log
+
+# Node graph files written/read by the save/load probes - scratch,
+# regenerated on demand.
+_mcp_nodes_*.txt

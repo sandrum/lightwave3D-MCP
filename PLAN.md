@@ -2987,3 +2987,52 @@ the link is half-made (only useful if a freeze can be avoided long
 enough to read it); or avoid `connect` entirely by building the graph
 by hand once, saving it as a node preset, and applying it via
 `LWNodeEditorFuncs.load`.
+
+### Step 3: save/load - wiring without `connect` (works)
+
+Option 2 from above: instead of connect, write a surface's whole node
+graph to a file and load one back. A zero-arg signature probe
+(`lw_probe_node_io`) confirmed the pieces, matching the C SDK:
+`LWNodeEditorFuncs.save(editor, saveState)` / `load(editor, loadState)`
+(also `copy(a, b)` and `reset(editor)`, untested), with the state
+objects from `LWFileIOFuncs.openSave(path, mode)` /
+`openLoad(path, mode)` and released by `closeSave`/`closeLoad(state)`;
+modes are the `LWIO_*` constants (`LWIO_ASCII`, `LWIO_BINARY`,
+`LWIO_OBJECT`, `LWIO_SCENE`, ...).
+
+`lw_probe_save_node_graph` (ASCII mode) writes plain, readable text:
+a `{ Root }` header, then `{ Nodes }` with one `Server "<type>"` +
+`{ Tag ... Name "<node_name>" ... { Data } }` block per node (Data holds
+every input value), then a `{ Connections }` block naming each wire by
+name only:
+
+```
+{ Connections
+  NodeName "Surface"
+  InputName "Material"
+  InputNodeName "Principled BSDF (1)"
+  InputOutputName "Material"
+}
+```
+
+Saving only reads the scene. Live test of `lw_probe_load_node_graph`:
+CONNECTOR started as Surface/Input/Standard (1) with Standard wired to
+Material (confirmed by a save). Loading a template saved earlier from a
+hand-wired Principled BSDF graph returned None with no exception, and a
+save straight afterwards was byte-for-byte identical to the template:
+load REPLACES the graph (no duplicate nodes) and restores its
+connections. Layout stayed fully responsive - unlike all three connect
+runs. The open Surface Editor still showed "Standard" until it was
+closed and reopened, then showed "Principled BSDF": load does not
+refresh an open Surface Editor, but the change is real.
+
+Two side findings: the surface's hand-wired state was lost on Layout
+restart even after saving the object, so the saved graph file - not
+the object - is what reliably carried the setup between sessions here;
+and the root block reads `Disabled 1` in every save so far, meaning
+unknown.
+
+This makes a real wiring tool possible: save the graph, rewrite its
+`{ Connections }` block (and add nodes via `lw_add_node` first if
+needed), load it back - the same end state as connect, without calling
+it.

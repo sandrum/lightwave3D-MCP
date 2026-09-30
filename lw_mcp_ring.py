@@ -1100,6 +1100,135 @@ def _probe_connect_handles(surf_name, target_node_name):
     return result
 
 
+def _probe_node_io():
+    """DIAGNOSTIC, temporary: option 2 of Node Editor wiring - rebuild a
+    connected graph via LWNodeEditorFuncs save/load (or copy) instead of
+    connect, which froze Layout in all three live runs. Zero risk: only
+    dir() scans and zero-arg TypeError signature capture (a bad argument
+    count fails in Python before any native call), nothing live touched.
+
+    Per the C SDK, save/load likely take LWSaveState/LWLoadState objects
+    rather than file names, opened via a file-IO global - so this also
+    lists every lwsdk name that looks IO/state-related, dumps any
+    file-IO funcs class it finds, and captures its methods' signatures."""
+    result = {"lwsdk_io_names": sorted(
+        n for n in dir(lwsdk)
+        if any(k in n.upper() for k in ("IO", "STATE", "FILE")))}
+
+    sigs = {}
+    nef = lwsdk.LWNodeEditorFuncs()
+    for method_name in ("load", "save", "copy", "reset"):
+        try:
+            getattr(nef, method_name)()
+            sigs[method_name] = "no error raised"
+        except Exception as exc:  # noqa: BLE001
+            sigs[method_name] = str(exc)
+    result["LWNodeEditorFuncs"] = sigs
+
+    for cls_name in ("LWFileIOFuncs", "LWFileIO"):
+        cls = getattr(lwsdk, cls_name, None)
+        if cls is None:
+            continue
+        try:
+            instance = cls()
+        except Exception as exc:  # noqa: BLE001
+            result[cls_name] = {"construct_error": str(exc)}
+            continue
+        cls_result = {}
+        for method_name in sorted(n for n in dir(instance) if not n.startswith("_")):
+            method = getattr(instance, method_name)
+            if not callable(method):
+                cls_result[method_name] = "<attribute>"
+                continue
+            try:
+                method()
+                cls_result[method_name] = "no error raised"
+            except Exception as exc:  # noqa: BLE001
+                cls_result[method_name] = str(exc)
+        result[cls_name] = cls_result
+    return result
+
+
+_NODE_IO_MODES = ("ASCII", "BINARY", "OBJECT", "SCENE")
+
+
+def _probe_save_node_graph(surf_name, mode_name):
+    """DIAGNOSTIC, temporary: option 2 of Node Editor wiring, step 2 -
+    write a surface's whole node graph to a file via
+    LWFileIOFuncs.openSave(path, LWIO_<mode>) + LWNodeEditorFuncs.save(
+    editor, saveState) + closeSave(state). Signatures confirmed by
+    lw_probe_node_io. Reads the scene, changes nothing in it. The file
+    lands next to this plug-in as _mcp_nodes_<surface>_<mode>.txt;
+    ASCII mode is the default so the saved graph (and whether it
+    records the node connections) can be inspected by eye before
+    LWNodeEditorFuncs.load is ever tried with it."""
+    if mode_name not in _NODE_IO_MODES:
+        return {"error": "mode must be one of %s" % (_NODE_IO_MODES,)}
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+    path = os.path.join(_HERE, "_mcp_nodes_%s_%s.txt" % (surf_name, mode_name))
+
+    fio = lwsdk.LWFileIOFuncs()
+    try:
+        state = fio.openSave(path, getattr(lwsdk, "LWIO_" + mode_name))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "openSave: %s" % exc}
+    if state is None:
+        return {"error": "openSave returned no state for %s" % path}
+    result = {"surface": surf_name, "mode": mode_name, "path": path}
+    try:
+        result["save_returned"] = repr(lwsdk.LWNodeEditorFuncs().save(editor, state))
+    except Exception as exc:  # noqa: BLE001
+        result["save_error"] = str(exc)
+    finally:
+        fio.closeSave(state)
+    result["size"] = os.path.getsize(path) if os.path.exists(path) else None
+    return result
+
+
+def _probe_load_node_graph(surf_name, mode_name, file_name):
+    """DIAGNOSTIC, temporary: option 2 of Node Editor wiring, step 3 -
+    the scene-mutating half: LWFileIOFuncs.openLoad(path, LWIO_<mode>)
+    + LWNodeEditorFuncs.load(editor, loadState) + closeLoad(state),
+    reading a graph file previously written by lw_probe_save_node_graph
+    (whose ASCII form ends in a plain "{ Connections ... }" block naming
+    each wire by node/socket name - so if load honours it, wiring can be
+    done by writing that block rather than calling connect, which froze
+    Layout in all three live runs). file_name is resolved next to this
+    plug-in and restricted to _mcp_nodes_*.txt. Whether load replaces
+    the existing graph or adds to it is one of the things this tests."""
+    if mode_name not in _NODE_IO_MODES:
+        return {"error": "mode must be one of %s" % (_NODE_IO_MODES,)}
+    if not (file_name.startswith("_mcp_nodes_") and file_name.endswith(".txt")
+            and os.path.basename(file_name) == file_name):
+        return {"error": "file_name must be a bare _mcp_nodes_*.txt name"}
+    path = os.path.join(_HERE, file_name)
+    if not os.path.exists(path):
+        return {"error": "file not found: %s" % path}
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+
+    fio = lwsdk.LWFileIOFuncs()
+    try:
+        state = fio.openLoad(path, getattr(lwsdk, "LWIO_" + mode_name))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "openLoad: %s" % exc}
+    if state is None:
+        return {"error": "openLoad returned no state for %s" % path}
+    result = {"surface": surf_name, "mode": mode_name, "path": path}
+    try:
+        result["load_returned"] = repr(lwsdk.LWNodeEditorFuncs().load(editor, state))
+    except Exception as exc:  # noqa: BLE001
+        result["load_error"] = str(exc)
+    finally:
+        fio.closeLoad(state)
+    return result
+
+
 def _probe_node_write():
     """DIAGNOSTIC, temporary: safe dir() scan (zero risk - Python
     introspection on freshly-constructed objects, nothing live touched)
@@ -1261,6 +1390,16 @@ def _handle_query(text):
             payload = {"result": _probe_node_write_sigs()}
         elif command == "probe_node_output_enum":
             payload = {"result": _probe_node_output_enum()}
+        elif command == "probe_save_node_graph":
+            surf_sg, _, mode_sg = arg.partition("|")
+            payload = {"result": _probe_save_node_graph(surf_sg or "CONNECTOR", mode_sg or "ASCII")}
+        elif command == "probe_load_node_graph":
+            parts_lg = (arg.split("|") + [""] * 3)[:3]
+            payload = {"result": _probe_load_node_graph(parts_lg[0] or "CONNECTOR",
+                                                        parts_lg[1] or "ASCII",
+                                                        parts_lg[2] or "_mcp_nodes_template.txt")}
+        elif command == "probe_node_io":
+            payload = {"result": _probe_node_io()}
         elif command == "probe_connect_handles":
             surf_pc, _, node_pc = arg.partition("|")
             payload = {"result": _probe_connect_handles(surf_pc or "CONNECTOR", node_pc or "Principled BSDF (1)")}

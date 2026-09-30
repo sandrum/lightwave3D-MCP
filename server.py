@@ -797,6 +797,44 @@ def lw_probe_node_output_enum() -> str:
 
 
 @mcp.tool()
+def lw_probe_save_node_graph(surface: str = "CONNECTOR", mode: str = "ASCII") -> str:
+    """DIAGNOSTIC, temporary: write a surface's whole node graph to
+    _mcp_nodes_<surface>_<mode>.txt in the project folder via
+    LWFileIOFuncs.openSave + LWNodeEditorFuncs.save + closeSave. Reads
+    the scene, changes nothing. `mode` is one of ASCII/BINARY/OBJECT/
+    SCENE (the LWIO_* constants); ASCII so the result can be inspected
+    for the node connections before LWNodeEditorFuncs.load is tried -
+    the save/load route is the alternative to connect, which froze
+    Layout in all three live runs."""
+    return json.dumps(_query("probe_save_node_graph", "%s|%s" % (surface, mode)))
+
+
+@mcp.tool()
+def lw_probe_load_node_graph(surface: str = "CONNECTOR", mode: str = "ASCII",
+                             file_name: str = "_mcp_nodes_template.txt") -> str:
+    """DIAGNOSTIC, temporary, SCENE-MUTATING: load a node graph file
+    (a bare _mcp_nodes_*.txt name in the project folder, as written by
+    lw_probe_save_node_graph) into a surface via LWFileIOFuncs.openLoad
+    + LWNodeEditorFuncs.load + closeLoad. Tests whether load restores
+    the file's "{ Connections }" block - the alternative to connect,
+    which froze Layout in all three live runs - and whether it replaces
+    or adds to the existing graph. Not yet run live; watch Layout."""
+    return json.dumps(_query("probe_load_node_graph", "%s|%s|%s" % (surface, mode, file_name)))
+
+
+@mcp.tool()
+def lw_probe_node_io() -> str:
+    """DIAGNOSTIC, temporary: zero-risk dir()/signature probe for
+    rebuilding a connected node graph via LWNodeEditorFuncs save/load/
+    copy instead of connect (which froze Layout in all three live
+    runs). Lists IO/state-related lwsdk names, captures zero-arg
+    TypeError signatures of load/save/copy/reset, and dumps any
+    LWFileIOFuncs class with its methods' signatures. Touches nothing
+    live."""
+    return json.dumps(_query("probe_node_io"))
+
+
+@mcp.tool()
 def lw_probe_connect_handles(surface: str = "CONNECTOR", node: str = "Principled BSDF (1)") -> str:
     """DIAGNOSTIC, temporary: obtain (but never use) both handles
     LWNodeEditorFuncs.connect(output, input) presumably needs, without
