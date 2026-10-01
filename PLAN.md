@@ -3227,3 +3227,67 @@ those commands (`AdaptiveSampling` twice). Side finding: with adaptive
 off, LWSceneInfo's `maxSamplesPerPixel` dropped to the minimum (2) while
 the camera still held 16 - LightWave renders at the minimum sample
 count when adaptive sampling is off.
+
+## Render tab quality settings (ROADMAP3.md "Remaining work" #3)
+
+Planned as "switch render engines (`RenderAlgorithm`/`RenderMode`)".
+Live, that turned out not to exist here: Render Properties > Render's
+renderer dropdown lists only "VPR" ("LightWave VPR Renderer, Version
+2019"). What the tab does offer is a set of speed-vs-quality controls,
+so the item was reframed around those.
+
+Command names from Cmd History while the user changed each control by
+hand (dragging a spinner logs one command per step - harmless):
+
+| Render tab control | Logged command |
+| --- | --- |
+| Raytrace Shadows | `RayTraceShadows 0/1` (explicit value, not a toggle) |
+| Diffuse Bounces | `DiffuseBounces <n>` |
+| Ray / Transparency / Reflection / Refraction Recursion Limit | `RayRecursionLimit` / `TransparencyRecursionLimit` / `ReflectionRecursionLimit` / `RefractionRecursionLimit <n>` |
+| Ray Precision | `RayPrecision <v>` |
+| Reflection / Refraction / SSS Samples | `ReflectionSamples` / `RefractionSamples` / `SubsurfaceScatteringSamples <n>` |
+| Global Mipmap / Flare / Light / Edge | `GlobalMipmapMultiplier` / `GlobalLensFlareIntensity` / `GlobalLightIntensity` / `GlobalEdgeMultiplier <v>` |
+| Edge Vertical Points | `EdgeVerticalPoints <n>` |
+| Diffuse / Reflection / Refraction Limit | `DiffuseLimit` / `ReflectionLimit` / `RefractionLimit <v>` |
+| Enable Despike / Despike Tolerance | `EnableDespike 1/0` / `DespikeTolerance <v>` |
+| Noise Filter (Off / On - CPU / On - GPU) | `NoiseFilter 0/1/2` |
+| Polygon Intersection Mode (Fastest / Watertight / Double Precision) | `RenderAlgorithm 0/1/2` |
+| Render Tile Size / Multithreading Limit | `RenderTileSize` / `RenderThreads` (already wrapped) |
+
+So `RenderAlgorithm` is the polygon intersection mode, not an engine.
+The `NoiseFilter` stub takes no arguments although the real command
+takes one (the same stub-bug class as `SetRenderDisplay`), so
+`lw_set_render_options` sends every command raw via `_send_command`.
+`RayTraceReflection`/`RayTraceRefraction` weren't logged that session
+but follow `RayTraceShadows`' shape - confirmed live below.
+
+Read-back from LWSceneInfo (`lwrender.h`): `renderOpts` LWROPT bits
+(shadow 0, reflect 1, refract 2, transparency 14, occlusion 17),
+`recursionDepth`, LW2018's `transparencyDepth`/`reflectionDepth`/
+`refractionDepth`/`reflectionsamples`/`refractionsamples`/
+`scatteringsamples`, and `radiosityIndirectBounceCount`. Ray
+precision, polygon intersection, noise filter and despike have no
+field.
+
+Live, with the Render tab and Cmd History open: the initial read
+matched the UI (shadows/reflection/refraction on, recursion 6/6/4/4,
+samples 1/1/1, bounces 2). One call then sent 15 commands - shadows on,
+reflection off, recursion 12/8/6/7, bounces 3, samples 2/3/4, precision
+7.5, despike on at 0.85, Watertight, GPU noise filter. Every readable
+value read back as sent (reflection off - so `RayTraceReflection`
+works), `radiosityIndirectBounceCount` followed Diffuse Bounces 2 -> 3
+(confirming the mapping), but `raycutoff` stayed 0.01 throughout, so it
+is NOT Ray Precision. The user confirmed precision 7.5 and despike in
+the UI, and Cmd History listed all the commands in order.
+
+`NoiseFilter 2` (GPU) popped a modal LightWave error, "A supported GPU
+is not available for Noise Filtering", that blocked Layout until the
+user clicked OK; LightWave then logged `NoiseFilter 0` itself and left
+the filter Off. That confirms 2 = GPU, but a value that can freeze
+Layout on any machine without a supported GPU isn't safe to offer, so
+`noise_filter` accepts only "off"/"cpu". Watertight = 1 (inferred from
+list order) was confirmed by switching to Double Precision (2) and back
+(1), the user checking the dropdown after each.
+
+`RenderMode(renderintegrator)` stays unwrapped: with only VPR
+available there's nothing in the UI to verify it against.

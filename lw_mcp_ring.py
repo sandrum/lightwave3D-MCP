@@ -246,6 +246,47 @@ def _get_antialiasing(name):
     return result
 
 
+def _get_render_options():
+    """Render Properties > Render tab state, for lw_set_render_options
+    to verify its writes against - every field LWSceneInfo exposes for
+    it (lwrender.h): the LWROPT_* bits of renderOpts for the raytrace
+    checkboxes, recursionDepth and the LW2018 transparency/reflection/
+    refractionDepth and *samples fields, and radiosityIndirectBounceCount
+    (confirmed live to be Diffuse Bounces). raycutoff is reported but is
+    NOT Ray Precision (it didn't change when Ray Precision did). Ray
+    precision, polygon intersection mode, noise filter and despike have
+    no LWSceneInfo field and can't be read back. Each field is read
+    separately so one failing doesn't hide the rest."""
+    scene = lwsdk.LWSceneInfo()
+    result = {}
+    try:
+        opts = int(scene.renderOpts)
+        result["render_opts_raw"] = opts
+        for key, bit in (("raytrace_shadows", 0), ("raytrace_reflection", 1),
+                         ("raytrace_refraction", 2), ("raytrace_transparency", 14),
+                         ("raytrace_occlusion", 17)):
+            result[key] = bool(opts & (1 << bit))
+    except Exception as exc:  # noqa: BLE001
+        result["render_opts_error"] = str(exc)
+    for key, attr in (
+        ("ray_recursion_limit", "recursionDepth"),
+        ("transparency_recursion_limit", "transparencyDepth"),
+        ("reflection_recursion_limit", "reflectionDepth"),
+        ("refraction_recursion_limit", "refractionDepth"),
+        ("reflection_samples", "reflectionsamples"),
+        ("refraction_samples", "refractionsamples"),
+        ("subsurface_samples", "scatteringsamples"),
+        ("ray_cutoff", "raycutoff"),
+        ("indirect_bounce_count", "radiosityIndirectBounceCount"),
+        ("render_type", "renderType"),
+    ):
+        try:
+            result[key] = getattr(scene, attr)
+        except Exception as exc:  # noqa: BLE001
+            result[key + "_error"] = str(exc)
+    return result
+
+
 def _get_light_info(name):
     """Same live-time fix as _get_camera_info.
 
@@ -1626,6 +1667,8 @@ def _handle_query(text):
             payload = {"result": _introspect()}
         elif command == "get_selection":
             payload = {"result": _get_selection()}
+        elif command == "get_render_options":
+            payload = {"result": _get_render_options()}
         elif command == "get_antialiasing":
             payload = {"result": _get_antialiasing(arg or "Camera")}
         elif command == "get_camera_info":

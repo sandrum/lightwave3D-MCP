@@ -1017,6 +1017,102 @@ def lw_set_render_globals(threads: int = None, tile_size: int = None) -> str:
         return json.dumps({"error": str(exc)})
 
 
+_POLYGON_INTERSECTION = {"fastest": 0, "watertight": 1, "double_precision": 2}
+# "On - GPU" is NoiseFilter 2, deliberately not offered: on a machine
+# without a supported GPU, LightWave pops a modal "A supported GPU is not
+# available for Noise Filtering" error that blocks Layout until someone
+# clicks OK (confirmed live).
+_NOISE_FILTER = {"off": 0, "cpu": 1}
+
+
+@mcp.tool()
+def lw_get_render_options() -> str:
+    """Read the Render Properties > Render tab settings LightWave
+    exposes: `raytrace_shadows`/`_reflection`/`_refraction` (plus
+    `_transparency`/`_occlusion`), `ray_recursion_limit`,
+    `transparency_/reflection_/refraction_recursion_limit`,
+    `reflection_/refraction_/subsurface_samples`, and
+    `indirect_bounce_count`, which is Diffuse Bounces (confirmed live).
+    `ray_cutoff` is reported too but is NOT Ray Precision - it stayed
+    0.01 when Ray Precision changed. Ray precision, polygon intersection
+    mode, noise filter and despike can't be read back - LightWave
+    doesn't expose them."""
+    return json.dumps(_query("get_render_options"))
+
+
+@mcp.tool()
+def lw_set_render_options(raytrace_shadows: bool = None, raytrace_reflection: bool = None,
+                          raytrace_refraction: bool = None, ray_recursion_limit: int = None,
+                          transparency_recursion_limit: int = None,
+                          reflection_recursion_limit: int = None,
+                          refraction_recursion_limit: int = None, diffuse_bounces: int = None,
+                          reflection_samples: int = None, refraction_samples: int = None,
+                          subsurface_samples: int = None, ray_precision: float = None,
+                          polygon_intersection: str = None, noise_filter: str = None,
+                          despike: bool = None, despike_tolerance: float = None) -> str:
+    """Set Render Properties > Render tab quality settings. Any
+    parameter left as None is not touched. This install's renderer
+    dropdown only offers VPR, so there is no engine to switch - these
+    are the settings that trade speed for quality instead (raytracing,
+    recursion/bounce limits, sample counts, noise filtering).
+
+    `polygon_intersection` is "fastest", "watertight" (the default) or
+    "double_precision"; `noise_filter` is "off" or "cpu". The GPU noise
+    filter is deliberately not offered: on a machine without a supported
+    GPU it pops a modal error that blocks Layout until someone clicks OK.
+
+    Command names are from Cmd History while each control was changed by
+    hand, and every one was confirmed live: the Raytrace checkboxes take
+    an explicit 0/1 (not toggles); Polygon Intersection Mode logs as
+    RenderAlgorithm (NOT a render engine choice) - Fastest 0, Watertight
+    1, Double Precision 2; Noise Filter logs `NoiseFilter <n>` - Off 0,
+    On-CPU 1 - and its stub takes no arguments, so every command here
+    is sent raw.
+
+    After sending, reads the tab back (lw_get_render_options) and
+    returns it as `state` - the Command Port is one-way UDP, so trust
+    that. Ray precision, polygon intersection, noise filter and despike
+    aren't in it; check those in the UI."""
+    for name, value, table in (("polygon_intersection", polygon_intersection, _POLYGON_INTERSECTION),
+                               ("noise_filter", noise_filter, _NOISE_FILTER)):
+        if value is not None and value not in table:
+            return json.dumps({"error": "%s must be one of %s" % (name, sorted(table))})
+    commands = []
+    for value, command, convert in (
+        (raytrace_shadows, "RayTraceShadows", int),
+        (raytrace_reflection, "RayTraceReflection", int),
+        (raytrace_refraction, "RayTraceRefraction", int),
+        (ray_recursion_limit, "RayRecursionLimit", int),
+        (transparency_recursion_limit, "TransparencyRecursionLimit", int),
+        (reflection_recursion_limit, "ReflectionRecursionLimit", int),
+        (refraction_recursion_limit, "RefractionRecursionLimit", int),
+        (diffuse_bounces, "DiffuseBounces", int),
+        (reflection_samples, "ReflectionSamples", int),
+        (refraction_samples, "RefractionSamples", int),
+        (subsurface_samples, "SubsurfaceScatteringSamples", int),
+        (ray_precision, "RayPrecision", float),
+        (despike, "EnableDespike", int),
+        (despike_tolerance, "DespikeTolerance", float),
+    ):
+        if value is not None:
+            commands.append((command, convert(value)))
+    if polygon_intersection is not None:
+        commands.append(("RenderAlgorithm", _POLYGON_INTERSECTION[polygon_intersection]))
+    if noise_filter is not None:
+        commands.append(("NoiseFilter", _NOISE_FILTER[noise_filter]))
+    lw = _layout()
+    sent = []
+    try:
+        for command, value in commands:
+            lw._send_command(command, [value])
+            sent.append("%s %s" % (command, value))
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc), "sent": sent})
+    time.sleep(0.3)
+    state = _query("get_render_options")
+    return json.dumps({"sent": sent, "state": state.get("result", state)})
+
+
 @mcp.tool()
 def lw_toggle_global_illumination() -> str:
     """Flip the "Enable GI" checkbox (Render Properties > Global

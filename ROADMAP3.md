@@ -554,9 +554,16 @@ each would add to the connector, most valuable first:
    every write. The reconstruction filter is read-only (it's a
    per-buffer setting in Render Properties > Buffers that logs no
    command). See `PLAN.md` "Antialiasing".
-3. **`RenderAlgorithm`/`RenderMode` family.** Switching render engines
-   (e.g. VPR for fast preview vs. a final-quality mode) programmatically
-   - useful for automating a preview-then-final workflow.
+3. **`RenderAlgorithm`/`RenderMode` family - DONE, reframed.** There's
+   no render engine to switch: this install's renderer dropdown only
+   offers VPR, and `RenderAlgorithm` turned out to be the Polygon
+   Intersection Mode. Shipped `lw_get_render_options` /
+   `lw_set_render_options` for the Render tab's speed-vs-quality
+   settings instead (raytracing, recursion limits, bounces, samples,
+   ray precision, intersection mode, CPU noise filter, despike), all
+   confirmed live. `RenderMode(renderintegrator)` is left unwrapped -
+   nothing in the UI it could be checked against. See `PLAN.md`
+   "Render tab quality settings".
 4. **`ColorSpaceOutput` family.** Color management/OCIO-style output
    control matters for accurate pipeline integration, but is a more
    specialized need than AA or render-mode switching.

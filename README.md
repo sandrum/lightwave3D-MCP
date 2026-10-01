@@ -273,6 +273,8 @@ reliably fixes it.
 | `lw_abort_render()` | Abort an in-progress render. |
 | `lw_get_render_status()` | Get real render completion state and progress, not a time-based guess. |
 | `lw_set_render_globals(threads=, tile_size=)` | Set render thread count / tile size. |
+| `lw_get_render_options()` | Read the Render tab: raytrace shadows/reflection/refraction, recursion limits, diffuse bounces, reflection/refraction/SSS samples. |
+| `lw_set_render_options(raytrace_shadows=, raytrace_reflection=, raytrace_refraction=, ray_recursion_limit=, ..._recursion_limit=, diffuse_bounces=, ..._samples=, ray_precision=, polygon_intersection=, noise_filter=, despike=, despike_tolerance=)` | Set the Render tab's quality settings; reads back what LightWave exposes. |
 | `lw_get_antialiasing(camera=)` | Read a camera's antialiasing: min/max samples, adaptive sampling and threshold, filter radius, and the reconstruction filter. |
 | `lw_set_antialiasing(camera=, min_samples=, max_samples=, adaptive_sampling=, adaptive_threshold=, filter_radius=)` | Set a camera's antialiasing (draft vs. final quality); reads every value back to confirm. |
 | `lw_toggle_global_illumination()` | Flip "Enable GI". |
@@ -593,6 +595,20 @@ this is distilled from.
   exact frame count matters. Also fixed a real bug: the counter was
   continuing to climb across separate renders in the same session
   instead of resetting. See `PLAN.md` for the full investigation.
+- **Render tab quality settings** - `lw_get_render_options()` /
+  `lw_set_render_options(...)`: raytraced shadows/reflection/refraction,
+  ray/transparency/reflection/refraction recursion limits, diffuse
+  bounces, reflection/refraction/SSS samples, ray precision, polygon
+  intersection mode, noise filter and despike. This install's renderer
+  dropdown only offers VPR, so there's no engine to switch; these are
+  the speed-vs-quality controls instead. Every command was found and
+  confirmed via Cmd History, and every readable value is read back.
+  Two surprises: `RenderAlgorithm` is the Polygon Intersection Mode
+  (Fastest/Watertight/Double Precision), not a render engine; and the
+  GPU noise filter pops a modal "A supported GPU is not available"
+  error on this machine, so the tool only offers Off and CPU. Ray
+  precision, polygon intersection, noise filter and despike can't be
+  read back.
 - **Antialiasing** - `lw_get_antialiasing(camera)` /
   `lw_set_antialiasing(camera, min_samples=, max_samples=,
   adaptive_sampling=, adaptive_threshold=, filter_radius=)`, the
