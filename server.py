@@ -790,7 +790,8 @@ def lw_add_node(surface: str = "CONNECTOR", node_type: str = "Principled BSDF",
     "Principled BSDF (2)" - one past the highest existing instance) and
     server_user_name, ready for lw_connect_nodes / lw_get_node_inputs.
     `x`/`y` place it in the Node Editor's graph view (default 0, 0 - the
-    origin, where it can overlap other nodes); see lw_move_node.
+    origin, where it can overlap other nodes); larger values go left/up,
+    roughly a pixel per unit - see lw_move_node for the details.
 
     **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
     `node_type` must be an exact server_user_name string already
@@ -903,6 +904,17 @@ def lw_move_node(node: str, x: int, y: int, surface: str = "CONNECTOR") -> str:
     `x`/`y` are the graph's own stored coordinates, as they appear in
     LightWave's saved node data. Reports `before`, the `coordinates`
     LightWave has afterwards, and `moved`.
+
+    Confirmed live: both axes run BACKWARDS - a larger x moves a node
+    left, a larger y moves it up - at roughly 1 screen pixel per unit at
+    100% zoom (1.5-1.9 before the Node Editor has ever been opened).
+    Exact screen placement isn't predictable: opening the Node Editor
+    makes LightWave rewrite the stored coordinates in its own frame
+    (a node set to -200, 100 read back as -421, -185 afterwards), so use
+    this to space nodes apart - a few hundred units is plenty - and the
+    Node Editor's own "Tidy Nodes" button for a proper layout. The
+    Surface node is stored almost on top of Input and can hide behind
+    it; move it clear if needed.
 
     Same save/rewrite/load route as the other node tools (rewrites the
     node's Coordinates line), not LWNodeEditorFuncs.setXY. Close and

@@ -237,10 +237,11 @@ reliably fixes it.
 | `lw_get_surface_nodes(surface=)` | List every node in a surface's node graph. |
 | `lw_get_node_inputs(surface=, node=)` | List a specific node's real parameter names. |
 | `lw_get_node_channel(surface=, node=, channel=)` | Read a node parameter's actual keyframe data. |
-| `lw_add_node(surface=, node_type=)` | Create a new node (added disconnected, at the graph's origin). **`node_type` must be a confirmed-real `server_user_name`, never a guess - an invalid one freezes Layout with a blocking dialog.** |
+| `lw_add_node(surface=, node_type=, x=, y=)` | Create a new node (added disconnected; at the graph's origin unless `x`/`y` are given). **`node_type` must be a confirmed-real `server_user_name`, never a guess - an invalid one freezes Layout with a blocking dialog.** |
 | `lw_connect_nodes(surface=, from_node=, to_node=, input_name=, output_name=)` | Wire one node's output into another's input, replacing what fed it (`to_node="Surface"` is the root, e.g. its `Material` input). Reports the connections LightWave actually has afterwards. |
 | `lw_disconnect_nodes(surface=, to_node=, input_name=)` | Remove the wire feeding one input. |
 | `lw_remove_node(node, surface=)` | Delete a node and every wire to or from it ("Surface" and "Input" are refused). |
+| `lw_move_node(node, x, y, surface=)` | Reposition a node in the Node Editor (cosmetic). Axes run backwards - larger x goes left, larger y goes up - at roughly a pixel per unit; for spacing nodes apart, not exact placement. |
 | `lw_probe_surf()` | Diagnostic: list `SURF_*` constants from the SDK. |
 
 **Bones & rigging**
@@ -450,9 +451,9 @@ this is distilled from.
   (`LWBSDFFuncs` turned out to be a shader-plugin-authoring API, not a
   way to read an existing node's parameters).
 
-  **Node Editor writing - nodes can be added, removed and wired.**
-  `lw_add_node`, `lw_remove_node`, `lw_connect_nodes` and
-  `lw_disconnect_nodes` all work
+  **Node Editor writing - nodes can be added, removed, moved and wired.**
+  `lw_add_node`, `lw_remove_node`, `lw_move_node`, `lw_connect_nodes`
+  and `lw_disconnect_nodes` all work
   by saving the surface's whole node graph as ASCII
   (`LWFileIOFuncs.openSave` + `LWNodeEditorFuncs.save`), editing the
   text - its `{ Connections }` block names every wire by node and socket
@@ -462,14 +463,15 @@ this is distilled from.
   Confirmed live end to end: added a Principled BSDF and wired it into
   Surface > Material, and the Surface Editor showed Principled BSDF.
 
-  The obvious SDK calls (`addNode`, `connect`, `destroyNode`) are
+  The obvious SDK calls (`addNode`, `connect`, `destroyNode`, `setXY`) are
   deliberately NOT used. `addNode` creates a
   node that looks normal but poisons the graph: a later `load` of it
   never returns, wedging the connector until Layout restarts.
   `connect` made the connection but froze Layout's UI all three times
-  it was tried - plausibly the same `addNode` nodes' fault. Two known
+  it was tried - plausibly the same `addNode` nodes' fault. Known
   limitations: an open Surface Editor only shows changes after being
-  closed and reopened, and new nodes are placed at the graph's origin.
+  closed and reopened, and node coordinates are only approximate (see
+  `lw_move_node`).
 
   **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
   `lw_add_node("CONNECTOR", "Constant")` - a category heading in the

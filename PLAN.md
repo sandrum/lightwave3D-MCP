@@ -3108,5 +3108,33 @@ unwired, LightWave-created `Standard (1)` left the Principled wire
 intact; removing the wired `Principled BSDF (1)` reported its wire
 under `wires_removed` and left just Surface and Input; removing
 "Surface" was refused. The user confirmed the reopened Surface Editor
-showed Material "(none)" and Layout stayed responsive. `setXY`
-(repositioning) remains, as does `Disabled 1`.
+showed Material "(none)" and Layout stayed responsive. `Disabled 1`
+remains unexplained.
+
+### Step 6: `lw_move_node` and `lw_add_node` x/y
+
+Same route again, never calling `setXY`: rewrite the node block's
+Tag-level `    Coordinates x y` line, load, re-save to confirm.
+`lw_add_node` gained optional `x`/`y` for the line it already writes.
+
+Live test, with an added Principled BSDF moved to 200, 0 and
+`Standard (1)` to -200, 100 (both confirmed in the re-saved graph): in
+the Node Editor, Principled ended up far LEFT of Input and Standard far
+RIGHT and lower - so x runs backwards (larger = further left) and y
+runs downwards in that frame, at roughly 1.5-1.9 px per unit at 100%
+zoom. Surface and Input (stored at -10, -10 and -30, -10; Input's block
+also carries `Placement 1`) didn't fit that scale cleanly, and Surface
+turned out hidden behind Input.
+
+A second move of Standard to -400, 100 then reported `before` as
+-421, -185, not the -200, 100 just set: opening the Node Editor makes
+LightWave rewrite the stored coordinates in its own frame. That also
+explains the template file holding 0, 0 for nodes placed apart by hand.
+Measured against Input in screenshots before and after (the view had
+scrolled), the +21, +285 change moved Standard about 22 px left and
+279 px up - roughly 1 px per unit, with BOTH axes backwards (larger y
+= further up) in the opened-editor frame. Direction is predictable;
+exact screen placement isn't, so the tool is documented for spacing
+nodes apart, with Tidy Nodes for real layout. This move also ran with
+the Node Editor OPEN - the first load done that way - and Layout stayed
+responsive (the editor needed reopening to show the change).

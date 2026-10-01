@@ -34,8 +34,9 @@ real thing.
   renders, and a scriptable `SetRenderDisplay` (a wrapped-method bug
   had made this look like a manual-only step).
 - Modeler writes (a separate Command Port mechanism from Layout's).
-- Node graphs: add, remove and wire/unwire nodes (`lw_add_node`,
-  `lw_remove_node`, `lw_connect_nodes`, `lw_disconnect_nodes`) - e.g.
+- Node graphs: add, remove, move and wire/unwire nodes (`lw_add_node`,
+  `lw_remove_node`, `lw_move_node`, `lw_connect_nodes`,
+  `lw_disconnect_nodes`) - e.g.
   switch a surface's
   material to Principled BSDF. Works by saving the graph as text,
   editing it and loading it back, because the SDK's own `addNode` and
