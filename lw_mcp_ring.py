@@ -194,6 +194,58 @@ def _get_camera_info(name):
     return result
 
 
+_RECONSTRUCTION_FILTERS = {
+    1: "Box", 2: "Box (sharp)", 3: "Box (soft)",
+    4: "Gaussian", 5: "Gaussian (sharp)", 6: "Gaussian (soft)",
+    7: "Mitchell", 8: "Mitchell (sharp)", 9: "Mitchell (soft)",
+    10: "Lanczos", 11: "Lanczos (sharp)", 12: "Lanczos (soft)",
+}
+
+
+def _get_antialiasing(name):
+    """Camera antialiasing/sampling state, for lw_set_antialiasing to
+    verify its writes against. Per camera, from LWCameraInfo:
+    minSamples/maxSamples/overSampling (the Camera Properties "Filter
+    Radius"), each (id, time). Scene-wide, from LWSceneInfo (lwrender.h
+    documents these as render-camera values): adaptiveSampling,
+    adaptiveThreshold, min/maxSamplesPerPixel, and `filter`, whose bits
+    1-5 the header documents as the reconstruction filter (1-3 Box,
+    4-6 Gaussian, 7-9 Mitchell, 10-12 Lanczos; standard/sharp/soft).
+    Each field is read separately so one failing doesn't hide the rest."""
+    cam_id = _find_item(name)
+    if cam_id is None:
+        return {"error": "camera not found: %s" % name}
+    ci = lwsdk.LWCameraInfo()
+    t = _current_time()
+    result = {"name": name}
+    for key, getter in (
+        ("min_samples", lambda: ci.minSamples(cam_id, t)),
+        ("max_samples", lambda: ci.maxSamples(cam_id, t)),
+        ("filter_radius", lambda: ci.overSampling(cam_id, t)),
+        ("noise_sampler", lambda: ci.noiseSampler(cam_id)),
+    ):
+        try:
+            result[key] = getter()
+        except Exception as exc:  # noqa: BLE001
+            result[key + "_error"] = str(exc)
+    scene = lwsdk.LWSceneInfo()
+    for key, attr in (
+        ("adaptive_sampling", "adaptiveSampling"),
+        ("adaptive_threshold", "adaptiveThreshold"),
+        ("scene_min_samples", "minSamplesPerPixel"),
+        ("scene_max_samples", "maxSamplesPerPixel"),
+        ("filter_raw", "filter"),
+    ):
+        try:
+            result[key] = getattr(scene, attr)
+        except Exception as exc:  # noqa: BLE001
+            result[key + "_error"] = str(exc)
+    if "filter_raw" in result:
+        code = (int(result["filter_raw"]) >> 1) & 0x1F
+        result["reconstruction_filter"] = _RECONSTRUCTION_FILTERS.get(code, "unknown (%d)" % code)
+    return result
+
+
 def _get_light_info(name):
     """Same live-time fix as _get_camera_info.
 
@@ -1574,6 +1626,8 @@ def _handle_query(text):
             payload = {"result": _introspect()}
         elif command == "get_selection":
             payload = {"result": _get_selection()}
+        elif command == "get_antialiasing":
+            payload = {"result": _get_antialiasing(arg or "Camera")}
         elif command == "get_camera_info":
             payload = {"result": _get_camera_info(arg or "Camera")}
         elif command == "get_light_info":

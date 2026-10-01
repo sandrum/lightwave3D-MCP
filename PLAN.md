@@ -3175,3 +3175,55 @@ Known limit, logged for later as `ROADMAP3.md` Known misses #11:
 enveloped (animated) inputs. Only the three plain value shapes have
 been seen; an enveloped input's stored shape has never been inspected,
 and the "unsupported"/refuse path that handles it has never run live.
+
+## Antialiasing (ROADMAP3.md "Remaining work" #2)
+
+The earlier render-globals pass (item 3) surveyed the `Antialiasing`
+family but found no UI match under Render Properties. The controls are
+in **Camera Properties** instead (the stubs sit among the camera's
+film/motion-blur commands): Minimum Samples, Maximum Samples, Adaptive
+Sampling (checkbox), Threshold, Filter Radius.
+
+Command names came from Cmd History while the user changed each
+control by hand - several are not what the stub names suggest:
+
+| Camera Properties control | Logged command |
+| --- | --- |
+| Minimum Samples | `MinAntialiasing <n>` |
+| Maximum Samples | `MaxAntialiasing <n>` |
+| Adaptive Sampling checkbox | `AdaptiveSampling` (no argument - a toggle) |
+| Threshold | `AdaptiveThreshold <value>` |
+| Filter Radius | `Oversampling <value>` |
+
+Each is preceded by `SelectItem 30000000` - they act on the selected
+camera, so the tool selects by numeric ID as `lw_set_camera` does. The
+`MinimumSamples`/`MaximumSamples` stubs, which look like the obvious
+match, are not what this UI uses.
+
+The reconstruction filter (Gaussian/Mitchell/Lanczos...) is not in
+Camera Properties: it's a per-buffer "Common" setting in Render
+Properties > Buffers, and changing it by hand logs nothing in Cmd
+History (nothing on that tab does). The `ReconstructionFilter(level)`
+stub exists but was not tried; left read-only.
+
+Read-back: the SDK header (`lwrender.h`) gives LWCameraInfo
+`minSamples`/`maxSamples`/`overSampling` (id, time) per camera, and
+LWSceneInfo `adaptiveSampling`/`adaptiveThreshold`/
+`min/maxSamplesPerPixel` plus `filter`, whose bits 1-5 are the
+reconstruction filter (1-3 Box, 4-6 Gaussian, 7-9 Mitchell, 10-12
+Lanczos; standard/sharp/soft). `lw_get_antialiasing` reads all of them;
+`lw_set_antialiasing` sends the commands, then reads back and returns
+the state. Because `AdaptiveSampling` only toggles, it reads the
+current state first and sends it only when the state must change.
+
+Live, with Camera Properties and Cmd History open: the initial read
+matched the UI exactly (1/8, adaptive on, 0.01, radius 0.5) and decoded
+the filter as Gaussian (`filter` 8), matching Render Properties. One
+call set min 2, max 16, threshold 0.05, radius 0.6 - all four read
+back. Adaptive off -> sent `AdaptiveSampling`, read 0; off again ->
+sent nothing; on -> sent it, read 1. The user confirmed Camera
+Properties showed 2/16/ticked/0.05/0.6 and Cmd History showed exactly
+those commands (`AdaptiveSampling` twice). Side finding: with adaptive
+off, LWSceneInfo's `maxSamplesPerPixel` dropped to the minimum (2) while
+the camera still held 16 - LightWave renders at the minimum sample
+count when adaptive sampling is off.

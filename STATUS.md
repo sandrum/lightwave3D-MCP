@@ -33,6 +33,10 @@ real thing.
   guessed timing) confirmed for both single-frame and multi-frame
   renders, and a scriptable `SetRenderDisplay` (a wrapped-method bug
   had made this look like a manual-only step).
+- Antialiasing (draft vs. final quality): read and set a camera's
+  min/max samples, adaptive sampling and threshold, and filter radius
+  (`lw_get_antialiasing`, `lw_set_antialiasing`), with every write read
+  back to confirm.
 - Modeler writes (a separate Command Port mechanism from Layout's).
 - Node graphs: add, remove, move and wire/unwire nodes, and read/set
   their input values (`lw_add_node`, `lw_remove_node`, `lw_move_node`,

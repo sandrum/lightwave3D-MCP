@@ -515,6 +515,17 @@ def lw_get_camera_info(name: str = "Camera") -> str:
 
 
 @mcp.tool()
+def lw_get_antialiasing(camera: str = "Camera") -> str:
+    """Read a camera's antialiasing/sampling settings: `min_samples`,
+    `max_samples`, `filter_radius` (Camera Properties' "Filter Radius")
+    and `noise_sampler` for that camera, plus `adaptive_sampling` (1/0),
+    `adaptive_threshold` and the render's `reconstruction_filter` (e.g.
+    "Gaussian"; `filter_raw` is the underlying bitfield) from the scene,
+    which LightWave reports for the render camera."""
+    return json.dumps(_query("get_antialiasing", camera))
+
+
+@mcp.tool()
 def lw_get_light_info(name: str = "Light") -> str:
     """Get a light's type, falloff, color (RGB), intensity, and range.
     Same live-playhead evaluation as lw_get_camera_info for the
@@ -1252,6 +1263,71 @@ def lw_set_fog(fog_type: int = None, min_distance: float = None, max_distance: f
         return json.dumps({"result": "set %s" % sent})
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_set_antialiasing(camera: str = "Camera", min_samples: int = None,
+                        max_samples: int = None, adaptive_sampling: bool = None,
+                        adaptive_threshold: float = None,
+                        filter_radius: float = None) -> str:
+    """Set a camera's antialiasing (Camera Properties' sampling block):
+    `min_samples`/`max_samples` (Minimum/Maximum Samples),
+    `adaptive_sampling` (on/off), `adaptive_threshold` (Threshold) and
+    `filter_radius` (Filter Radius). Any parameter left as None is not
+    touched. Higher samples and a lower threshold mean a cleaner, slower
+    render - e.g. a draft pass at 1/4 samples, a final at 8/64. With
+    adaptive sampling OFF, LightWave renders every pixel at
+    `min_samples` - confirmed live, the scene's effective maximum
+    dropped to the minimum - so `max_samples` and `adaptive_threshold`
+    only matter with it on.
+
+    Command names are from Cmd History while the controls were changed
+    by hand, NOT the obvious stub names: Minimum/Maximum Samples log as
+    MinAntialiasing/MaxAntialiasing (the MinimumSamples/MaximumSamples
+    stubs are something else), Filter Radius logs as Oversampling, and
+    the Adaptive Sampling checkbox logs a bare AdaptiveSampling - a
+    toggle. So `adaptive_sampling` reads the current state first and
+    toggles only if it differs. The camera is selected by numeric ID,
+    never by name (see lw_set_camera).
+
+    The Command Port is one-way UDP, so after sending, this reads every
+    value back (lw_get_antialiasing) and returns it as `state` -
+    trust that, not just the "sent" list. The reconstruction filter
+    (Render Properties > Buffers) is not settable here: changing it by
+    hand logs no command at all."""
+    camera_id, id_resp = _resolve_item_id(camera)
+    if not camera_id:
+        return json.dumps({"error": "could not resolve camera: %s" % camera, "detail": id_resp})
+    lw = _layout()
+    sent = []
+    try:
+        lw.SelectItem(camera_id)
+        if min_samples is not None:
+            lw.MinAntialiasing(int(min_samples))
+            sent.append("MinAntialiasing %d" % int(min_samples))
+        if max_samples is not None:
+            lw.MaxAntialiasing(int(max_samples))
+            sent.append("MaxAntialiasing %d" % int(max_samples))
+        if adaptive_sampling is not None:
+            current = _query("get_antialiasing", camera).get("result", {}).get("adaptive_sampling")
+            if current is None:
+                return json.dumps({"error": "couldn't read adaptive_sampling state, so "
+                                            "didn't toggle it", "sent": sent})
+            if bool(current) != bool(adaptive_sampling):
+                lw.AdaptiveSampling()
+                sent.append("AdaptiveSampling")
+        if adaptive_threshold is not None:
+            lw.AdaptiveThreshold(float(adaptive_threshold))
+            sent.append("AdaptiveThreshold %s" % adaptive_threshold)
+        if filter_radius is not None:
+            lw.Oversampling(float(filter_radius))
+            sent.append("Oversampling %s" % filter_radius)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc), "sent": sent})
+    time.sleep(0.3)
+    state = _query("get_antialiasing", camera)
+    return json.dumps({"camera": camera, "id": camera_id, "sent": sent,
+                       "state": state.get("result", state)})
 
 
 @mcp.tool()

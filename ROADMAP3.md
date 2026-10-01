@@ -548,10 +548,12 @@ each would add to the connector, most valuable first:
    `server_user_name` already seen via `lw_get_surface_nodes`. Open
    follow-up: enveloped inputs (Known misses #11). See `PLAN.md` "Node
    Editor writing" for the full investigation.
-2. **`Antialiasing` family.** Practical, everyday render-quality control
-   (draft vs. final passes) - probably the single most commonly toggled
-   setting in an automated render pipeline, ahead of GI/radiosity
-   tuning which is comparatively set-and-forget.
+2. **`Antialiasing` family - DONE.** `lw_get_antialiasing` /
+   `lw_set_antialiasing`: min/max samples, adaptive sampling and
+   threshold, filter radius, all confirmed live and read back after
+   every write. The reconstruction filter is read-only (it's a
+   per-buffer setting in Render Properties > Buffers that logs no
+   command). See `PLAN.md` "Antialiasing".
 3. **`RenderAlgorithm`/`RenderMode` family.** Switching render engines
    (e.g. VPR for fast preview vs. a final-quality mode) programmatically
    - useful for automating a preview-then-final workflow.

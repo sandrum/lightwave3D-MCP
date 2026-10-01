@@ -273,6 +273,8 @@ reliably fixes it.
 | `lw_abort_render()` | Abort an in-progress render. |
 | `lw_get_render_status()` | Get real render completion state and progress, not a time-based guess. |
 | `lw_set_render_globals(threads=, tile_size=)` | Set render thread count / tile size. |
+| `lw_get_antialiasing(camera=)` | Read a camera's antialiasing: min/max samples, adaptive sampling and threshold, filter radius, and the reconstruction filter. |
+| `lw_set_antialiasing(camera=, min_samples=, max_samples=, adaptive_sampling=, adaptive_threshold=, filter_radius=)` | Set a camera's antialiasing (draft vs. final quality); reads every value back to confirm. |
 | `lw_toggle_global_illumination()` | Flip "Enable GI". |
 | `lw_set_gi_interpolated(enabled)` | Set GI's "Interpolated" mode. |
 | `lw_set_gi_radiosity_tolerance(degrees)` | Set GI's Angular Tolerance. |
@@ -591,6 +593,20 @@ this is distilled from.
   exact frame count matters. Also fixed a real bug: the counter was
   continuing to climb across separate renders in the same session
   instead of resetting. See `PLAN.md` for the full investigation.
+- **Antialiasing** - `lw_get_antialiasing(camera)` /
+  `lw_set_antialiasing(camera, min_samples=, max_samples=,
+  adaptive_sampling=, adaptive_threshold=, filter_radius=)`, the
+  sampling block of Camera Properties. Confirmed live end to end,
+  checked against both the UI and Cmd History. The real command names
+  came from Cmd History, not the obvious stubs: Minimum/Maximum Samples
+  are `MinAntialiasing`/`MaxAntialiasing`, Filter Radius is
+  `Oversampling`, and Adaptive Sampling is a bare `AdaptiveSampling`
+  toggle - so the tool reads the current state and only toggles when it
+  differs. Every call reads all values back (LWCameraInfo per camera,
+  LWSceneInfo for adaptive sampling/threshold/filter) and returns them.
+  With adaptive sampling off, LightWave renders at the minimum sample
+  count. The reconstruction filter (Render Properties > Buffers) is
+  read-only: changing it by hand logs no command.
 - **Render Globals / GI quality settings** (ROADMAP3.md item 3) -
   `lw_set_render_globals(threads=, tile_size=)`, `lw_toggle_global_
   illumination()`, `lw_set_gi_interpolated(enabled)`,
