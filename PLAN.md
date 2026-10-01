@@ -3036,3 +3036,58 @@ This makes a real wiring tool possible: save the graph, rewrite its
 `{ Connections }` block (and add nodes via `lw_add_node` first if
 needed), load it back - the same end state as connect, without calling
 it.
+
+### Step 4: shipping it - and the real culprit, `addNode`
+
+`lw_connect_nodes` was rebuilt on save/load: check every name against
+the live graph, save the graph as ASCII, rewrite its `{ Connections }`
+block, load it back, then save again and report the connections
+LightWave actually has. `lw_disconnect_nodes` is the same with the
+wire removed.
+
+Its first live run hung: the listener received the request and never
+answered (pings queued behind it), while Layout's UI stayed responsive
+- the reverse of the connect freezes - and the surface's Material came
+up "(none)", i.e. load had got partway. The file it was loading was
+byte-for-byte identical to the template that had loaded fine, so the
+difference was the circumstances. Two candidates: (A) `Principled BSDF
+(1)` had just been created by `lw_add_node` (`addNode`), whereas the
+successful load created it itself; (B) save, rewrite and load ran in
+one request rather than three. A separate `lw_add_node` + probe load
+reproduced the hang - (A). But the successful load had also run over a
+same-named pre-existing node (`Standard (1)`), so name clashes weren't
+the issue; the decisive test was the same load over a Principled BSDF
+added by hand in the Node Editor, which worked (byte-identical result,
+listener fine). So: **nodes created by `LWNodeEditorFuncs.addNode` look
+normal but poison the graph - a later `load` never returns.** At least
+two, possibly all three, of the connect freezes also involved an
+addNode-made node, so connect itself may well be fine; that was not
+re-tested, since the save/load route made it unnecessary.
+
+With no addNode-made nodes in the graph, `lw_disconnect_nodes` and
+`lw_connect_nodes` then worked first time, live, each verified by
+LightWave's own re-saved graph: Principled -> Material removed (a file
+with no `{ Connections }` block does clear all wiring); Standard (1) ->
+Material connected; a second wire (Input.Item ID -> Principled
+BSDF (1).Roughness) added alongside it and removed again (multiple
+wires are simply repeated four-line groups in the one block).
+
+`lw_add_node` was then rebuilt the same way, never calling addNode:
+append a minimal node block - `Server`/`RealName` = the type, `Name` =
+"<type> (N)" with N one past the highest existing instance,
+`Coordinates 0 0`, and an empty `{ Data }` (as Surface and Input are
+saved) - and load. Live: it created `Principled BSDF (1)` whose saved
+data was identical to a hand-added node's (all 27 input defaults), the
+only difference being a missing `Placement 3` display line; then
+`lw_connect_nodes` wired it into Surface.Material, the listener stayed
+up, and the user confirmed the Surface Editor (after reopening) showed
+Principled BSDF, the Node Editor showed the wire, and Layout stayed
+responsive. The new node does land at the graph's origin, overlapping
+others - cosmetic, accepted.
+
+The five temporary probes behind steps 2-4 (`lw_probe_node_output_enum`,
+`lw_probe_connect_handles`, `lw_probe_node_io`,
+`lw_probe_save_node_graph`, `lw_probe_load_node_graph`) are removed now
+that the shipped tools cover them. Still open: `destroyNode` and
+`setXY` (both presumably doable the same way - drop a node's block, or
+edit its `Coordinates`), and what the root block's `Disabled 1` means.

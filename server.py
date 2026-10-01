@@ -783,156 +783,90 @@ def lw_probe_node_write_sigs() -> str:
 
 
 @mcp.tool()
-def lw_probe_node_output_enum() -> str:
-    """DIAGNOSTIC, temporary: safe, zero-risk, UNFILTERED dir() dump of
-    LWNodeOutputFuncs/LWNodeFuncs/LWNodeEditorFuncs, looking for the
-    output-side equivalent of LWNodeInputFuncs.numInputs/byIndex (the
-    proven way to enumerate a node's INPUT sockets from the read
-    investigation). Needed before LWNodeEditorFuncs.connect(output,
-    input) can be tested live - its 2 arguments are presumably output/
-    input socket handles, not node handles, and there is currently no
-    known way to obtain a node's own output handle to pass as the
-    first one."""
-    return json.dumps(_query("probe_node_output_enum"))
-
-
-@mcp.tool()
-def lw_probe_save_node_graph(surface: str = "CONNECTOR", mode: str = "ASCII") -> str:
-    """DIAGNOSTIC, temporary: write a surface's whole node graph to
-    _mcp_nodes_<surface>_<mode>.txt in the project folder via
-    LWFileIOFuncs.openSave + LWNodeEditorFuncs.save + closeSave. Reads
-    the scene, changes nothing. `mode` is one of ASCII/BINARY/OBJECT/
-    SCENE (the LWIO_* constants); ASCII so the result can be inspected
-    for the node connections before LWNodeEditorFuncs.load is tried -
-    the save/load route is the alternative to connect, which froze
-    Layout in all three live runs."""
-    return json.dumps(_query("probe_save_node_graph", "%s|%s" % (surface, mode)))
-
-
-@mcp.tool()
-def lw_probe_load_node_graph(surface: str = "CONNECTOR", mode: str = "ASCII",
-                             file_name: str = "_mcp_nodes_template.txt") -> str:
-    """DIAGNOSTIC, temporary, SCENE-MUTATING: load a node graph file
-    (a bare _mcp_nodes_*.txt name in the project folder, as written by
-    lw_probe_save_node_graph) into a surface via LWFileIOFuncs.openLoad
-    + LWNodeEditorFuncs.load + closeLoad. Tests whether load restores
-    the file's "{ Connections }" block - the alternative to connect,
-    which froze Layout in all three live runs - and whether it replaces
-    or adds to the existing graph. Not yet run live; watch Layout."""
-    return json.dumps(_query("probe_load_node_graph", "%s|%s|%s" % (surface, mode, file_name)))
-
-
-@mcp.tool()
-def lw_probe_node_io() -> str:
-    """DIAGNOSTIC, temporary: zero-risk dir()/signature probe for
-    rebuilding a connected node graph via LWNodeEditorFuncs save/load/
-    copy instead of connect (which froze Layout in all three live
-    runs). Lists IO/state-related lwsdk names, captures zero-arg
-    TypeError signatures of load/save/copy/reset, and dumps any
-    LWFileIOFuncs class with its methods' signatures. Touches nothing
-    live."""
-    return json.dumps(_query("probe_node_io"))
-
-
-@mcp.tool()
-def lw_probe_connect_handles(surface: str = "CONNECTOR", node: str = "Principled BSDF (1)") -> str:
-    """DIAGNOSTIC, temporary: obtain (but never use) both handles
-    LWNodeEditorFuncs.connect(output, input) presumably needs, without
-    calling connect. Mutates nothing - inspects an existing node
-    (`node` is a node_name from lw_get_surface_nodes). Captures zero-arg
-    TypeError signatures of the enumeration methods, enumerates the
-    node's outputs via LWNodeOutputFuncs byIndex and first/next, and
-    finds the root Surface node's "Material" input via getRootNodeID +
-    both LWNodeInputFuncs.byIndex and LWNodeEditorFuncs.getInputByName."""
-    return json.dumps(_query("probe_connect_handles %s|%s" % (surface, node)))
-
-
-@mcp.tool()
 def lw_add_node(surface: str = "CONNECTOR", node_type: str = "Principled BSDF") -> str:
-    """Create a new node in a surface's node graph (Node Editor writing,
-    step 1 - ROADMAP3.md item 2 follow-up). Wraps LWNodeEditorFuncs().
-    addNode(editor, node_type), found via a staged dir()-first
-    investigation mirroring the original node-reading investigation:
-    dir() scans of the node SDK classes for write-suggestive method
-    names, then zero-arg calls to read each candidate's real argument
-    count from its own Python TypeError - the same safe technique
-    already used for evaluate_scalar/evaluate_vector - before this
-    first real scene-mutating call was made.
+    """Create a new, unconnected node in a surface's node graph (Node
+    Editor writing, step 1). Returns the new node's node_name (e.g.
+    "Principled BSDF (2)" - one past the highest existing instance) and
+    server_user_name, ready for lw_connect_nodes / lw_get_node_inputs.
 
     **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
     `node_type` must be an exact server_user_name string already
     confirmed to exist via lw_get_surface_nodes on a real node instance
     (e.g. "Principled BSDF", "Standard") - NOT a category name from the
     Node Editor's own "Add Node" browser panel (e.g. "Constant" is a
-    CATEGORY heading there, not a real node type name) and not a
-    guess. Confirmed live the hard way: `lw_add_node("CONNECTOR",
-    "Constant")` popped a real, modal "Plug-in Missing: No plug-in of
-    type NodeHandler found with name Constant. Would you like to load
-    it from disk?" dialog that froze Layout's entire main thread -
-    indistinguishable from a crash until a human clicked "No" to
-    dismiss it, at which point Layout recovered cleanly with no
-    corruption. This is the exact same failure shape as the Content
-    Directory dialog from ROADMAP2.md item 3: a genuinely blocking
-    dialog a one-way fire-and-forget command has no way to dismiss.
-    Only pass `node_type` values already proven real via
-    lw_get_surface_nodes' server_user_name field on an existing node -
-    never guess a new one against a live, unattended session.
+    CATEGORY heading there, not a real node type name) and not a guess.
+    An unknown type pops a modal "Plug-in Missing: No plug-in of type
+    NodeHandler found..." dialog that freezes Layout's main thread until
+    a human clicks "No" - the same failure shape as the Content
+    Directory dialog from ROADMAP2.md item 3.
 
-    Confirmed live end to end (with a valid type): `lw_add_node
-    ("CONNECTOR", "Principled BSDF")` created a real, visible node in
-    the Node Editor UI, confirmed via screenshot. Returns the new
-    node's own node_name/server_user_name so it can be addressed
-    immediately in lw_get_node_inputs/lw_get_node_channel without a
-    separate lw_get_surface_nodes round-trip.
+    Uses the same save/rewrite/load route as lw_connect_nodes: saves
+    the graph as ASCII, appends a minimal node block (empty data, so
+    the node starts from its own defaults), loads it back, and confirms
+    the node exists afterwards. It does NOT use LWNodeEditorFuncs.addNode
+    any more: nodes made by addNode look normal but poison the graph -
+    a later load of it never returns and wedges the connector until
+    Layout restarts (confirmed live twice; the identical load over a
+    hand-added node worked), and they plausibly caused every
+    LWNodeEditorFuncs.connect freeze too. A graph that still contains
+    an addNode-made node from an older version of this tool will hang
+    here as well - restart Layout without saving first.
 
-    The new node is added UNCONNECTED - it does not automatically wire
-    into the Surface node's Material input or anything else; wiring
-    nodes together (LWNodeEditorFuncs.connect) and repositioning them
-    (setXY) are confirmed to exist with real argument counts but not
-    yet live-tested or wrapped - natural next steps for a future
-    session. See PLAN.md "Node Editor writing" for the full staged
-    investigation."""
+    Close and reopen an open Surface Editor to see changes; safest with
+    the Node Editor closed. See PLAN.md "Node Editor writing"."""
     return json.dumps(_query("add_node", "%s|%s" % (surface, node_type)))
 
 
-# DELIBERATELY NOT REGISTERED as an MCP tool: connect freezes Layout
-# (confirmed three times, including with no editors open and the
-# viewport in Wireframe - see docstring + PLAN.md "Node Editor
-# writing"). Re-add @mcp.tool() only once a non-freezing call sequence
-# is found.
+@mcp.tool()
 def lw_connect_nodes(surface: str = "CONNECTOR", from_node: str = "Principled BSDF (1)",
                      to_node: str = "Surface", input_name: str = "Material",
                      output_name: str = "") -> str:
     """Wire one node's output into another node's input in a surface's
-    node graph (Node Editor writing, step 2). Wraps
-    LWNodeEditorFuncs.connect(output, input).
+    node graph (Node Editor writing, step 2), replacing whatever fed
+    that input before.
 
     `from_node`/`to_node` are node_name values from lw_get_surface_nodes
     (e.g. "Principled BSDF (1)"); `to_node="Surface"` is the root output
     node. `input_name` is an input on `to_node` as listed by
     lw_get_node_inputs (for "Surface": Material, Normal, Bump,
-    Displacement, Clip). `output_name` selects an output on `from_node`
-    by name; empty means its first output (Principled BSDF has exactly
-    one, "Material"). Unknown node/socket names return an error listing
-    what's available rather than guessing.
+    Displacement, Clip - its OpenGL input can't currently be addressed).
+    `output_name` selects an output on `from_node`; empty means its
+    first output (Principled BSDF has exactly one, "Material"). Unknown
+    node/socket names return an error listing what's available, and
+    nothing changes. To wire in a node that isn't in the graph yet, add
+    it with lw_add_node first.
 
-    **CRITICAL, confirmed live twice: the connection takes effect, then
-    Layout's UI freezes and must be killed from Task Manager.** Run 1
-    (Node Editor open): the Surface Editor's Material field changed from
-    "(none)" to "Principled BSDF" - the connection is real - but the
-    Node Editor never drew the wire and Layout stopped responding, while
-    lw_ping still answered "pong" (the UI hung, not the ring listener).
-    Run 2 (Node Editor closed, Surface Editor still open, viewport in
-    Textured Shaded Solid): same freeze - so it is not the Node Editor
-    failing to refresh. Run 3 (Surface and Node Editors both closed,
-    viewport in Wireframe): Layout froze immediately, before anything
-    was reopened - so connect itself causes the freeze, not a redraw
-    of the edited surface afterwards. Root cause unknown. A manual connection made in
-    the Node Editor UI does not freeze, so the SDK-side connect likely
-    leaves some bookkeeping undone (or triggers a redraw that loops).
-    """
+    Does NOT call LWNodeEditorFuncs.connect: that made the connection
+    but froze Layout's UI in all three live runs (it had to be killed
+    from Task Manager each time). Instead it saves the surface's whole
+    graph as ASCII, rewrites the file's "{ Connections }" block (which
+    names every wire by node and socket name), and loads it back -
+    confirmed live to replace the graph exactly with Layout staying
+    responsive. The graph is then saved again and the result reports
+    the connections LightWave actually has afterwards (`connected`:
+    true/false), plus the `before` list.
+
+    An open Surface Editor does not refresh: close and reopen it to see
+    the new Material. Safest with the Node Editor closed - the load
+    route has only been tested that way. See PLAN.md "Node Editor
+    writing" for the full investigation."""
     return json.dumps(_query("connect_nodes", "%s|%s|%s|%s|%s"
                              % (surface, from_node, to_node, input_name, output_name)))
+
+
+@mcp.tool()
+def lw_disconnect_nodes(surface: str = "CONNECTOR", to_node: str = "Surface",
+                        input_name: str = "Material") -> str:
+    """Remove the wire feeding one input in a surface's node graph -
+    the counterpart of lw_connect_nodes, using the same save/rewrite/
+    load route (not LWNodeEditorFuncs.connect/disconnect). `to_node` is
+    a node_name from lw_get_surface_nodes ("Surface" for the root
+    output node) and `input_name` an input on it. Returns an error if
+    nothing is connected there. Reports `disconnected` and the
+    connections LightWave has afterwards. Close and reopen an open
+    Surface Editor to see the change; safest with the Node Editor
+    closed."""
+    return json.dumps(_query("disconnect_nodes", "%s|%s|%s" % (surface, to_node, input_name)))
 
 
 @mcp.tool()

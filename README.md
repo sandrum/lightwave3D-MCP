@@ -30,9 +30,10 @@ leaving the chat.
   muscle/joint-compensation family, and Endomorph baking.
 - **Cameras & lights** - resolution, depth of field, motion blur, falloff,
   volumetrics, and per-light object inclusion/exclusion lists.
-- **Surfaces & node graphs** - read and write flat surface properties, plus
+- **Surfaces & node graphs** - read and write flat surface properties,
   introspect a surface's actual node graph (e.g. every PrincipledBSDF
-  parameter).
+  parameter), and build one: add nodes and wire/unwire them (e.g. switch a
+  surface's material to Principled BSDF).
 - **Render automation** - trigger frame/scene renders, track real completion
   state (not a time-based guess), and configure GI/radiosity/thread/tile
   settings.
@@ -236,7 +237,9 @@ reliably fixes it.
 | `lw_get_surface_nodes(surface=)` | List every node in a surface's node graph. |
 | `lw_get_node_inputs(surface=, node=)` | List a specific node's real parameter names. |
 | `lw_get_node_channel(surface=, node=, channel=)` | Read a node parameter's actual keyframe data. |
-| `lw_add_node(surface=, node_type=)` | Create a new node (added disconnected). **`node_type` must be a confirmed-real `server_user_name`, never a guess - an invalid one freezes Layout with a blocking dialog.** |
+| `lw_add_node(surface=, node_type=)` | Create a new node (added disconnected, at the graph's origin). **`node_type` must be a confirmed-real `server_user_name`, never a guess - an invalid one freezes Layout with a blocking dialog.** |
+| `lw_connect_nodes(surface=, from_node=, to_node=, input_name=, output_name=)` | Wire one node's output into another's input, replacing what fed it (`to_node="Surface"` is the root, e.g. its `Material` input). Reports the connections LightWave actually has afterwards. |
+| `lw_disconnect_nodes(surface=, to_node=, input_name=)` | Remove the wire feeding one input. |
 | `lw_probe_surf()` | Diagnostic: list `SURF_*` constants from the SDK. |
 
 **Bones & rigging**
@@ -446,40 +449,34 @@ this is distilled from.
   (`LWBSDFFuncs` turned out to be a shader-plugin-authoring API, not a
   way to read an existing node's parameters).
 
-  **Node Editor writing - in progress, node creation now done.**
-  `lw_add_node(surface=, node_type=)` wraps `LWNodeEditorFuncs().
-  addNode(editor, node_type)`, found via the same dir()-first staged
-  approach the read side used. Confirmed live end to end via a real UI
-  screenshot: `lw_add_node("CONNECTOR", "Principled BSDF")` created a
-  genuine, visible node in the Node Editor - `node_type` is the
-  `server_user_name` string (e.g. "Principled BSDF"), not the
-  instance-suffixed `node_name`. The new node is added disconnected -
-  wiring (`connect`), removal (`destroyNode`), and repositioning
-  (`setXY`) all have confirmed real argument counts (found via the
-  same zero-arg-TypeError technique used for `evaluate_scalar`) but
-  aren't live-tested or wrapped yet. A real architectural finding along
-  the way: the write API's `setValue` exists only on
-  `LWNodeOutputFuncs`, not `LWNodeInputFuncs` - suggesting it's shaped
-  for authoring custom plugin node types, not for directly setting an
-  existing built-in node's input parameter (echoing the `LWBSDFFuncs`
-  dead end above).
+  **Node Editor writing - nodes can be added and wired.**
+  `lw_add_node`, `lw_connect_nodes` and `lw_disconnect_nodes` all work
+  by saving the surface's whole node graph as ASCII
+  (`LWFileIOFuncs.openSave` + `LWNodeEditorFuncs.save`), editing the
+  text - its `{ Connections }` block names every wire by node and socket
+  name, and a new node is a short block with empty data that picks up
+  the node type's own defaults - and loading it back (`openLoad` +
+  `load`), then saving once more to report what LightWave actually has.
+  Confirmed live end to end: added a Principled BSDF and wired it into
+  Surface > Material, and the Surface Editor showed Principled BSDF.
+
+  The obvious SDK calls are deliberately NOT used. `addNode` creates a
+  node that looks normal but poisons the graph: a later `load` of it
+  never returns, wedging the connector until Layout restarts.
+  `connect` made the connection but froze Layout's UI all three times
+  it was tried - plausibly the same `addNode` nodes' fault. Two known
+  limitations: an open Surface Editor only shows changes after being
+  closed and reopened, and new nodes are placed at the graph's origin.
 
   **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
-  Tried `lw_add_node("CONNECTOR", "Constant")` next, assuming "Constant"
-  (a category heading in the Node Editor's own "Add Node" browser
-  panel) would work like "Principled BSDF" had - instead LightWave
-  popped a real, modal "Plug-in Missing: No plug-in of type NodeHandler
-  found with name Constant" dialog and froze Layout's whole main
-  thread, indistinguishable from a crash from the outside until a
-  screenshot revealed the actual dialog underneath; clicking "No"
-  recovered Layout cleanly with zero corruption. The exact same failure
-  shape as the Content Directory dialog from `ROADMAP2.md` item 3 - a
-  genuinely blocking dialog a one-way command has no way to dismiss.
-  `node_type` must only ever be an exact `server_user_name` string
-  already confirmed via `lw_get_surface_nodes` on a real existing node
-  - never a category name from the Node Editor's browser UI, never a
-  guess, against a live, unattended session. See `PLAN.md` "Node Editor
-  writing" for the full staged investigation, including this incident.
+  `lw_add_node("CONNECTOR", "Constant")` - a category heading in the
+  Node Editor's "Add Node" browser, not a node type - popped a real,
+  modal "Plug-in Missing: No plug-in of type NodeHandler found with
+  name Constant" dialog that froze Layout until a human clicked "No"
+  (recovered cleanly, no corruption). `node_type` must only ever be an
+  exact `server_user_name` already confirmed via `lw_get_surface_nodes`
+  on a real existing node - never a category name, never a guess. See
+  `PLAN.md` "Node Editor writing" for the full investigation.
 - `lw_get_hierarchy` - every item's parent, plus IK target/goal/pole,
   by name. Useful before rigging on top of something already parented.
   **Now also walks bone chains within each object** (`LWItemInfo.first(

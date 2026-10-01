@@ -656,139 +656,289 @@ def _get_node_channel(surf_name, node_name, channel_name):
 
 
 def _add_node(surf_name, node_type):
-    """Node Editor writing, step 1 (ROADMAP3.md follow-up) - create a
-    new node in a surface's node graph. Wraps LWNodeEditorFuncs().
-    addNode(editor, node_type), found via a staged dir()-first
-    investigation mirroring ROADMAP3.md item 2's read-side approach:
-    dir() scans of LWNodeFuncs/LWNodeEditorFuncs/LWNodeInputFuncs/
-    LWNodeOutputFuncs for write-suggestive method names, then zero-arg
-    calls to read each candidate's real argument count from its Python
-    TypeError (the same safe technique already used for evaluate_scalar/
-    evaluate_vector), before this first real scene-mutating call.
+    """Node Editor writing, step 1 - create a new node in a surface's
+    node graph, via the same save/rewrite/load route as _rewire_nodes
+    (PLAN.md "Node Editor writing").
 
-    CRITICAL, confirmed live: an invalid node_type freezes Layout.
-    node_type must be an exact server_user_name string already
-    confirmed to exist via lw_get_surface_nodes on a real node instance
-    (e.g. "Principled BSDF", "Standard") - NOT a category name from the
-    Node Editor's own "Add Node" browser panel ("Constant" is a
-    CATEGORY heading there, not a real node type) and not a guess.
-    Confirmed the hard way: addNode(editor, "Constant") popped a real,
-    modal "Plug-in Missing: No plug-in of type NodeHandler found with
-    name Constant. Would you like to load it from disk?" dialog that
-    froze Layout's whole main thread - indistinguishable from a crash
-    until a human clicked "No", after which Layout recovered cleanly.
-    Same failure shape as the Content Directory dialog from
-    ROADMAP2.md item 3.
+    Deliberately does NOT use LWNodeEditorFuncs.addNode, which this tool
+    originally wrapped. A node made by addNode looks normal (visible in
+    the Node Editor, listed by lw_get_surface_nodes) but poisons the
+    graph: a later LWNodeEditorFuncs.load of it never returns, wedging
+    the ring listener until Layout restarts - confirmed live twice,
+    while the identical load over a HAND-added node of the same type
+    and name worked. addNode nodes plausibly also caused all three
+    connect freezes.
 
-    Confirmed live end to end (with a valid type): addNode(editor,
-    "Principled BSDF") against CONNECTOR's node editor created a real,
-    visible node in the Node Editor UI. Returns the new node's own
-    node_name/server_user_name so the caller can address it immediately
-    in lw_get_node_inputs/lw_get_node_channel without a separate
-    lw_get_surface_nodes round-trip. The new node is added unconnected
-    - it does NOT automatically wire into the Surface node's Material
-    input; see lw_connect_nodes for that (not yet shipped). NodeID
-    handles like the one this returns internally are not JSON-
-    serializable SWIG objects, so only the node's name/type are
-    reported back, matching lw_get_surface_nodes' own shape."""
-    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
-    if not surf_ids:
-        return {"error": "surface not found: %s" % surf_name}
-    surf = surf_ids[0]
-    sf = lwsdk.LWSurfaceFuncs()
-    editor = sf.getNodeEditor(surf)
-    nef = lwsdk.LWNodeEditorFuncs()
-    nf = lwsdk.LWNodeFuncs()
-    try:
-        new_node = nef.addNode(editor, node_type)
-    except Exception as exc:  # noqa: BLE001
-        return {"error": str(exc)}
-    if new_node is None:
-        return {"error": "addNode returned no node - unrecognized node_type? %s" % node_type}
-    return {
-        "surface": surf_name,
-        "node_name": nf.nodeName(new_node),
-        "server_user_name": nf.serverUserName(new_node),
-    }
+    Instead: save the graph as ASCII, append a minimal node block to
+    its "{ Nodes }" section - Server/RealName = node_type, Name =
+    "<node_type> (N)" with N one past the highest existing instance,
+    and an empty "{ Data }" (as the Surface and Input nodes are saved),
+    so the node starts from its own defaults - then load it back. It
+    then saves again and confirms the node really exists.
 
-
-def _connect_nodes(surf_name, from_node_name, to_node_name, input_name, output_name):
-    """Node Editor writing, step 2 - wire one node's output socket into
-    another node's input socket via LWNodeEditorFuncs.connect(output,
-    input). Both handles were confirmed obtainable, read-only, by
-    lw_probe_connect_handles before this first live connect call:
-
-    - Output: LWNodeOutputFuncs first(node)/next(out). NOT byIndex -
-      byIndex(node, 0) returned no handle on a Principled BSDF whose
-      output count is 1, so first/next is the reliable path here (the
-      reverse of the input side).
-    - Input: LWNodeInputFuncs numInputs/byIndex on the target node,
-      matched by name - the path already proven by lw_get_node_inputs.
-      The root "Surface" node lists an unnamed entry at index 0 before
-      Material/Normal/Bump/Displacement/Clip; skipped naturally by the
-      name match. LWNodeEditorFuncs.getInputByName(root, "Material")
-      accepted its arguments but returned None, so it isn't used.
-
-    to_node_name "Surface" resolves via getRootNodeID rather than the
-    node list. output_name empty means the node's first output."""
+    CRITICAL, inherited from the addNode version: an unknown node_type
+    pops a modal "Plug-in Missing" dialog that freezes Layout. Only pass
+    exact server_user_name values already seen via lw_get_surface_nodes
+    (e.g. "Principled BSDF", "Standard"), never a Node Editor category
+    name or a guess."""
+    if '"' in node_type or "\n" in node_type or not node_type.strip():
+        return {"error": "invalid node_type: %r" % node_type}
     surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
     if not surf_ids:
         return {"error": "surface not found: %s" % surf_name}
     editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
     nef = lwsdk.LWNodeEditorFuncs()
     nf = lwsdk.LWNodeFuncs()
-    nif = lwsdk.LWNodeInputFuncs()
-    nof = lwsdk.LWNodeOutputFuncs()
 
-    from_node = None
-    to_node = nef.getRootNodeID(editor) if to_node_name == "Surface" else None
-    for i in range(min(nef.numberOfNodes(editor), _MAX_NODES_PER_EDITOR)):
-        node = nef.nodeByIndex(editor, i)
-        name = nf.nodeName(node)
-        if name == from_node_name:
-            from_node = node
-        if to_node is None and name == to_node_name:
-            to_node = node
-    if from_node is None:
-        return {"error": "node not found: %s" % from_node_name}
-    if to_node is None:
-        return {"error": "node not found: %s" % to_node_name}
+    existing = _node_names(nef, nf, editor)
+    pattern = re.compile(r"^%s \((\d+)\)$" % re.escape(node_type))
+    taken = [int(m.group(1)) for m in (pattern.match(n) for n in existing) if m]
+    node_name = "%s (%d)" % (node_type, max(taken) + 1 if taken else 1)
 
-    output = None
-    output_names = []
-    out = nof.first(from_node)
-    while out is not None and len(output_names) < _MAX_INPUTS_PER_NODE:
-        output_names.append(nof.name(out))
-        if output is None and (not output_name or nof.name(out) == output_name):
-            output = out
-        out = nof.next(out)
-    if output is None:
-        return {"error": "output not found on %s: %s (available: %s)"
-                         % (from_node_name, output_name or "<first>", output_names)}
-
-    target_input = None
-    input_names = []
-    for i in range(min(nif.numInputs(to_node), _MAX_INPUTS_PER_NODE)):
-        inp = nif.byIndex(to_node, i)
-        name = nif.name(inp)
-        input_names.append(name)
-        if name == input_name:
-            target_input = inp
-            break
-    if target_input is None:
-        return {"error": "input not found on %s: %s (available: %s)"
-                         % (to_node_name, input_name, input_names)}
-
+    path = os.path.join(_HERE, _REWIRE_SCRATCH)
     try:
-        rc = nef.connect(output, target_input)
+        lines = _save_graph_text(editor, path).splitlines()
+        try:
+            nodes_start = lines.index("{ Nodes")
+            nodes_end = lines.index("}", nodes_start)
+        except ValueError:
+            return {"error": "saved graph has no { Nodes } block"}
+        block = [
+            '  Server "%s"' % node_type,
+            "  { Tag",
+            '    RealName "%s"' % node_type,
+            '    Name "%s"' % node_name,
+            "    Coordinates 0 0",
+            "    Mode 1",
+            "    Selected 0",
+            "    { Data",
+            "    }",
+            "  }",
+        ]
+        with open(path, "w") as f:
+            f.write("\n".join(lines[:nodes_end] + block + lines[nodes_end:]) + "\n")
+        _load_graph_file(editor, path)
+        _save_graph_text(editor, path)
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    after = _node_names(nef, nf, editor)
+    if node_name not in after:
+        return {"error": "node not present after load: %s" % node_name, "nodes": after}
+    node = _find_node(nef, nf, editor, node_name)
     return {
         "surface": surf_name,
-        "from": "%s.%s" % (from_node_name, nof.name(output)),
-        "to": "%s.%s" % (to_node_name, input_name),
-        "connect_returned": rc if isinstance(rc, (int, float, bool, type(None))) else repr(rc),
+        "node_name": node_name,
+        "server_user_name": nf.serverUserName(node),
     }
+
+
+_CONNECTION_KEYS = ("NodeName", "InputName", "InputNodeName", "InputOutputName")
+_REWIRE_SCRATCH = "_mcp_nodes__rewire.txt"
+
+
+def _find_node(nef, nf, editor, node_name):
+    """Resolve a node_name to its NodeID; "Surface" is the root node."""
+    if node_name == "Surface":
+        return nef.getRootNodeID(editor)
+    for i in range(min(nef.numberOfNodes(editor), _MAX_NODES_PER_EDITOR)):
+        node = nef.nodeByIndex(editor, i)
+        if nf.nodeName(node) == node_name:
+            return node
+    return None
+
+
+def _node_names(nef, nf, editor):
+    return [nf.nodeName(nef.nodeByIndex(editor, i))
+            for i in range(min(nef.numberOfNodes(editor), _MAX_NODES_PER_EDITOR))]
+
+
+def _input_names(nif, node):
+    """Input names via numInputs/byIndex, skipping the unnamed entry the
+    root Surface node reports at index 0. Note that on the root node this
+    misses its last input (OpenGL) - see PLAN.md "Node Editor writing"."""
+    names = []
+    for i in range(min(nif.numInputs(node), _MAX_INPUTS_PER_NODE)):
+        name = nif.name(nif.byIndex(node, i))
+        if name:
+            names.append(name)
+    return names
+
+
+def _output_names(nof, node):
+    """Output names via first/next - byIndex(node, 0) returns nothing."""
+    names = []
+    out = nof.first(node)
+    while out is not None and len(names) < _MAX_INPUTS_PER_NODE:
+        names.append(nof.name(out))
+        out = nof.next(out)
+    return names
+
+
+def _save_graph_text(editor, path):
+    fio = lwsdk.LWFileIOFuncs()
+    state = fio.openSave(path, lwsdk.LWIO_ASCII)
+    if state is None:
+        raise RuntimeError("openSave returned no state for %s" % path)
+    try:
+        lwsdk.LWNodeEditorFuncs().save(editor, state)
+    finally:
+        fio.closeSave(state)
+    with open(path) as f:
+        return f.read()
+
+
+def _load_graph_file(editor, path):
+    fio = lwsdk.LWFileIOFuncs()
+    state = fio.openLoad(path, lwsdk.LWIO_ASCII)
+    if state is None:
+        raise RuntimeError("openLoad returned no state for %s" % path)
+    try:
+        lwsdk.LWNodeEditorFuncs().load(editor, state)
+    finally:
+        fio.closeLoad(state)
+
+
+def _split_connections(text):
+    """Split a saved ASCII node graph into (text before the
+    "{ Connections" block, list of connection dicts). Parses strictly -
+    the block must be nothing but repeated NodeName/InputName/
+    InputNodeName/InputOutputName lines in that order - and raises on
+    anything else rather than risk loading a mangled graph. A graph
+    with no block at all has no connections."""
+    lines = text.splitlines()
+    try:
+        start = lines.index("{ Connections")
+    except ValueError:
+        return text.rstrip("\n") + "\n", []
+    try:
+        end = lines.index("}", start)
+    except ValueError:
+        raise RuntimeError("unterminated { Connections } block")
+    if any(line.strip() for line in lines[end + 1:]):
+        raise RuntimeError("unexpected content after { Connections } block")
+    body = [line.strip() for line in lines[start + 1:end] if line.strip()]
+    if len(body) % len(_CONNECTION_KEYS):
+        raise RuntimeError("unexpected { Connections } layout: %r" % body)
+    connections = []
+    for i in range(0, len(body), len(_CONNECTION_KEYS)):
+        conn = {}
+        for key, line in zip(_CONNECTION_KEYS, body[i:i + len(_CONNECTION_KEYS)]):
+            m = re.match(r'^%s "([^"]*)"$' % key, line)
+            if not m:
+                raise RuntimeError("unexpected { Connections } line: %r" % line)
+            conn[key] = m.group(1)
+        connections.append(conn)
+    return "\n".join(lines[:start]) + "\n", connections
+
+
+def _join_connections(head, connections):
+    if not connections:
+        return head
+    out = [head.rstrip("\n"), "{ Connections"]
+    for conn in connections:
+        for key in _CONNECTION_KEYS:
+            out.append('  %s "%s"' % (key, conn[key]))
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+def _describe(connections):
+    return ["%s.%s -> %s.%s" % (c["InputNodeName"], c["InputOutputName"],
+                                c["NodeName"], c["InputName"]) for c in connections]
+
+
+def _rewire_nodes(surf_name, to_node_name, input_name, from_node_name, output_name):
+    """Node Editor wiring via save/load (PLAN.md "Node Editor writing",
+    step 3). Wires from_node's output into to_node's input, replacing
+    whatever fed that input before; with from_node_name None, only
+    disconnects that input.
+
+    LWNodeEditorFuncs.connect is NOT used: it made the connection but
+    froze Layout's UI in all three live runs. Instead this saves the
+    surface's whole graph as ASCII (LWFileIOFuncs.openSave +
+    LWNodeEditorFuncs.save), rewrites its "{ Connections }" block -
+    which names every wire by node/socket name - and loads it back
+    (openLoad + load), which was confirmed live to replace the graph
+    exactly and leave Layout responsive. It then saves once more and
+    returns the connections LightWave actually reports, so the result
+    is verified rather than assumed.
+
+    Every name is checked against the live graph first (nodes via
+    numberOfNodes/nodeByIndex, inputs via LWNodeInputFuncs, outputs via
+    LWNodeOutputFuncs first/next), and an unknown one returns an error
+    listing the valid choices - nothing is loaded. An open Surface
+    Editor does not refresh after the load; close and reopen it."""
+    names = [surf_name, to_node_name, input_name, from_node_name or "", output_name or ""]
+    if any('"' in n or "\n" in n for n in names):
+        return {"error": "names may not contain quotes or newlines"}
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+
+    to_node = _find_node(nef, nf, editor, to_node_name)
+    if to_node is None:
+        return {"error": "node not found: %s (available: %s)"
+                         % (to_node_name, _node_names(nef, nf, editor))}
+    inputs = _input_names(lwsdk.LWNodeInputFuncs(), to_node)
+    if input_name not in inputs:
+        return {"error": "input not found on %s: %s (available: %s)"
+                         % (to_node_name, input_name, inputs)}
+
+    new_conn = None
+    if from_node_name is not None:
+        from_node = _find_node(nef, nf, editor, from_node_name)
+        if from_node is None:
+            return {"error": "node not found: %s (available: %s)"
+                             % (from_node_name, _node_names(nef, nf, editor))}
+        outputs = _output_names(lwsdk.LWNodeOutputFuncs(), from_node)
+        if not outputs:
+            return {"error": "node has no outputs: %s" % from_node_name}
+        output_name = output_name or outputs[0]
+        if output_name not in outputs:
+            return {"error": "output not found on %s: %s (available: %s)"
+                             % (from_node_name, output_name, outputs)}
+        new_conn = {"NodeName": to_node_name, "InputName": input_name,
+                    "InputNodeName": from_node_name, "InputOutputName": output_name}
+
+    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    try:
+        head, connections = _split_connections(_save_graph_text(editor, path))
+        kept = [c for c in connections
+                if not (c["NodeName"] == to_node_name and c["InputName"] == input_name)]
+        if new_conn is None and len(kept) == len(connections):
+            return {"error": "nothing connected to %s.%s" % (to_node_name, input_name),
+                    "connections": _describe(connections)}
+        if new_conn is not None:
+            kept.append(new_conn)
+        with open(path, "w") as f:
+            f.write(_join_connections(head, kept))
+        _load_graph_file(editor, path)
+        _, after = _split_connections(_save_graph_text(editor, path))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    result = {"surface": surf_name, "before": _describe(connections),
+              "connections": _describe(after)}
+    if new_conn is not None:
+        result["connected"] = new_conn in after
+    else:
+        result["disconnected"] = not any(
+            c["NodeName"] == to_node_name and c["InputName"] == input_name for c in after)
+    return result
 
 
 def _resolve_name(ii, item_id):
@@ -983,250 +1133,15 @@ def _probe_node_write_sigs():
     return result
 
 
-def _probe_node_output_enum():
-    """DIAGNOSTIC, temporary: safe, zero-risk, UNFILTERED dir() dump of
-    LWNodeOutputFuncs/LWNodeFuncs/LWNodeEditorFuncs, looking for the
-    output-side equivalent of LWNodeInputFuncs.numInputs/byIndex (which
-    the read investigation already proved enumerates a node's INPUT
-    sockets). Needed before LWNodeEditorFuncs.connect(output, input) can
-    be tested live - connect's 2 arguments are presumably output/input
-    socket handles, not node handles, and there is currently no known
-    way to obtain a node's own output handle to pass as the first one."""
-    result = {}
-    for cls_name in ("LWNodeOutputFuncs", "LWNodeFuncs", "LWNodeEditorFuncs"):
-        cls = getattr(lwsdk, cls_name)
-        result[cls_name] = sorted(n for n in dir(cls()) if not n.startswith("_"))
-    return result
 
 
-def _probe_connect_handles(surf_name, target_node_name):
-    """DIAGNOSTIC, temporary: step 3 of the Node Editor writing
-    investigation - obtain (but do NOT use) both handles
-    LWNodeEditorFuncs.connect(output, input) presumably needs, without
-    ever calling connect itself. Reuses an existing node rather than
-    adding one, so it mutates nothing.
-
-    Stage 1 is the zero-arg TypeError signature capture already used by
-    _probe_node_write_sigs, for every enumeration method involved, so
-    the argument counts are on record even if a stage-2 call fails.
-    Stage 2 makes the real, read-only calls: enumerate the target
-    node's outputs via LWNodeOutputFuncs (numInputs - apparently the
-    output count despite its name - plus byIndex, and separately
-    first/next), then find the root Surface node via getRootNodeID and
-    its "Material" input both via the already-proven LWNodeInputFuncs
-    numInputs/byIndex path and via LWNodeEditorFuncs.getInputByName.
-    Every call is individually wrapped so one failure doesn't hide the
-    rest; handles are reported only as None/not-None (SWIG objects
-    aren't JSON-serializable)."""
-    nef = lwsdk.LWNodeEditorFuncs()
-    nf = lwsdk.LWNodeFuncs()
-    nif = lwsdk.LWNodeInputFuncs()
-    nof = lwsdk.LWNodeOutputFuncs()
-    result = {"signatures": {}, "outputs_by_index": [], "outputs_by_first_next": []}
-
-    sig_targets = {
-        "LWNodeOutputFuncs": (nof, ["numInputs", "byIndex", "first", "next", "name", "type", "node"]),
-        "LWNodeEditorFuncs": (nef, ["getRootNodeID", "getInputByName", "getInputByIndex",
-                                    "getInputNodeID", "numInputs"]),
-    }
-    for cls_name, (instance, method_names) in sig_targets.items():
-        cls_result = {}
-        for method_name in method_names:
-            try:
-                getattr(instance, method_name)()
-                cls_result[method_name] = "no error raised"
-            except Exception as exc:  # noqa: BLE001
-                cls_result[method_name] = str(exc)
-        result["signatures"][cls_name] = cls_result
-
-    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
-    if not surf_ids:
-        result["error"] = "surface not found: %s" % surf_name
-        return result
-    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
-
-    target_node = None
-    available = []
-    for i in range(min(nef.numberOfNodes(editor), _MAX_NODES_PER_EDITOR)):
-        node = nef.nodeByIndex(editor, i)
-        available.append(nf.nodeName(node))
-        if nf.nodeName(node) == target_node_name:
-            target_node = node
-    if target_node is None:
-        result["error"] = "node not found: %s (available: %s)" % (target_node_name, available)
-        return result
-
-    try:
-        out_count = nof.numInputs(target_node)
-        result["output_count"] = out_count
-        for i in range(min(out_count, _MAX_INPUTS_PER_NODE)):
-            out = nof.byIndex(target_node, i)
-            result["outputs_by_index"].append(
-                {"handle": out is not None, "name": nof.name(out), "type": nof.type(out)})
-    except Exception as exc:  # noqa: BLE001
-        result["outputs_by_index_error"] = str(exc)
-
-    try:
-        out = nof.first(target_node)
-        while out is not None and len(result["outputs_by_first_next"]) < _MAX_INPUTS_PER_NODE:
-            result["outputs_by_first_next"].append(nof.name(out))
-            out = nof.next(out)
-    except Exception as exc:  # noqa: BLE001
-        result["outputs_by_first_next_error"] = str(exc)
-
-    root = None
-    try:
-        root = nef.getRootNodeID(editor)
-        result["root"] = None if root is None else {
-            "node_name": nf.nodeName(root), "server_user_name": nf.serverUserName(root)}
-    except Exception as exc:  # noqa: BLE001
-        result["root_error"] = str(exc)
-
-    if root is not None:
-        try:
-            names = []
-            for i in range(min(nif.numInputs(root), _MAX_INPUTS_PER_NODE)):
-                inp = nif.byIndex(root, i)
-                names.append(nif.name(inp))
-            result["root_inputs"] = names
-            result["material_via_byIndex"] = "Material" in names
-        except Exception as exc:  # noqa: BLE001
-            result["root_inputs_error"] = str(exc)
-        try:
-            inp = nef.getInputByName(root, "Material")
-            result["material_via_getInputByName"] = None if inp is None else nif.name(inp)
-        except Exception as exc:  # noqa: BLE001
-            result["material_via_getInputByName_error"] = str(exc)
-    return result
 
 
-def _probe_node_io():
-    """DIAGNOSTIC, temporary: option 2 of Node Editor wiring - rebuild a
-    connected graph via LWNodeEditorFuncs save/load (or copy) instead of
-    connect, which froze Layout in all three live runs. Zero risk: only
-    dir() scans and zero-arg TypeError signature capture (a bad argument
-    count fails in Python before any native call), nothing live touched.
-
-    Per the C SDK, save/load likely take LWSaveState/LWLoadState objects
-    rather than file names, opened via a file-IO global - so this also
-    lists every lwsdk name that looks IO/state-related, dumps any
-    file-IO funcs class it finds, and captures its methods' signatures."""
-    result = {"lwsdk_io_names": sorted(
-        n for n in dir(lwsdk)
-        if any(k in n.upper() for k in ("IO", "STATE", "FILE")))}
-
-    sigs = {}
-    nef = lwsdk.LWNodeEditorFuncs()
-    for method_name in ("load", "save", "copy", "reset"):
-        try:
-            getattr(nef, method_name)()
-            sigs[method_name] = "no error raised"
-        except Exception as exc:  # noqa: BLE001
-            sigs[method_name] = str(exc)
-    result["LWNodeEditorFuncs"] = sigs
-
-    for cls_name in ("LWFileIOFuncs", "LWFileIO"):
-        cls = getattr(lwsdk, cls_name, None)
-        if cls is None:
-            continue
-        try:
-            instance = cls()
-        except Exception as exc:  # noqa: BLE001
-            result[cls_name] = {"construct_error": str(exc)}
-            continue
-        cls_result = {}
-        for method_name in sorted(n for n in dir(instance) if not n.startswith("_")):
-            method = getattr(instance, method_name)
-            if not callable(method):
-                cls_result[method_name] = "<attribute>"
-                continue
-            try:
-                method()
-                cls_result[method_name] = "no error raised"
-            except Exception as exc:  # noqa: BLE001
-                cls_result[method_name] = str(exc)
-        result[cls_name] = cls_result
-    return result
 
 
-_NODE_IO_MODES = ("ASCII", "BINARY", "OBJECT", "SCENE")
 
 
-def _probe_save_node_graph(surf_name, mode_name):
-    """DIAGNOSTIC, temporary: option 2 of Node Editor wiring, step 2 -
-    write a surface's whole node graph to a file via
-    LWFileIOFuncs.openSave(path, LWIO_<mode>) + LWNodeEditorFuncs.save(
-    editor, saveState) + closeSave(state). Signatures confirmed by
-    lw_probe_node_io. Reads the scene, changes nothing in it. The file
-    lands next to this plug-in as _mcp_nodes_<surface>_<mode>.txt;
-    ASCII mode is the default so the saved graph (and whether it
-    records the node connections) can be inspected by eye before
-    LWNodeEditorFuncs.load is ever tried with it."""
-    if mode_name not in _NODE_IO_MODES:
-        return {"error": "mode must be one of %s" % (_NODE_IO_MODES,)}
-    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
-    if not surf_ids:
-        return {"error": "surface not found: %s" % surf_name}
-    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
-    path = os.path.join(_HERE, "_mcp_nodes_%s_%s.txt" % (surf_name, mode_name))
 
-    fio = lwsdk.LWFileIOFuncs()
-    try:
-        state = fio.openSave(path, getattr(lwsdk, "LWIO_" + mode_name))
-    except Exception as exc:  # noqa: BLE001
-        return {"error": "openSave: %s" % exc}
-    if state is None:
-        return {"error": "openSave returned no state for %s" % path}
-    result = {"surface": surf_name, "mode": mode_name, "path": path}
-    try:
-        result["save_returned"] = repr(lwsdk.LWNodeEditorFuncs().save(editor, state))
-    except Exception as exc:  # noqa: BLE001
-        result["save_error"] = str(exc)
-    finally:
-        fio.closeSave(state)
-    result["size"] = os.path.getsize(path) if os.path.exists(path) else None
-    return result
-
-
-def _probe_load_node_graph(surf_name, mode_name, file_name):
-    """DIAGNOSTIC, temporary: option 2 of Node Editor wiring, step 3 -
-    the scene-mutating half: LWFileIOFuncs.openLoad(path, LWIO_<mode>)
-    + LWNodeEditorFuncs.load(editor, loadState) + closeLoad(state),
-    reading a graph file previously written by lw_probe_save_node_graph
-    (whose ASCII form ends in a plain "{ Connections ... }" block naming
-    each wire by node/socket name - so if load honours it, wiring can be
-    done by writing that block rather than calling connect, which froze
-    Layout in all three live runs). file_name is resolved next to this
-    plug-in and restricted to _mcp_nodes_*.txt. Whether load replaces
-    the existing graph or adds to it is one of the things this tests."""
-    if mode_name not in _NODE_IO_MODES:
-        return {"error": "mode must be one of %s" % (_NODE_IO_MODES,)}
-    if not (file_name.startswith("_mcp_nodes_") and file_name.endswith(".txt")
-            and os.path.basename(file_name) == file_name):
-        return {"error": "file_name must be a bare _mcp_nodes_*.txt name"}
-    path = os.path.join(_HERE, file_name)
-    if not os.path.exists(path):
-        return {"error": "file not found: %s" % path}
-    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
-    if not surf_ids:
-        return {"error": "surface not found: %s" % surf_name}
-    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
-
-    fio = lwsdk.LWFileIOFuncs()
-    try:
-        state = fio.openLoad(path, getattr(lwsdk, "LWIO_" + mode_name))
-    except Exception as exc:  # noqa: BLE001
-        return {"error": "openLoad: %s" % exc}
-    if state is None:
-        return {"error": "openLoad returned no state for %s" % path}
-    result = {"surface": surf_name, "mode": mode_name, "path": path}
-    try:
-        result["load_returned"] = repr(lwsdk.LWNodeEditorFuncs().load(editor, state))
-    except Exception as exc:  # noqa: BLE001
-        result["load_error"] = str(exc)
-    finally:
-        fio.closeLoad(state)
-    return result
 
 
 def _probe_node_write():
@@ -1377,32 +1292,23 @@ def _handle_query(text):
             payload = {"result": _add_node(surf_an or "CONNECTOR", type_an or "Principled BSDF")}
         elif command == "connect_nodes":
             parts_cn = (arg.split("|") + [""] * 5)[:5]
-            payload = {"result": _connect_nodes(parts_cn[0] or "CONNECTOR",
-                                                parts_cn[1] or "Principled BSDF (1)",
-                                                parts_cn[2] or "Surface",
-                                                parts_cn[3] or "Material",
-                                                parts_cn[4])}
+            payload = {"result": _rewire_nodes(parts_cn[0] or "CONNECTOR",
+                                               parts_cn[2] or "Surface",
+                                               parts_cn[3] or "Material",
+                                               parts_cn[1] or "Principled BSDF (1)",
+                                               parts_cn[4])}
+        elif command == "disconnect_nodes":
+            parts_dn = (arg.split("|") + [""] * 3)[:3]
+            payload = {"result": _rewire_nodes(parts_dn[0] or "CONNECTOR",
+                                               parts_dn[1] or "Surface",
+                                               parts_dn[2] or "Material",
+                                               None, None)}
         elif command == "probe_surf":
             payload = {"result": _probe_surf_constants()}
         elif command == "probe_node_write":
             payload = {"result": _probe_node_write()}
         elif command == "probe_node_write_sigs":
             payload = {"result": _probe_node_write_sigs()}
-        elif command == "probe_node_output_enum":
-            payload = {"result": _probe_node_output_enum()}
-        elif command == "probe_save_node_graph":
-            surf_sg, _, mode_sg = arg.partition("|")
-            payload = {"result": _probe_save_node_graph(surf_sg or "CONNECTOR", mode_sg or "ASCII")}
-        elif command == "probe_load_node_graph":
-            parts_lg = (arg.split("|") + [""] * 3)[:3]
-            payload = {"result": _probe_load_node_graph(parts_lg[0] or "CONNECTOR",
-                                                        parts_lg[1] or "ASCII",
-                                                        parts_lg[2] or "_mcp_nodes_template.txt")}
-        elif command == "probe_node_io":
-            payload = {"result": _probe_node_io()}
-        elif command == "probe_connect_handles":
-            surf_pc, _, node_pc = arg.partition("|")
-            payload = {"result": _probe_connect_handles(surf_pc or "CONNECTOR", node_pc or "Principled BSDF (1)")}
         elif command == "get_render_status":
             payload = {"result": _get_render_status()}
         elif command == "get_hierarchy":
