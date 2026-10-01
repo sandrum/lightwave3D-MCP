@@ -507,10 +507,27 @@ re-discovering them from scratch.
     `"Images"`, etc.) are inferred from the Preferences > Paths panel's
     own visible labels, never tested against a real UI change one by
     one.
-11. **Node graph reading only covers enveloped (keyframed) parameters**
-    - a never-touched, un-enveloped parameter has no channel at all to
-    read via the current `lw_get_node_channel` approach; its current
-    value is an open gap (see "Remaining work" below).
+11. **Node input values with an envelope (animated inputs) can't be
+    read or set by `lw_get_node_values`/`lw_set_node_input`.** The
+    mirror image of the gap this item used to describe (un-enveloped
+    values, now readable). Both tools parse each input's `{ Attr }`
+    block in the saved graph, and handle only the three plain shapes
+    seen so far (`"vparam"` one number, `"vparam3"` three, `"int"` a
+    whole number). An enveloped input is presumably stored differently
+    - but no enveloped input has ever been inspected, so that's a guess.
+    By design, such an input is reported as type `"unsupported"` with no
+    value, and `lw_set_node_input` refuses it with nothing changed - but
+    that path has never run live either. `lw_get_node_channel` still
+    reads an enveloped input's keyframes. **To pick this up:** in the
+    Node Editor, add an envelope to one Principled BSDF input (its "E"
+    button) and key a couple of values; check `lw_get_node_values`
+    reports it as `"unsupported"`; then look at that input's raw
+    `{ Attr }` text - nothing currently exposes the raw saved graph
+    (the old `lw_probe_save_node_graph` was removed), so a small
+    temporary dump is needed. Then decide what "setting" an animated
+    input should mean - edit the current key, drop the envelope, or
+    refuse - before writing anything. See `PLAN.md` "Node Editor
+    writing", step 7.
 
 ## Remaining work, ranked by usefulness
 
@@ -518,45 +535,19 @@ Unlike the difficulty-based ranking used to work through this roadmap's
 open items, this list ranks what's left by how much real capability
 each would add to the connector, most valuable first:
 
-1. **Node Editor writing - IN PROGRESS, node creation now done.**
-   Reading node graphs already worked
-   (`lw_get_surface_nodes`/`lw_get_node_inputs`/`lw_get_node_channel`);
-   this needed the SDK's node API directly, same as reading did (no
-   native Command Port command for node editing exists at all).
-   Staged the same dir()-first investigation the read side used: a safe
-   `dir()` scan found a real write API
-   (`LWNodeEditorFuncs.addNode/connect/destroyNode/setXY`,
-   `LWNodeOutputFuncs.create/setValue`, etc.); the zero-arg TypeError
-   technique confirmed real argument counts for all twelve candidates
-   without touching scene state. A real architectural finding along the
-   way: `setValue` exists only on `LWNodeOutputFuncs`, not
-   `LWNodeInputFuncs` - suggesting this API is shaped for *authoring
-   custom plugin node types*, not for directly setting an existing
-   built-in node's input parameter, echoing the earlier `LWBSDFFuncs`
-   dead end from the read investigation.
-
-   **Shipped `lw_add_node(surface, node_type)`** - confirmed live end
-   to end via a real UI screenshot: `addNode(editor, "Principled
-   BSDF")` created a genuine, visible node in the Node Editor.
-   `node_type` is the `server_user_name` string (e.g. "Principled
-   BSDF"), not the instance-suffixed `node_name`. The new node is added
-   disconnected - wiring (`connect`), removal (`destroyNode`), and
-   repositioning (`setXY`) all have confirmed real argument counts but
-   are not yet live-tested or wrapped.
-
-   **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
-   Tried `lw_add_node("CONNECTOR", "Constant")` next, assuming
-   "Constant" (a category heading in the Node Editor's own browser
-   panel) would work like "Principled BSDF" had - instead LightWave
-   popped a real, modal "Plug-in Missing" dialog and froze Layout's
-   whole main thread, indistinguishable from a crash until a human
-   clicked "No" to dismiss it (Layout then recovered cleanly, zero
-   corruption). Same failure shape as the Content Directory dialog from
-   `ROADMAP2.md` item 3. `node_type` must only ever be an exact
-   `server_user_name` string already confirmed via
-   `lw_get_surface_nodes` on a real existing node - never a category
-   name or a guess. See `PLAN.md` "Node Editor writing" for the full
-   staged investigation, including this incident.
+1. **Node Editor writing - DONE.** Nodes can be added, removed, moved,
+   wired/unwired, and their input values read and set
+   (`lw_add_node`, `lw_remove_node`, `lw_move_node`,
+   `lw_connect_nodes`, `lw_disconnect_nodes`, `lw_get_node_values`,
+   `lw_set_node_input`) - all confirmed live. None of it uses the SDK's
+   own node mutators: `addNode` creates nodes that make any later graph
+   load hang, and `connect` froze Layout every time it was tried.
+   Instead every tool saves the surface's node graph as ASCII text,
+   edits it, and loads it back. An invalid `node_type` still freezes
+   Layout with a modal "Plug-in Missing" dialog, so it must be an exact
+   `server_user_name` already seen via `lw_get_surface_nodes`. Open
+   follow-up: enveloped inputs (Known misses #11). See `PLAN.md` "Node
+   Editor writing" for the full investigation.
 2. **`Antialiasing` family.** Practical, everyday render-quality control
    (draft vs. final passes) - probably the single most commonly toggled
    setting in an automated render pipeline, ahead of GI/radiosity
@@ -567,11 +558,12 @@ each would add to the connector, most valuable first:
 4. **`ColorSpaceOutput` family.** Color management/OCIO-style output
    control matters for accurate pipeline integration, but is a more
    specialized need than AA or render-mode switching.
-5. **Reading un-enveloped node parameters.** A completeness item for
-   the already-shipped node-reading tools - useful, but narrower than
-   any capability above since the enveloped-parameter path already
-   covers the common case (any parameter someone has actually
-   keyframed).
+5. **Enveloped (animated) node inputs in `lw_get_node_values`/
+   `lw_set_node_input`** (Known misses #11). A completeness item for
+   the node-value tools - narrower than anything above, since plain
+   values already work and `lw_get_node_channel` already reads an
+   enveloped input's keyframes. (The item that used to sit here,
+   reading un-enveloped node parameters, is done.)
 6. **`ObjGIRadiosityTolerance`'s unreachable precondition mode.**
    Chasing down why "Monte Carlo Interpolated" never appears as a
    selectable Type in this install - polish on an already-shipped tool,

@@ -3170,3 +3170,8 @@ confirming the unit conversion. Not checked: whether the change shows
 in a render - the user judged the Surface Editor confirmation enough
 (the shaded viewport didn't visibly change, but the object visible
 there may not use CONNECTOR).
+
+Known limit, logged for later as `ROADMAP3.md` Known misses #11:
+enveloped (animated) inputs. Only the three plain value shapes have
+been seen; an enveloped input's stored shape has never been inspected,
+and the "unsupported"/refuse path that handles it has never run live.
