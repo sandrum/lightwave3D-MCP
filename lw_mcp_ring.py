@@ -941,6 +941,88 @@ def _rewire_nodes(surf_name, to_node_name, input_name, from_node_name, output_na
     return result
 
 
+_UNREMOVABLE_NODES = ("Surface", "Input")
+
+
+def _drop_node_block(text, node_name):
+    """Remove one node's block from a saved ASCII graph's "{ Nodes }"
+    section. A block runs from its '  Server "<type>"' line to the
+    first line that is exactly '  }' (the Tag close - everything inside
+    it, attribute data included, is indented deeper); the node is
+    identified by its '    Name "<node_name>"' line at Tag level.
+    Raises if the node isn't found exactly once."""
+    lines = text.splitlines()
+    nodes_start = lines.index("{ Nodes")
+    nodes_end = lines.index("}", nodes_start)
+    blocks = []
+    i = nodes_start + 1
+    while i < nodes_end:
+        if lines[i].startswith('  Server "'):
+            close = lines.index("  }", i)
+            blocks.append((i, close))
+            i = close + 1
+        else:
+            i += 1
+    target = '    Name "%s"' % node_name
+    matches = [(a, b) for a, b in blocks if target in lines[a:b + 1]]
+    if len(matches) != 1:
+        raise RuntimeError("expected one block for %s, found %d" % (node_name, len(matches)))
+    a, b = matches[0]
+    return "\n".join(lines[:a] + lines[b + 1:]) + "\n"
+
+
+def _remove_node(surf_name, node_name):
+    """Node Editor writing - delete a node from a surface's node graph,
+    along with every wire to or from it, via the same save/rewrite/load
+    route as _add_node/_rewire_nodes (PLAN.md "Node Editor writing").
+    LWNodeEditorFuncs.destroyNode is not used, in keeping with avoiding
+    the node SDK's direct mutators (addNode poisoned graphs; connect
+    froze Layout).
+
+    Refuses "Surface" (the root output node) and "Input", which every
+    surface has built in. Saves the graph again afterwards and confirms
+    the node is gone."""
+    if '"' in node_name or "\n" in node_name or not node_name:
+        return {"error": "invalid node name: %r" % node_name}
+    if node_name in _UNREMOVABLE_NODES:
+        return {"error": "%s is built into every surface and can't be removed" % node_name}
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+    if _find_node(nef, nf, editor, node_name) is None:
+        return {"error": "node not found: %s (available: %s)"
+                         % (node_name, _node_names(nef, nf, editor))}
+
+    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    try:
+        head, connections = _split_connections(_save_graph_text(editor, path))
+        kept = [c for c in connections
+                if node_name not in (c["NodeName"], c["InputNodeName"])]
+        with open(path, "w") as f:
+            f.write(_join_connections(_drop_node_block(head, node_name), kept))
+        _load_graph_file(editor, path)
+        _, after = _split_connections(_save_graph_text(editor, path))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    nodes_after = _node_names(nef, nf, editor)
+    return {
+        "surface": surf_name,
+        "removed": node_name not in nodes_after,
+        "wires_removed": _describe([c for c in connections if c not in kept]),
+        "nodes": nodes_after,
+        "connections": _describe(after),
+    }
+
+
 def _resolve_name(ii, item_id):
     """None for LWITEM_NULL (no relationship set), otherwise the item's
     name. Isolated so a bad/unexpected ID degrades to None instead of
@@ -1303,6 +1385,9 @@ def _handle_query(text):
                                                parts_dn[1] or "Surface",
                                                parts_dn[2] or "Material",
                                                None, None)}
+        elif command == "remove_node":
+            surf_rn, _, node_rn = arg.partition("|")
+            payload = {"result": _remove_node(surf_rn or "CONNECTOR", node_rn)}
         elif command == "probe_surf":
             payload = {"result": _probe_surf_constants()}
         elif command == "probe_node_write":

@@ -3091,3 +3091,22 @@ The five temporary probes behind steps 2-4 (`lw_probe_node_output_enum`,
 that the shipped tools cover them. Still open: `destroyNode` and
 `setXY` (both presumably doable the same way - drop a node's block, or
 edit its `Coordinates`), and what the root block's `Disabled 1` means.
+
+### Step 5: `lw_remove_node`
+
+Done the same way, never calling `destroyNode`: drop the node's block
+from `{ Nodes }` - from its `  Server "<type>"` line to the first line
+that is exactly `  }` (the Tag close; all attribute data inside is
+indented deeper), matched by its Tag-level `    Name "<node_name>"`
+line - plus every `{ Connections }` entry naming it on either end, then
+load and re-save to confirm. "Surface" and "Input" are refused, and
+`node` has no default so a missing argument can't delete anything.
+
+Confirmed live, each step verified by LightWave's re-saved graph: with
+Principled BSDF (1) added and wired to Surface.Material, removing the
+unwired, LightWave-created `Standard (1)` left the Principled wire
+intact; removing the wired `Principled BSDF (1)` reported its wire
+under `wires_removed` and left just Surface and Input; removing
+"Surface" was refused. The user confirmed the reopened Surface Editor
+showed Material "(none)" and Layout stayed responsive. `setXY`
+(repositioning) remains, as does `Disabled 1`.

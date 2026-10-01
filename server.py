@@ -870,6 +870,29 @@ def lw_disconnect_nodes(surface: str = "CONNECTOR", to_node: str = "Surface",
 
 
 @mcp.tool()
+def lw_remove_node(node: str, surface: str = "CONNECTOR") -> str:
+    """Delete a node from a surface's node graph, together with every
+    wire to or from it. `node` is a node_name from lw_get_surface_nodes
+    (e.g. "Principled BSDF (1)"); "Surface" and "Input" are built into
+    every surface and are refused. Reports `removed`, the wires that
+    went with it (`wires_removed`), and the nodes and connections
+    LightWave has afterwards.
+
+    Removing the node that feeds Surface > Material leaves the surface
+    with no material - connect another one first (lw_connect_nodes) if
+    that isn't intended.
+
+    Uses the same save/rewrite/load route as lw_add_node and
+    lw_connect_nodes (drops the node's block and its wires from the
+    saved graph text, then loads it back), not
+    LWNodeEditorFuncs.destroyNode - the node SDK's direct mutators have
+    proven unsafe here (see lw_add_node). Close and reopen an open
+    Surface Editor to see the change; safest with the Node Editor
+    closed."""
+    return json.dumps(_query("remove_node", "%s|%s" % (surface, node)))
+
+
+@mcp.tool()
 def lw_set_camera_resolution(width: int, height: int) -> str:
     """Set the render resolution (ROADMAP.md item 6 camera setup half).
     Wraps the native FrameSize(width, height) command - this is a
