@@ -705,12 +705,9 @@ def lw_get_node_inputs(surface: str = "CONNECTOR", node: str = "Principled BSDF 
     Does NOT report each input's current value - LightWave's
     LWNodeInputFuncs.evaluate_scalar/evaluate_vector both failed live
     needing extra shading context this connector has no way to supply
-    outside an active render. To read a specific parameter's actual
-    value, add an envelope to it in the UI (Graph Editor, or the node's
-    own envelope button) first, then use lw_get_node_channel - a
-    parameter with no envelope has no value reachable through this
-    connector today; that's a confirmed, honest limitation, not a
-    placeholder."""
+    outside an active render. Use lw_get_node_values for the values
+    (read from the saved graph instead), and lw_get_node_channel for an
+    enveloped parameter's keyframes."""
     return json.dumps(_query("get_node_inputs", "%s|%s" % (surface, node)))
 
 
@@ -920,6 +917,51 @@ def lw_move_node(node: str, x: int, y: int, surface: str = "CONNECTOR") -> str:
     node's Coordinates line), not LWNodeEditorFuncs.setXY. Close and
     reopen the Node Editor to see the change."""
     return json.dumps(_query("move_node", "%s|%s|%d|%d" % (surface, node, x, y)))
+
+
+@mcp.tool()
+def lw_get_node_values(node: str, surface: str = "CONNECTOR") -> str:
+    """Read every stored input value of a node - e.g. a Principled
+    BSDF's Color, Roughness, Metallic - which lw_get_node_inputs can't
+    (LWNodeInputFuncs' evaluate calls only work during a render). Each
+    input reports `name`, `format`, `type` and `value` (a list).
+
+    Values are in LightWave's internal units: "Percent" is a fraction
+    (Roughness 10% = 0.1), "Color" is 0-1 per channel (200/255 =
+    0.784), "Distance" is in metres, "Float" is a plain number. `type`
+    is "vparam" (one number), "vparam3" (three) or "int" (a whole
+    number); "unsupported" means a shape this connector doesn't parse
+    (an enveloped input, say), with no value. Inputs that only take a
+    wire (e.g. Principled's Projection, Normal, Bump) have no stored
+    value and aren't listed.
+
+    Works by saving the surface's graph as ASCII and parsing the node's
+    block - read-only, nothing is loaded back."""
+    return json.dumps(_query("get_node_values", "%s|%s" % (surface, node)))
+
+
+@mcp.tool()
+def lw_set_node_input(node: str, input_name: str, value: float | list[float],
+                      surface: str = "CONNECTOR") -> str:
+    """Set one input value on a node - e.g. a Principled BSDF's
+    Roughness or Color. `node` is a node_name from lw_get_surface_nodes;
+    `input_name` one listed by lw_get_node_values.
+
+    `value` uses LightWave's internal units, exactly as
+    lw_get_node_values reports them: one number for a "vparam" or "int"
+    input (Percent as a fraction - 25% is 0.25; Distance in metres), and
+    a list of three 0-1 numbers for a "vparam3" Color (e.g. [1, 0, 0]
+    for red). The wrong count, or a fraction for an "int" input, is
+    refused without changing anything.
+
+    Same save/rewrite/load route as the other node tools: rewrites that
+    input's value line in the saved graph, loads it back, then re-saves
+    and reports `before`, the `value` LightWave actually holds, and
+    `set`. Adds a `warning` when a wire feeds the input, since the wire
+    then overrides the value. Close and reopen an open Surface Editor
+    to see the change."""
+    return json.dumps(_query("set_node_input", "%s|%s|%s|%s"
+                             % (surface, node, input_name, json.dumps(value))))
 
 
 @mcp.tool()

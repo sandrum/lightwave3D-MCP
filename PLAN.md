@@ -3138,3 +3138,35 @@ exact screen placement isn't, so the tool is documented for spacing
 nodes apart, with Tidy Nodes for real layout. This move also ran with
 the Node Editor OPEN - the first load done that way - and Layout stayed
 responsive (the editor needed reopening to show the change).
+
+### Step 7: input values - `lw_get_node_values` / `lw_set_node_input`
+
+The saved graph also holds every input's value, inside each node's
+`{ Data }` as one `{ Attr }` block per input: `Name "<input>"`, `Tag`
+lines (`Tag "FORMAT"` gives the units), then `{ Value` and the value in
+one of three shapes - `"vparam"` / `{ Value` / `1` / one number;
+`"vparam3"` / `{ Value` / `3` / three numbers; or `"int"` / one whole
+number. Units are internal: Percent is a fraction (Roughness 10% =
+0.1), Color 0-1 per channel (200/255 = 0.784), Distance in metres.
+Principled BSDF stores 24 values; its wire-only sockets (Projection,
+Normal, Bump) have none. Nothing in the two graphs examined fell
+outside those shapes; an enveloped input presumably would, and the
+tools refuse anything that doesn't match exactly.
+
+`lw_get_node_values` saves and parses (read-only) - which finally
+reads a never-enveloped parameter's value, the long-standing gap
+`lw_get_node_inputs` (the evaluate_* calls need render context) and
+`lw_get_node_channel` (envelopes only) left. `lw_set_node_input`
+rewrites one value line, loads, re-saves, and reports `before`/`value`/
+`set`, with a `warning` if a wire feeds the input.
+
+Live: on a freshly added and wired Principled BSDF, all 24 defaults
+read back (Color 0.502 x3, Roughness 0.1, Refraction Index 1.5, ...);
+Color set to [1, 0, 0] and Roughness to 0.35 both confirmed by the
+re-save; a one-number Color was refused with nothing changed. The user
+confirmed the reopened Surface Editor showed Color 255 0 0, Roughness
+35.0%, and the untouched Subsurface Color as 128 128 128 (= 0.502),
+confirming the unit conversion. Not checked: whether the change shows
+in a render - the user judged the Surface Editor confirmation enough
+(the shaded viewport didn't visibly change, but the object visible
+there may not use CONNECTOR).

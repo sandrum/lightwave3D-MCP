@@ -1085,6 +1085,174 @@ def _remove_node(surf_name, node_name):
     }
 
 
+_VALUE_SHAPES = {"vparam": 1, "vparam3": 3, "int": 1}
+
+
+def _node_attrs(lines, node_name):
+    """Parse every stored input value in one node's block of a saved
+    ASCII graph. Each input is an '{ Attr' block: 'Name "<input>"',
+    some 'Tag' lines (FORMAT gives the units: Percent is stored as a
+    fraction, Color as 0-1 per channel, Distance in metres), then
+    '{ Value' + a type line and the value itself in one of three shapes:
+
+        "vparam"  / { Value / 1 / <x> / }        - one number
+        "vparam3" / { Value / 3 / <x y z> / }    - three numbers
+        "int"     / <n>                          - one whole number
+
+    Returns one dict per input with the line index of its value, so
+    _set_node_input can rewrite exactly that line. An input whose value
+    doesn't match those shapes (an enveloped one, say) is reported with
+    type "unsupported" and no value rather than guessed at."""
+    a, b = _node_block_span(lines, node_name)
+    attrs = []
+    i = a
+    while i <= b:
+        if lines[i].strip() != "{ Attr":
+            i += 1
+            continue
+        indent = len(lines[i]) - len(lines[i].lstrip())
+        end = i + 1
+        while not (lines[end].strip() == "}"
+                   and len(lines[end]) - len(lines[end].lstrip()) == indent):
+            end += 1
+        body = [line.strip() for line in lines[i + 1:end]]
+        m = re.match(r'^Name "([^"]*)"$', body[0]) if body else None
+        attr = {"name": m.group(1) if m else None, "format": None,
+                "type": "unsupported", "value": None, "line": None}
+        for line in body:
+            fm = re.match(r'^Tag "FORMAT" "([^"]*)"$', line)
+            if fm:
+                attr["format"] = fm.group(1)
+        if "{ Value" in body:
+            v = body.index("{ Value")
+            kind = body[v + 1:v + 2]
+            try:
+                if kind == ['"int"']:
+                    attr.update(type="int", value=[int(body[v + 2])], line=i + 1 + v + 2)
+                elif kind in (['"vparam"'], ['"vparam3"']):
+                    shape = kind[0].strip('"')
+                    count = _VALUE_SHAPES[shape]
+                    if (body[v + 2] == "{ Value" and body[v + 3] == str(count)
+                            and body[v + 5] == "}"):
+                        values = [float(x) for x in body[v + 4].split()]
+                        if len(values) == count:
+                            attr.update(type=shape, value=values, line=i + 1 + v + 4)
+            except (IndexError, ValueError):
+                pass
+        if attr["name"] is not None:
+            attrs.append(attr)
+        i = end + 1
+    return attrs
+
+
+def _public_attr(attr):
+    return {k: attr[k] for k in ("name", "format", "type", "value")}
+
+
+def _get_node_values(surf_name, node_name):
+    """Read every stored input value of one node - the values
+    LWNodeInputFuncs.evaluate_* can't give outside a render - by saving
+    the graph as ASCII and parsing the node's block (see _node_attrs).
+    Read-only: nothing is loaded back."""
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+    if _find_node(nef, nf, editor, node_name) is None:
+        return {"error": "node not found: %s (available: %s)"
+                         % (node_name, _node_names(nef, nf, editor))}
+    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    try:
+        lines = _save_graph_text(editor, path).splitlines()
+        attrs = _node_attrs(lines, node_name)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return {"surface": surf_name, "node": node_name,
+            "inputs": [_public_attr(a) for a in attrs]}
+
+
+def _format_value(shape, values):
+    if shape == "int":
+        return str(int(values[0]))
+    return " ".join("%.17g" % float(v) for v in values)
+
+
+def _set_node_input(surf_name, node_name, input_name, values):
+    """Set one stored input value on a node by rewriting that input's
+    value line in the saved ASCII graph and loading it back - the same
+    save/rewrite/load route as the other node tools. values is a list
+    whose length must match the input's shape (1 for "vparam"/"int",
+    3 for "vparam3"), in LightWave's internal units (see _node_attrs).
+    Re-saves afterwards and reports the value LightWave actually holds,
+    plus a warning when a wire feeds the input (the wire then decides
+    the input, not this value)."""
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+    if _find_node(nef, nf, editor, node_name) is None:
+        return {"error": "node not found: %s (available: %s)"
+                         % (node_name, _node_names(nef, nf, editor))}
+
+    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    try:
+        text = _save_graph_text(editor, path)
+        lines = text.splitlines()
+        attrs = _node_attrs(lines, node_name)
+        matches = [a for a in attrs if a["name"] == input_name]
+        if len(matches) != 1:
+            return {"error": "no stored value for input %s on %s (inputs with values: %s)"
+                             % (input_name, node_name, [a["name"] for a in attrs])}
+        attr = matches[0]
+        if attr["line"] is None:
+            return {"error": "input %s has a value shape this tool doesn't handle "
+                             "(enveloped?) - not changed" % input_name}
+        if len(values) != _VALUE_SHAPES[attr["type"]]:
+            return {"error": "%s takes %d number(s) (%s, format %s), got %d"
+                             % (input_name, _VALUE_SHAPES[attr["type"]], attr["type"],
+                                attr["format"], len(values))}
+        if attr["type"] == "int" and float(values[0]) != int(values[0]):
+            return {"error": "%s takes a whole number" % input_name}
+        before = attr["value"]
+        old_line = lines[attr["line"]]
+        indent = old_line[:len(old_line) - len(old_line.lstrip())]
+        lines[attr["line"]] = indent + _format_value(attr["type"], values)
+        with open(path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        _load_graph_file(editor, path)
+        after_text = _save_graph_text(editor, path)
+        after = [a for a in _node_attrs(after_text.splitlines(), node_name)
+                 if a["name"] == input_name][0]
+        _, connections = _split_connections(after_text)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    result = {"surface": surf_name, "node": node_name, "input": input_name,
+              "format": attr["format"], "before": before, "value": after["value"],
+              "set": after["value"] is not None and all(
+                  abs(x - float(y)) < 1e-9 for x, y in zip(after["value"], values))}
+    wired = [c for c in connections
+             if c["NodeName"] == node_name and c["InputName"] == input_name]
+    if wired:
+        result["warning"] = ("a wire feeds this input (%s), so it overrides this value"
+                             % _describe(wired)[0])
+    return result
+
+
 def _resolve_name(ii, item_id):
     """None for LWITEM_NULL (no relationship set), otherwise the item's
     name. Isolated so a bad/unexpected ID degrades to None instead of
@@ -1436,6 +1604,19 @@ def _handle_query(text):
             payload = {"result": _add_node(parts_an[0] or "CONNECTOR",
                                            parts_an[1] or "Principled BSDF",
                                            int(parts_an[2] or 0), int(parts_an[3] or 0))}
+        elif command == "get_node_values":
+            surf_gv, _, node_gv = arg.partition("|")
+            payload = {"result": _get_node_values(surf_gv or "CONNECTOR", node_gv)}
+        elif command == "set_node_input":
+            parts_si = arg.split("|", 3)
+            if len(parts_si) != 4:
+                payload = {"error": "set_node_input needs surface|node|input|values"}
+            else:
+                values_si = json.loads(parts_si[3])
+                if not isinstance(values_si, list):
+                    values_si = [values_si]
+                payload = {"result": _set_node_input(parts_si[0] or "CONNECTOR", parts_si[1],
+                                                     parts_si[2], values_si)}
         elif command == "move_node":
             parts_mn = (arg.split("|") + [""] * 4)[:4]
             payload = {"result": _move_node(parts_mn[0] or "CONNECTOR", parts_mn[1],

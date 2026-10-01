@@ -237,6 +237,8 @@ reliably fixes it.
 | `lw_get_surface_nodes(surface=)` | List every node in a surface's node graph. |
 | `lw_get_node_inputs(surface=, node=)` | List a specific node's real parameter names. |
 | `lw_get_node_channel(surface=, node=, channel=)` | Read a node parameter's actual keyframe data. |
+| `lw_get_node_values(node, surface=)` | Read every stored input value of a node (e.g. Principled's Color, Roughness), with its units. |
+| `lw_set_node_input(node, input_name, value, surface=)` | Set one input value - one number, or three 0-1 numbers for a color. Percent is a fraction (35% = `0.35`). |
 | `lw_add_node(surface=, node_type=, x=, y=)` | Create a new node (added disconnected; at the graph's origin unless `x`/`y` are given). **`node_type` must be a confirmed-real `server_user_name`, never a guess - an invalid one freezes Layout with a blocking dialog.** |
 | `lw_connect_nodes(surface=, from_node=, to_node=, input_name=, output_name=)` | Wire one node's output into another's input, replacing what fed it (`to_node="Surface"` is the root, e.g. its `Material` input). Reports the connections LightWave actually has afterwards. |
 | `lw_disconnect_nodes(surface=, to_node=, input_name=)` | Remove the wire feeding one input. |
@@ -441,27 +443,31 @@ this is distilled from.
   real Principled BSDF parameters, matching the UI exactly) - but not
   values, since `LWNodeInputFuncs.evaluate_scalar/evaluate_vector` both
   need shading context this connector can't supply outside a render.
-  `lw_get_node_channel(surface, node, channel)` reads a parameter's
-  actual keyframe data - confirmed live end to end (Roughness read back
-  as `0.1`, matching the UI's "10.0%") - but **only for parameters that
-  already have an envelope**; a never-touched parameter has no value
-  reachable this way, a real, confirmed, honestly-documented limitation.
+  `lw_get_node_values(node)` reads them instead from the saved graph
+  (see "Node Editor writing" below). `lw_get_node_channel(surface,
+  node, channel)` reads an enveloped parameter's keyframe data -
+  confirmed live end to end (Roughness read back as `0.1`, matching the
+  UI's "10.0%").
   See `PLAN.md` "Node Editor / PrincipledBSDF nodes" for the full
   nine-step staged investigation, including a genuine dead end
   (`LWBSDFFuncs` turned out to be a shader-plugin-authoring API, not a
   way to read an existing node's parameters).
 
-  **Node Editor writing - nodes can be added, removed, moved and wired.**
-  `lw_add_node`, `lw_remove_node`, `lw_move_node`, `lw_connect_nodes`
-  and `lw_disconnect_nodes` all work
+  **Node Editor writing - nodes can be added, removed, moved, wired and
+  given input values.** `lw_add_node`, `lw_remove_node`,
+  `lw_move_node`, `lw_connect_nodes`, `lw_disconnect_nodes`,
+  `lw_get_node_values` and `lw_set_node_input` all work
   by saving the surface's whole node graph as ASCII
   (`LWFileIOFuncs.openSave` + `LWNodeEditorFuncs.save`), editing the
   text - its `{ Connections }` block names every wire by node and socket
   name, and a new node is a short block with empty data that picks up
   the node type's own defaults - and loading it back (`openLoad` +
   `load`), then saving once more to report what LightWave actually has.
-  Confirmed live end to end: added a Principled BSDF and wired it into
-  Surface > Material, and the Surface Editor showed Principled BSDF.
+  Input values are plain text in each node's block too, in LightWave's
+  internal units (Percent as a fraction, Color as 0-1 per channel,
+  Distance in metres). Confirmed live end to end: added a Principled
+  BSDF, wired it into Surface > Material, set its Color to red and
+  Roughness to 35%, and the Surface Editor showed exactly that.
 
   The obvious SDK calls (`addNode`, `connect`, `destroyNode`, `setXY`) are
   deliberately NOT used. `addNode` creates a
