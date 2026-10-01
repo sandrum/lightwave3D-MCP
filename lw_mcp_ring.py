@@ -655,7 +655,7 @@ def _get_node_channel(surf_name, node_name, channel_name):
     return {"surface": surf_name, "node": node_name, "channel": channel_name, "keys": keys}
 
 
-def _add_node(surf_name, node_type):
+def _add_node(surf_name, node_type, x=0, y=0):
     """Node Editor writing, step 1 - create a new node in a surface's
     node graph, via the same save/rewrite/load route as _rewire_nodes
     (PLAN.md "Node Editor writing").
@@ -672,6 +672,7 @@ def _add_node(surf_name, node_type):
     Instead: save the graph as ASCII, append a minimal node block to
     its "{ Nodes }" section - Server/RealName = node_type, Name =
     "<node_type> (N)" with N one past the highest existing instance,
+    Coordinates x y (default 0 0, the graph's origin - see _move_node),
     and an empty "{ Data }" (as the Surface and Input nodes are saved),
     so the node starts from its own defaults - then load it back. It
     then saves again and confirms the node really exists.
@@ -708,7 +709,7 @@ def _add_node(surf_name, node_type):
             "  { Tag",
             '    RealName "%s"' % node_type,
             '    Name "%s"' % node_name,
-            "    Coordinates 0 0",
+            "    Coordinates %d %d" % (x, y),
             "    Mode 1",
             "    Selected 0",
             "    { Data",
@@ -944,14 +945,13 @@ def _rewire_nodes(surf_name, to_node_name, input_name, from_node_name, output_na
 _UNREMOVABLE_NODES = ("Surface", "Input")
 
 
-def _drop_node_block(text, node_name):
-    """Remove one node's block from a saved ASCII graph's "{ Nodes }"
-    section. A block runs from its '  Server "<type>"' line to the
-    first line that is exactly '  }' (the Tag close - everything inside
-    it, attribute data included, is indented deeper); the node is
-    identified by its '    Name "<node_name>"' line at Tag level.
-    Raises if the node isn't found exactly once."""
-    lines = text.splitlines()
+def _node_block_span(lines, node_name):
+    """(first, last) line indexes of one node's block in a saved ASCII
+    graph's "{ Nodes }" section. A block runs from its '  Server
+    "<type>"' line to the first line that is exactly '  }' (the Tag
+    close - everything inside it, attribute data included, is indented
+    deeper); the node is identified by its '    Name "<node_name>"' line
+    at Tag level. Raises if the node isn't found exactly once."""
     nodes_start = lines.index("{ Nodes")
     nodes_end = lines.index("}", nodes_start)
     blocks = []
@@ -967,8 +967,70 @@ def _drop_node_block(text, node_name):
     matches = [(a, b) for a, b in blocks if target in lines[a:b + 1]]
     if len(matches) != 1:
         raise RuntimeError("expected one block for %s, found %d" % (node_name, len(matches)))
-    a, b = matches[0]
+    return matches[0]
+
+
+def _drop_node_block(text, node_name):
+    """Remove one node's block from a saved ASCII graph."""
+    lines = text.splitlines()
+    a, b = _node_block_span(lines, node_name)
     return "\n".join(lines[:a] + lines[b + 1:]) + "\n"
+
+
+def _coordinates_index(lines, node_name):
+    """Index of a node's Tag-level '    Coordinates x y' line."""
+    a, b = _node_block_span(lines, node_name)
+    hits = [i for i in range(a, b + 1) if lines[i].startswith("    Coordinates ")]
+    if len(hits) != 1:
+        raise RuntimeError("expected one Coordinates line for %s, found %d"
+                           % (node_name, len(hits)))
+    return hits[0]
+
+
+def _node_coordinates(text, node_name):
+    lines = text.splitlines()
+    return [int(v) for v in lines[_coordinates_index(lines, node_name)].split()[1:3]]
+
+
+def _move_node(surf_name, node_name, x, y):
+    """Node Editor writing - reposition a node in the Node Editor's
+    graph view by rewriting its block's Coordinates line in the saved
+    graph and loading it back (the same save/rewrite/load route as the
+    other node tools; LWNodeEditorFuncs.setXY is not used). Purely
+    cosmetic: placement has no effect on shading. Works on any node,
+    including Surface and Input. Saves again afterwards and reports the
+    coordinates LightWave actually has."""
+    if '"' in node_name or "\n" in node_name or not node_name:
+        return {"error": "invalid node name: %r" % node_name}
+    surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
+    if not surf_ids:
+        return {"error": "surface not found: %s" % surf_name}
+    editor = lwsdk.LWSurfaceFuncs().getNodeEditor(surf_ids[0])
+    nef = lwsdk.LWNodeEditorFuncs()
+    nf = lwsdk.LWNodeFuncs()
+    if _find_node(nef, nf, editor, node_name) is None:
+        return {"error": "node not found: %s (available: %s)"
+                         % (node_name, _node_names(nef, nf, editor))}
+
+    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    try:
+        lines = _save_graph_text(editor, path).splitlines()
+        i = _coordinates_index(lines, node_name)
+        before = [int(v) for v in lines[i].split()[1:3]]
+        lines[i] = "    Coordinates %d %d" % (x, y)
+        with open(path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        _load_graph_file(editor, path)
+        after = _node_coordinates(_save_graph_text(editor, path), node_name)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return {"surface": surf_name, "node": node_name, "before": before,
+            "coordinates": after, "moved": after == [x, y]}
 
 
 def _remove_node(surf_name, node_name):
@@ -1370,8 +1432,14 @@ def _handle_query(text):
             chan_a = parts_gnc[2] if len(parts_gnc) > 2 and parts_gnc[2] else "Roughness"
             payload = {"result": _get_node_channel(surf_a, node_a, chan_a)}
         elif command == "add_node":
-            surf_an, _, type_an = arg.partition("|")
-            payload = {"result": _add_node(surf_an or "CONNECTOR", type_an or "Principled BSDF")}
+            parts_an = (arg.split("|") + [""] * 4)[:4]
+            payload = {"result": _add_node(parts_an[0] or "CONNECTOR",
+                                           parts_an[1] or "Principled BSDF",
+                                           int(parts_an[2] or 0), int(parts_an[3] or 0))}
+        elif command == "move_node":
+            parts_mn = (arg.split("|") + [""] * 4)[:4]
+            payload = {"result": _move_node(parts_mn[0] or "CONNECTOR", parts_mn[1],
+                                            int(parts_mn[2] or 0), int(parts_mn[3] or 0))}
         elif command == "connect_nodes":
             parts_cn = (arg.split("|") + [""] * 5)[:5]
             payload = {"result": _rewire_nodes(parts_cn[0] or "CONNECTOR",

@@ -783,11 +783,14 @@ def lw_probe_node_write_sigs() -> str:
 
 
 @mcp.tool()
-def lw_add_node(surface: str = "CONNECTOR", node_type: str = "Principled BSDF") -> str:
+def lw_add_node(surface: str = "CONNECTOR", node_type: str = "Principled BSDF",
+                x: int = 0, y: int = 0) -> str:
     """Create a new, unconnected node in a surface's node graph (Node
     Editor writing, step 1). Returns the new node's node_name (e.g.
     "Principled BSDF (2)" - one past the highest existing instance) and
     server_user_name, ready for lw_connect_nodes / lw_get_node_inputs.
+    `x`/`y` place it in the Node Editor's graph view (default 0, 0 - the
+    origin, where it can overlap other nodes); see lw_move_node.
 
     **CRITICAL, confirmed live: an invalid `node_type` freezes Layout.**
     `node_type` must be an exact server_user_name string already
@@ -814,7 +817,7 @@ def lw_add_node(surface: str = "CONNECTOR", node_type: str = "Principled BSDF") 
 
     Close and reopen an open Surface Editor to see changes; safest with
     the Node Editor closed. See PLAN.md "Node Editor writing"."""
-    return json.dumps(_query("add_node", "%s|%s" % (surface, node_type)))
+    return json.dumps(_query("add_node", "%s|%s|%d|%d" % (surface, node_type, x, y)))
 
 
 @mcp.tool()
@@ -890,6 +893,21 @@ def lw_remove_node(node: str, surface: str = "CONNECTOR") -> str:
     Surface Editor to see the change; safest with the Node Editor
     closed."""
     return json.dumps(_query("remove_node", "%s|%s" % (surface, node)))
+
+
+@mcp.tool()
+def lw_move_node(node: str, x: int, y: int, surface: str = "CONNECTOR") -> str:
+    """Reposition a node in the Node Editor's graph view - purely
+    cosmetic, no effect on shading. `node` is a node_name from
+    lw_get_surface_nodes (any node, including "Surface" and "Input").
+    `x`/`y` are the graph's own stored coordinates, as they appear in
+    LightWave's saved node data. Reports `before`, the `coordinates`
+    LightWave has afterwards, and `moved`.
+
+    Same save/rewrite/load route as the other node tools (rewrites the
+    node's Coordinates line), not LWNodeEditorFuncs.setXY. Close and
+    reopen the Node Editor to see the change."""
+    return json.dumps(_query("move_node", "%s|%s|%d|%d" % (surface, node, x, y)))
 
 
 @mcp.tool()
