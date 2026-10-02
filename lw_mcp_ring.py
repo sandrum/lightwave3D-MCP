@@ -47,10 +47,16 @@ import lwsdk
 
 __lwver__ = "11"
 
+import sys
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
-RESPONSE_PATH = os.path.join(_HERE, "_mcp_response.json")
-DEBUG_LOG_PATH = os.path.join(_HERE, "_mcp_ring_debug.log")
-RENDER_STATUS_PATH = os.path.join(_HERE, "_mcp_render_status.json")
+if _HERE not in sys.path:  # in case LightWave hasn't put this folder on sys.path
+    sys.path.insert(0, _HERE)
+import lw_mcp_config  # noqa: E402 - shared ports/exchange folder, see .env.example
+
+RESPONSE_PATH = lw_mcp_config.exchange_path("_mcp_response.json")
+DEBUG_LOG_PATH = lw_mcp_config.exchange_path("_mcp_ring_debug.log")
+RENDER_STATUS_PATH = lw_mcp_config.exchange_path("_mcp_render_status.json")
 
 TOPIC = "MCP"
 # ROADMAP2.md item 8: this was originally r"^\{(.+)\}\s*(.*)$" - a GREEDY
@@ -842,7 +848,7 @@ def _add_node(surf_name, node_type, x=0, y=0):
     taken = [int(m.group(1)) for m in (pattern.match(n) for n in existing) if m]
     node_name = "%s (%d)" % (node_type, max(taken) + 1 if taken else 1)
 
-    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    path = lw_mcp_config.exchange_path(_REWIRE_SCRATCH)
     try:
         lines = _save_graph_text(editor, path).splitlines()
         try:
@@ -1056,7 +1062,7 @@ def _rewire_nodes(surf_name, to_node_name, input_name, from_node_name, output_na
         new_conn = {"NodeName": to_node_name, "InputName": input_name,
                     "InputNodeName": from_node_name, "InputOutputName": output_name}
 
-    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    path = lw_mcp_config.exchange_path(_REWIRE_SCRATCH)
     try:
         head, connections = _split_connections(_save_graph_text(editor, path))
         kept = [c for c in connections
@@ -1158,7 +1164,7 @@ def _move_node(surf_name, node_name, x, y):
         return {"error": "node not found: %s (available: %s)"
                          % (node_name, _node_names(nef, nf, editor))}
 
-    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    path = lw_mcp_config.exchange_path(_REWIRE_SCRATCH)
     try:
         lines = _save_graph_text(editor, path).splitlines()
         i = _coordinates_index(lines, node_name)
@@ -1204,7 +1210,7 @@ def _remove_node(surf_name, node_name):
         return {"error": "node not found: %s (available: %s)"
                          % (node_name, _node_names(nef, nf, editor))}
 
-    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    path = lw_mcp_config.exchange_path(_REWIRE_SCRATCH)
     try:
         head, connections = _split_connections(_save_graph_text(editor, path))
         kept = [c for c in connections
@@ -1309,7 +1315,7 @@ def _get_node_values(surf_name, node_name):
     if _find_node(nef, nf, editor, node_name) is None:
         return {"error": "node not found: %s (available: %s)"
                          % (node_name, _node_names(nef, nf, editor))}
-    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    path = lw_mcp_config.exchange_path(_REWIRE_SCRATCH)
     try:
         lines = _save_graph_text(editor, path).splitlines()
         attrs = _node_attrs(lines, node_name)
@@ -1349,7 +1355,7 @@ def _set_node_input(surf_name, node_name, input_name, values):
         return {"error": "node not found: %s (available: %s)"
                          % (node_name, _node_names(nef, nf, editor))}
 
-    path = os.path.join(_HERE, _REWIRE_SCRATCH)
+    path = lw_mcp_config.exchange_path(_REWIRE_SCRATCH)
     try:
         text = _save_graph_text(editor, path)
         lines = text.splitlines()

@@ -40,11 +40,16 @@ isn't reliably visible in this environment (same lesson learned from the
 Layout side - see PLAN.md).
 """
 import os
+import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-OUT_PATH = os.path.join(_HERE, "_modeler_enable_result.txt")
+if _HERE not in sys.path:  # in case LightWave hasn't put this folder on sys.path
+    sys.path.insert(0, _HERE)
+import lw_mcp_config  # noqa: E402 - shared ports/exchange folder, see .env.example
 
-PORT = 9736
+OUT_PATH = lw_mcp_config.exchange_path("_modeler_enable_result.txt")
+
+PORT = lw_mcp_config.MODELER_PORT
 
 lines = ["stage 0: script started"]
 

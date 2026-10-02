@@ -44,13 +44,14 @@ from mcp.server.fastmcp import FastMCP
 from lwcommandport.layout import Layout
 from lwcommandport.modeler import Modeler
 
-HOST = "localhost"
-PORT = 9735  # must match lw_enable_command_port.py
-MODELER_PORT = 9736  # must match lw_enable_modeler_command_port.py
+import lw_mcp_config  # shared ports/exchange folder - see .env.example
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-RESPONSE_PATH = os.path.join(_HERE, "_mcp_response.json")
-MODELER_RESPONSE_PATH = os.path.join(_HERE, "_mcp_modeler_response.json")
+HOST = lw_mcp_config.HOST
+PORT = lw_mcp_config.LAYOUT_PORT
+MODELER_PORT = lw_mcp_config.MODELER_PORT
+
+RESPONSE_PATH = lw_mcp_config.exchange_path("_mcp_response.json")
+MODELER_RESPONSE_PATH = lw_mcp_config.exchange_path("_mcp_modeler_response.json")
 
 mcp = FastMCP("lightwave")
 

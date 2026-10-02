@@ -27,8 +27,15 @@ except ImportError:
     print("This is a LightWave Python Generic plug-in. Please run it inside LightWave.")
     sys.exit(1)
 
-# Must match PORT in server.py / lw_mcp_query.py
-PORT = 9735
+import os
+import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:  # in case LightWave hasn't put this folder on sys.path
+    sys.path.insert(0, _HERE)
+import lw_mcp_config  # noqa: E402 - shared with server.py, see .env.example
+
+PORT = lw_mcp_config.LAYOUT_PORT
 
 _ok = lwsdk.LWCommandPort().enable(PORT)
 

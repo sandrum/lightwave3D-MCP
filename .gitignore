@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
+# Local settings - copy .env.example to .env and edit. Never committed.
+.env
+
 # Runtime state written by the currently-active read path on every
 # query/render - churns every session, unlike the frozen _mcp_diag*
 # files (superseded plugins, kept tracked as historical evidence - see

@@ -60,13 +60,45 @@ leaving the chat.
 - Python 3.x
 - Claude Desktop
 
+### Configuration (optional)
+
+Everything works out of the box with the defaults below. To change them,
+copy `.env.example` to `.env` in the repo folder and edit it - `.env` is
+git-ignored, so your values stay on your machine:
+
+```
+copy .env.example .env
+```
+
+| Setting | Default | What it is |
+| --- | --- | --- |
+| `LW_MCP_HOST` | `localhost` | Machine LightWave runs on, as seen from `server.py`. |
+| `LW_MCP_LAYOUT_PORT` | `9735` | Layout's Command Port. |
+| `LW_MCP_MODELER_PORT` | `9736` | Modeler's Command Port (must differ from Layout's). |
+| `LW_MCP_EXCHANGE_DIR` | *(the repo folder)* | Where `server.py` and the LightWave scripts exchange reply/status/debug files. |
+
+For example, to move the ports and keep the exchange files out of the
+repo folder:
+
+```
+LW_MCP_LAYOUT_PORT=9835
+LW_MCP_MODELER_PORT=9836
+LW_MCP_EXCHANGE_DIR=%TEMP%\lightwave_mcp
+```
+
+Both sides read the same file through `lw_mcp_config.py`: `server.py`
+and every script you load into LightWave. A real environment variable
+of the same name overrides `.env`. After changing a value, restart
+Claude Desktop **and** reload the LightWave scripts (or restart Layout).
+The ports and folders shown in the steps below are the defaults.
+
 ### Quick Start
 
 **1. Enable the Command Port (once per Layout session)**
 
 Utilities → Plugins → Add Plugins → select `lw_enable_command_port.py`.
 It runs automatically on load (it's a "single-shot" plug-in) - the title
-bar should change to show `(CP: 9735)`.
+bar should change to show `(CP: 9735)` (or your `LW_MCP_LAYOUT_PORT`).
 
 **2. Enable the read path (once per Layout session)**
 
@@ -111,7 +143,7 @@ Plugins → select `lw_enable_modeler_command_port.py` (this only
 *registers* it - Modeler treats single-file plug-ins differently than
 Layout). Then Utilities → Additional → find and click
 `lw_enable_modeler_command_port` in the list to actually run it. Title
-bar should change to show `(CP: 9736)`. Note: the script may report
+bar should change to show `(CP: 9736)` (or your `LW_MCP_MODELER_PORT`). Note: the script may report
 "failure" internally (a real bug in this SDK build's `ModCommand.
 execute()` return code, not an actual failure) - trust the title bar,
 not any printed result.
@@ -947,6 +979,8 @@ writeup.
 - `lw_mcp_render_monitor.py` — Render Display plug-in (`lwsdk.IFrameBuffer`) providing real render completion signaling for `lw_get_render_status`. Needs Add Plugins plus manual selection as the active Render Display. Working.
 - `lw_enable_modeler_command_port.py` — run once inside Modeler (Add Plugins, then Utilities > Additional). Enables Modeler writes. Working.
 - `lw_mcp_modeler_query.py` — Modeler read-path attempt. Works when invoked from inside Modeler's own UI, but confirmed unreachable over the network - kept for the record, not usable as-is. See `ROADMAP.md` item 5.
+- `lw_mcp_config.py` — shared settings (host, ports, exchange folder) read by `server.py` and every LightWave-side script, from `.env` if present. Not a plug-in; don't load it into LightWave.
+- `.env.example` — documented template for `.env` (see Configuration).
 - `server.py` — MCP server Claude Desktop launches. Layout writes/reads, animation, render/camera automation, hierarchy queries, and Modeler writes all work; Modeler reads do not (see above).
 - `lwcommandport/` — NewTek's official Command Port client (copied from the LightWave install), with one real bug fixed in `Ring()` (see `PLAN.md`).
 - `lw_mcp_master.py`, `lw_mcp_query.py` — two earlier, unsuccessful attempts at solving Layout reads, kept for reference/history. Do not load.

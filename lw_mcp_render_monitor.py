@@ -89,9 +89,15 @@ import lwsdk
 
 __lwver__ = "11"
 
+import sys
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
-STATUS_PATH = os.path.join(_HERE, "_mcp_render_status.json")
-DEBUG_LOG_PATH = os.path.join(_HERE, "_mcp_render_debug.log")
+if _HERE not in sys.path:  # in case LightWave hasn't put this folder on sys.path
+    sys.path.insert(0, _HERE)
+import lw_mcp_config  # noqa: E402 - shared ports/exchange folder, see .env.example
+
+STATUS_PATH = lw_mcp_config.exchange_path("_mcp_render_status.json")
+DEBUG_LOG_PATH = lw_mcp_config.exchange_path("_mcp_render_debug.log")
 
 
 def _log(line):
