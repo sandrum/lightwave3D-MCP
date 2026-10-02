@@ -1,12 +1,19 @@
 """
 lw_diag_items.py (v2 - defensive)
 
-One-shot diagnostic Generic plug-in. Writes to a HARDCODED absolute path
-(not derived from __file__, in case that's not set reliably when Layout
-loads a script plug-in) at every stage, so we can tell exactly how far
-execution gets even if something later throws.
+One-shot diagnostic Generic plug-in. Writes next to this script at
+every stage, so we can tell exactly how far execution gets even if
+something later throws. (Originally a hard-coded absolute path, in case
+__file__ wasn't set when Layout loads a script plug-in; lw_mcp_ring.py
+has since relied on __file__ throughout, and the current working
+directory is the fallback if it's ever missing.)
 """
-OUT_PATH = r"C:\Users\sandr\IdeaProjects\LightwaveMCP\_diag_items.txt"
+import os
+try:
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+except NameError:  # no __file__ in this execution context
+    _HERE = os.getcwd()
+OUT_PATH = os.path.join(_HERE, "_diag_items.txt")
 
 with open(OUT_PATH, "w") as f:
     f.write("stage 0: script started\n")

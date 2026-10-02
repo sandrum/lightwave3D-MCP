@@ -131,11 +131,15 @@ In `claude_desktop_config.json`:
   "mcpServers": {
     "lightwave": {
       "command": "python",
-      "args": ["C:\\Users\\sandr\\IdeaProjects\\LightwaveMCP\\server.py"]
+      "args": ["C:\\path\\to\\LightwaveMCP\\server.py"]
     }
   }
 }
 ```
+
+Replace `C:\path\to\LightwaveMCP` with the absolute path of your own
+clone of this repo (JSON needs each backslash doubled, or use forward
+slashes).
 
 Restart Claude Desktop.
 

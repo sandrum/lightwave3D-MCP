@@ -1903,7 +1903,7 @@ Checked the stub first: `ContentDirectory(self, *args)` already takes a
 real argument correctly (`dirname`), no repeat of the missing-`*args`
 bug class found repeatedly in earlier roadmaps. Tested directly via
 `lw_run_command` before writing any wrapper: sent
-`ContentDirectory(C:\Users\sandr\AppData\Local\Temp)` (the exact
+`ContentDirectory(C:\Users\<you>\AppData\Local\Temp)` (the exact
 directory the test scene lives in, outside LightWave's default Content
 Directory) - Cmd History logged it cleanly, no error, no dialog.
 
@@ -1922,7 +1922,7 @@ Shipped `lw_set_content_directory(path)`, a thin wrapper (following the
 same shape as every other simple settable command here). Re-tested
 through the actual wrapped tool (not just `lw_run_command`) after a
 Claude Desktop restart - Cmd History showed the identical
-`ContentDirectory C:\Users\sandr\AppData\Local\Temp` line, confirming
+`ContentDirectory C:\Users\<you>\AppData\Local\Temp` line, confirming
 the wrapper introduces no bugs of its own.
 
 Surveyed but did not wrap two related commands: `ContentTypeDirectory(

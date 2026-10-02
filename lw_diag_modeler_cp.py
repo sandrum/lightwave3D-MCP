@@ -12,7 +12,11 @@ Diagnose why ENABLECOMMANDPORT reported failure (result=0) for Modeler.
 import os
 import socket
 
-OUT_PATH = r"C:\Users\sandr\IdeaProjects\LightwaveMCP\_diag_modeler_cp.txt"
+try:
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+except NameError:  # no __file__ in this execution context
+    _HERE = os.getcwd()
+OUT_PATH = os.path.join(_HERE, "_diag_modeler_cp.txt")
 lines = []
 
 # 1. bind test on 9736

@@ -8,7 +8,12 @@ _diag_api.txt. Safer than guessing from static docs, which have already
 been shown to be out of sync with this build (LWMessageFuncs.info() and
 IMaster.__init__ argument-count bugs found earlier).
 """
-OUT_PATH = r"C:\Users\sandr\IdeaProjects\LightwaveMCP\_diag_api.txt"
+import os
+try:
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+except NameError:  # no __file__ in this execution context
+    _HERE = os.getcwd()
+OUT_PATH = os.path.join(_HERE, "_diag_api.txt")
 
 lines = []
 
