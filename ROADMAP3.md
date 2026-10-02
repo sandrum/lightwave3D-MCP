@@ -452,11 +452,14 @@ future session (with a richer test rig, a different LightWave install,
 or just fresh eyes) knows exactly where to start digging rather than
 re-discovering them from scratch.
 
-1. **Light falloff read-back bug** - `lw_get_light_info`'s
-   `falloff_type` always returns the scene-default value, never what
-   was just written via `lw_set_light`. Tried the two-argument
-   `(id, time)` channel-read shape used elsewhere in `_get_light_info`;
-   confirmed live it does NOT fix this. Still open in `lw_mcp_ring.py`.
+1. **Light falloff read-back bug - RESOLVED: not a reader bug.** The
+   reader is correct (0 = Off, 1 = Inv Distance^2, the only options in
+   LightWave 2019). The stale readings only happen when Light
+   Properties is open while `lw_set_light` changes the falloff: the
+   panel gets out of step and the reading stays stale with it. Every
+   earlier test had the panel open. `lw_set_light` now accepts only 0/1
+   and both tools warn to close the panel first. See `PLAN.md` "Light
+   falloff read-back, resolved".
 2. **`FogColor` never visibly updates** even after its
    `EnableVolumetrics` precondition is satisfied, unlike every other
    color command tested (`BackdropColor`/`SkyColor`/gradient colors all

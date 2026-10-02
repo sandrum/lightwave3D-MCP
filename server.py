@@ -530,14 +530,15 @@ def lw_get_antialiasing(camera: str = "Camera") -> str:
 def lw_get_light_info(name: str = "Light") -> str:
     """Get a light's type, falloff, color (RGB), intensity, and range.
     Same live-playhead evaluation as lw_get_camera_info for the
-    animatable values. Known limitation: falloff is a stale read - it
-    reports the scene-default value and does not reflect writes made
-    via lw_set_light's falloff_type, confirmed live (UI screenshot
-    showed the write took effect while this field kept reporting the
-    old value). See lw_mcp_ring.py's _get_light_info for the
-    investigation. color_rgb is intensity-multiplied, not the raw
-    light color - LWLightInfo.color() behaves that way; there's a
-    separate rawColor() accessor this doesn't use."""
+    animatable values. `falloff` is the Intensity Falloff setting:
+    0 = Off, 1 = Inv Distance^2 - the only two options LightWave 2019
+    has, matching the SDK's LWLFALL_OFF/LWLFALL_ON. Confirmed live to
+    follow both hand changes and lw_set_light writes - provided Light
+    Properties is closed when a write arrives: with the panel open the
+    reading stays stale (see lw_set_light). color_rgb is
+    intensity-multiplied, not the raw light color - LWLightInfo.color()
+    behaves that way; there's a separate rawColor() accessor this
+    doesn't use."""
     return json.dumps(_query("get_light_info", name))
 
 
@@ -1639,15 +1640,17 @@ def lw_set_light(light: str, intensity: float = None, color: list = None,
     `volumetric_samples=8` showed "8"; `volumetric_intensity=0.5` showed
     "50.0%", both exact matches.
 
-    falloff_type write confirmed live via UI screenshot (Light
-    Properties showed the new "Intensity Falloff" setting immediately)
-    - but lw_get_light_info's own falloff field is a known-stale read
-    that never reflects it, an unfixed limitation documented in
-    lw_mcp_ring.py's _get_light_info. falloff_type is also a real
-    LightWave constraint, not a bug: it only applies to Point/Spot
-    lights, confirmed via LightWave's own error dialog ("This option
-    does not apply to the current light type") when tried on a Distant
-    light. cone_angle only matters for spot/cone-type lights - not
+    `falloff_type` is the Intensity Falloff dropdown: 0 = Off, 1 = Inv
+    Distance^2 - the only two options in LightWave 2019 (Cmd History logs
+    LightFalloffType 0/1); anything else is refused. Confirmed live, and
+    read back correctly by lw_get_light_info - but close Light Properties before changing falloff. If that panel is open
+    when the command arrives, the light does change, but the open panel
+    gets out of step - it stops responding and can't be closed normally
+    (reopening it from the Scene Editor shows the real value) - and
+    lw_get_light_info keeps reporting the old value. Confirmed live.
+    It only applies to Point/Spot lights, confirmed via LightWave's own
+    error dialog ("This option does not apply to the current light
+    type") when tried on a Distant light. cone_angle only matters for spot/cone-type lights - not
     independently visually confirmed the way falloff_type was.
 
     Deliberately does NOT cover LightVisibleToCamera/LightCastsShadows.
@@ -1670,6 +1673,8 @@ def lw_set_light(light: str, intensity: float = None, color: list = None,
     argument, then again with no arguments right after it) - Python
     silently keeps only the second definition, so the argument version
     was completely unreachable before this fix."""
+    if falloff_type is not None and falloff_type not in (0, 1):
+        return json.dumps({"error": "falloff_type must be 0 (Off) or 1 (Inv Distance^2)"})
     light_id, id_resp = _resolve_item_id(light)
     if not light_id:
         return json.dumps({"error": "could not resolve light: %s" % light, "detail": id_resp})

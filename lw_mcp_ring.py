@@ -349,20 +349,15 @@ def _get_color_space():
 def _get_light_info(name):
     """Same live-time fix as _get_camera_info.
 
-    ROADMAP2.md item 5: falloff(light_id) is a known-stale read - it
-    always reports the scene-default value regardless of what
-    lw_set_light's falloff_type just wrote. Confirmed via UI screenshot
-    that the WRITE genuinely takes effect (Light Properties showed
-    "Intensity Falloff: Inv Distance^2" right after setting
-    falloff_type=2) while this field kept reporting the original
-    default. Also tried li.falloff(light_id, t) (the (id, time) shape
-    every other animatable field here uses) in case falloff is
-    channel-driven like they are - confirmed live that this does NOT
-    fix it either, it just returns the same stale value without even
-    raising, so there's no exception to branch on. Left as the simple
-    one-argument call and documented as an open, un-worked-around
-    limitation of the read path rather than shipping dead code that
-    only pretends to address it."""
+    falloff(light_id) is the Intensity Falloff setting, 0 = Off / 1 =
+    Inv Distance^2 (lwrender.h's LWLFALL_OFF/LWLFALL_ON - LightWave 2019
+    has no other options). It was long documented here as a stale read
+    that ignored lw_set_light's writes; re-tested live, it follows both
+    hand changes and command writes correctly. The stale readings were
+    caused by Light Properties being open when the write arrived: the
+    open panel gets out of step (stops responding), and the reading
+    stays stale with it. Every earlier test had the panel open to watch
+    the change. See PLAN.md "Light falloff read-back, resolved"."""
     light_id = _find_item(name)
     if light_id is None:
         return {"error": "light not found: %s" % name}

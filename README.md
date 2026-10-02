@@ -672,11 +672,13 @@ this is distilled from.
   (ROADMAP2.md item 5) - the write-side counterpart to
   `lw_get_light_info`. Same shape and numeric-ID `SelectItem` pattern as
   `lw_set_camera`. Confirmed live: `intensity`/`color` take effect
-  immediately. `falloff_type` write confirmed live via UI screenshot,
-  but only applies to Point/Spot lights (LightWave pops "This option
-  does not apply to the current light type" for Distant); its own
-  read-back through `lw_get_light_info` is a known-stale bug, unrelated
-  to the write (see below). Fixed a real duplicate-definition bug found
+  immediately. `falloff_type` is 0 (Off) or 1 (Inv Distance^2) - the
+  only two options in LightWave 2019 - and only applies to Point/Spot
+  lights (LightWave pops "This option does not apply to the current
+  light type" for Distant). `lw_get_light_info` reads it back
+  correctly, **as long as Light Properties is closed when you change
+  it**: with the panel open, the light changes but the panel gets out of
+  step (stops responding) and the reading stays stale. Fixed a real duplicate-definition bug found
   in the stub: `LightFalloffType` was defined twice, and Python silently
   kept only the argument-less second copy, making the real one
   unreachable. Deliberately does **not** wrap `LightVisibleToCamera`/

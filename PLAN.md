@@ -3338,3 +3338,32 @@ Render set to sRGB (Final Render requested as "srgb") and Auto Sense
 on all read back and matched the tab and Cmd History; "bogus" was
 refused with nothing sent; restoring everything to Linear with all four
 checkboxes off read back correctly.
+
+## Light falloff read-back, resolved (ROADMAP3.md Known misses #1)
+
+Long documented as "`lw_get_light_info` falloff is a stale read that
+never reflects `lw_set_light`'s writes". Re-investigated with the SDK
+header now unpacked locally and Cmd History:
+
+- `lwrender.h` defines only `LWLFALL_OFF 0` / `LWLFALL_ON 1` for
+  `LWLightInfo.falloff()`, and LightWave 2019's Intensity Falloff
+  dropdown has exactly two options, Off and Inv Distance^2, logging
+  `LightFalloffType 0` / `LightFalloffType 1`. The original test sent
+  `falloff_type=2` (from older LightWave's longer list), which the UI
+  showed as Inv Distance^2 - i.e. any non-zero value means "on".
+- With Light Properties open, `lw_set_light(falloff_type=0)` changed the
+  light (the panel showed Off only after being closed and reopened) but
+  `lw_get_light_info` kept reading 1 - and the panel then stopped
+  responding: it couldn't be closed normally, and only reopening it from
+  the Scene Editor showed the current value. Layout needed a restart.
+- After the restart, with the panel closed for each read: hand changes
+  read back correctly (Off -> 0, Inv Distance^2 -> 1), and so did
+  `lw_set_light` writes (0 -> 0, 1 -> 1). Cmd History showed a hand
+  change and the tool's write log the identical `SelectItem 20000000` /
+  `LightFalloffType <n>`.
+
+So the reader was never wrong: the open panel was. Every earlier test
+had kept Light Properties open to watch the change. `lw_set_light` now
+refuses `falloff_type` values other than 0/1, and both light tools'
+descriptions (plus README) warn to close Light Properties before
+changing falloff.
