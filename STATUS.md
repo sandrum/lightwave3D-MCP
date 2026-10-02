@@ -33,6 +33,9 @@ real thing.
   guessed timing) confirmed for both single-frame and multi-frame
   renders, and a scriptable `SetRenderDisplay` (a wrapped-method bug
   had made this look like a manual-only step).
+- Colour space: read and set every slot on the CS tab (display, final
+  render output, file types, alpha) and its four checkboxes
+  (`lw_get_color_space`, `lw_set_color_space`).
 - Render tab quality settings: raytracing, recursion limits, diffuse
   bounces, sample counts, ray precision, polygon intersection mode,
   CPU noise filter, despike (`lw_get_render_options`,

@@ -3291,3 +3291,50 @@ list order) was confirmed by switching to Double Precision (2) and back
 
 `RenderMode(renderintegrator)` stays unwrapped: with only VPR
 available there's nothing in the UI to verify it against.
+
+## Colour space (ROADMAP3.md "Remaining work" #4)
+
+The settings live in Edit > General Options > **CS** tab. Every
+per-slot stub in the bundled command list takes no arguments, but Cmd
+History (user changing each control by hand) shows they all take a
+value - the same stub-bug class as `NoiseFilter`/`SetRenderDisplay` -
+so `lw_set_color_space` sends them raw:
+
+| CS tab control | Logged command |
+| --- | --- |
+| Picked Colors | `ColorSpaceSurfaceColor <name>` |
+| Light Color | `ColorSpaceLightColor <name>` |
+| Palette / 8-bit / Float Files | `ColorSpacePaletteFiles` / `ColorSpace8BitFiles` / `ColorSpaceFloatFiles <name>` |
+| Alpha | `ColorSpaceAlpha <name>` |
+| Display | `ColorSpaceViewer <name>` |
+| Default Final Render | `ColorSpaceOutput <name>` |
+| Default Buffer | `ColorSpaceOutputBuffer <name>` |
+| Embedded Alpha Channel | `ColorSpaceOutputAlpha <name>` |
+| Auto Sense on Load / Color Correct OpenGL / Affect Color Picker / Convert 8-bit to Float | `ColorSpaceAutoSense` / `ColorSpaceCorrectOpenGL` / `ColorSpaceAffectPicker` / `ColorSpace8BitToFloat 1/0` |
+
+(Palette Files wasn't changed that session; it follows the same
+pattern.) Names are as the UI spells them: `Linear`, `sRGB`, `rec709`,
+`Cineon`, `ciexyz`.
+
+Read-back: `lwcolorspace.h`'s LWColorSpaceFuncs - read-only calls only:
+`colorSpaceName(LWCOLORSPACETYPES)` per slot,
+`getColorSpaceBoolean(name)` for the checkboxes, and
+`numberOfColorSpaces`/`nameOfColorSpaces` per layer for the valid
+names (RGB: Linear, sRGB, rec709, Cineon, ciexyz; Alpha: Linear, sRGB,
+rec709). The header's own `setColorSpace`/`setColorSpaceBoolean` were
+deliberately not used, in favour of the Cmd-History-verified commands.
+`lw_set_color_space` matches each requested name case-insensitively
+against the live list before sending anything, so an unknown name
+never reaches LightWave (whose reaction is untested and could be a
+modal dialog, as `NoiseFilter 2` and `addNode("Constant")` were).
+
+Live: after a Layout restart the read showed every slot Linear and all
+checkboxes off, matching the tab - the values the user had set by hand
+in the previous session were gone, so these preferences did not
+persist. `colorSpaceName(lwcst_output_buffer)` returns null although
+the tab shows Default Buffer's value, so that slot can't be read back;
+the two VPR slots (not on the tab) return null too. Display and Final
+Render set to sRGB (Final Render requested as "srgb") and Auto Sense
+on all read back and matched the tab and Cmd History; "bogus" was
+refused with nothing sent; restoring everything to Linear with all four
+checkboxes off read back correctly.

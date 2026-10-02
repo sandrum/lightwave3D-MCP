@@ -1026,6 +1026,128 @@ _NOISE_FILTER = {"off": 0, "cpu": 1}
 
 
 @mcp.tool()
+def lw_get_color_space() -> str:
+    """Read LightWave's colour space settings: each slot's current
+    colour space by name (`slots`: viewer, surface_color, light_color,
+    palette/8bit/float/alpha files, output, output_alpha, output_vpr,
+    output_vpr_alpha, output_buffer), the four checkboxes (`flags`:
+    auto_sense, correct_opengl, affect_picker, 8bit_to_float), and the
+    names available to choose from (`available`: rgb, alpha - the alpha
+    slots only take Linear/sRGB/rec709). Uses LWColorSpaceFuncs'
+    read-only calls; changes nothing.
+
+    Confirmed live against the CS tab. `output_buffer` (Default Buffer)
+    always reads null even though the tab shows a value - LightWave's
+    reader returns nothing for it - so a Default Buffer change can't be
+    confirmed here. `output_vpr`/`output_vpr_alpha` read null too and
+    aren't on the tab at all. These are preferences, not scene
+    settings, and in testing they did NOT survive a Layout restart."""
+    return json.dumps(_query("get_color_space"))
+
+
+# (parameter, command, lw_get_color_space slot key, layer of names it takes)
+_COLOR_SPACE_SETTINGS = (
+    ("display", "ColorSpaceViewer", "viewer", "rgb"),
+    ("picked_colors", "ColorSpaceSurfaceColor", "surface_color", "rgb"),
+    ("light_color", "ColorSpaceLightColor", "light_color", "rgb"),
+    ("palette_files", "ColorSpacePaletteFiles", "palette_files", "rgb"),
+    ("eight_bit_files", "ColorSpace8BitFiles", "8bit_files", "rgb"),
+    ("float_files", "ColorSpaceFloatFiles", "float_files", "rgb"),
+    ("alpha", "ColorSpaceAlpha", "alpha_files", "alpha"),
+    ("final_render", "ColorSpaceOutput", "output", "rgb"),
+    ("buffer", "ColorSpaceOutputBuffer", "output_buffer", "rgb"),
+    ("embedded_alpha", "ColorSpaceOutputAlpha", "output_alpha", "alpha"),
+)
+_COLOR_SPACE_FLAG_COMMANDS = (
+    ("auto_sense", "ColorSpaceAutoSense"),
+    ("correct_opengl", "ColorSpaceCorrectOpenGL"),
+    ("affect_picker", "ColorSpaceAffectPicker"),
+    ("convert_8bit_to_float", "ColorSpace8BitToFloat"),
+)
+
+
+@mcp.tool()
+def lw_set_color_space(display: str = None, picked_colors: str = None,
+                       light_color: str = None, palette_files: str = None,
+                       eight_bit_files: str = None, float_files: str = None,
+                       alpha: str = None, final_render: str = None, buffer: str = None,
+                       embedded_alpha: str = None, auto_sense: bool = None,
+                       correct_opengl: bool = None, affect_picker: bool = None,
+                       convert_8bit_to_float: bool = None) -> str:
+    """Set LightWave's colour spaces (Edit > General Options > CS tab).
+    Any parameter left as None is not touched. Parameters follow the
+    tab's labels: "Convert Color Space to Linear" - `picked_colors`,
+    `light_color`, `palette_files`, `eight_bit_files`, `float_files`,
+    `alpha`; "Apply Color Space" - `display`, `final_render` (the
+    rendered output), `buffer`, `embedded_alpha`; and the four
+    checkboxes `auto_sense`, `correct_opengl`, `affect_picker`,
+    `convert_8bit_to_float`.
+
+    A colour space is given by name - the built-ins are "Linear",
+    "sRGB", "rec709", "Cineon" and "ciexyz"; lw_get_color_space lists
+    what this install has (`available`). Names are matched without
+    regard to case against that live list BEFORE anything is sent, and
+    an unknown name is refused with the valid choices - LightWave's own
+    reaction to a bad name is untested and could be a modal dialog.
+
+    Command names are from Cmd History while each control was changed
+    by hand; they don't all match their labels: Picked Colors is
+    ColorSpaceSurfaceColor, Display is ColorSpaceViewer, Default Final
+    Render is ColorSpaceOutput, Default Buffer is
+    ColorSpaceOutputBuffer, Embedded Alpha Channel is
+    ColorSpaceOutputAlpha. Every one takes its value as an argument
+    (checkboxes 1/0, not toggles) although the stubs declare none, so
+    they're sent raw. After sending, reads everything back and returns
+    it as `state` (except Default Buffer, which can't be read - see
+    lw_get_color_space). Confirmed live: Display and Final Render set
+    to sRGB (from "srgb" - case-insensitive) and Auto Sense on, all
+    matching the CS tab and Cmd History, then restored; an unknown name
+    was refused with nothing sent."""
+    values = {"display": display, "picked_colors": picked_colors,
+              "light_color": light_color, "palette_files": palette_files,
+              "eight_bit_files": eight_bit_files, "float_files": float_files,
+              "alpha": alpha, "final_render": final_render, "buffer": buffer,
+              "embedded_alpha": embedded_alpha}
+    flags = {"auto_sense": auto_sense, "correct_opengl": correct_opengl,
+             "affect_picker": affect_picker, "convert_8bit_to_float": convert_8bit_to_float}
+    commands = []
+    if any(v is not None for v in values.values()):
+        current = _query("get_color_space").get("result")
+        if not isinstance(current, dict) or not isinstance(current.get("available"), dict):
+            return json.dumps({"error": "couldn't read the available colour spaces, "
+                                        "so nothing was sent", "detail": current})
+        for param, command, _slot, layer in _COLOR_SPACE_SETTINGS:
+            value = values[param]
+            if value is None:
+                continue
+            names = current["available"].get(layer)
+            if not isinstance(names, list):
+                return json.dumps({"error": "couldn't read the %s colour space list" % layer})
+            match = [n for n in names if n.lower() == value.strip().lower()]
+            if not match:
+                return json.dumps({"error": "%s: unknown colour space %r (available: %s); "
+                                            "nothing was sent" % (param, value, names)})
+            if " " in match[0]:
+                return json.dumps({"error": "%s: %r contains a space, which this "
+                                            "connector can't send safely" % (param, match[0])})
+            commands.append((command, match[0]))
+    for param, command in _COLOR_SPACE_FLAG_COMMANDS:
+        if flags[param] is not None:
+            commands.append((command, int(flags[param])))
+    lw = _layout()
+    sent = []
+    try:
+        for command, value in commands:
+            lw._send_command(command, [value])
+            sent.append("%s %s" % (command, value))
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc), "sent": sent})
+    time.sleep(0.3)
+    state = _query("get_color_space")
+    return json.dumps({"sent": sent, "state": state.get("result", state)})
+
+
+@mcp.tool()
 def lw_get_render_options() -> str:
     """Read the Render Properties > Render tab settings LightWave
     exposes: `raytrace_shadows`/`_reflection`/`_refraction` (plus

@@ -564,9 +564,11 @@ each would add to the connector, most valuable first:
    confirmed live. `RenderMode(renderintegrator)` is left unwrapped -
    nothing in the UI it could be checked against. See `PLAN.md`
    "Render tab quality settings".
-4. **`ColorSpaceOutput` family.** Color management/OCIO-style output
-   control matters for accurate pipeline integration, but is a more
-   specialized need than AA or render-mode switching.
+4. **`ColorSpaceOutput` family - DONE.** `lw_get_color_space` /
+   `lw_set_color_space` cover every slot on the CS tab plus its four
+   checkboxes, confirmed live. Default Buffer can be set but not read
+   back (LightWave's reader returns nothing for it). See `PLAN.md`
+   "Colour space".
 5. **Enveloped (animated) node inputs in `lw_get_node_values`/
    `lw_set_node_input`** (Known misses #11). A completeness item for
    the node-value tools - narrower than anything above, since plain

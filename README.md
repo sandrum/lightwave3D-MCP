@@ -273,6 +273,8 @@ reliably fixes it.
 | `lw_abort_render()` | Abort an in-progress render. |
 | `lw_get_render_status()` | Get real render completion state and progress, not a time-based guess. |
 | `lw_set_render_globals(threads=, tile_size=)` | Set render thread count / tile size. |
+| `lw_get_color_space()` | Read every colour space setting (display, final render, file types, alpha, ...), the four CS checkboxes, and the colour spaces available. |
+| `lw_set_color_space(display=, final_render=, buffer=, embedded_alpha=, picked_colors=, light_color=, palette_files=, eight_bit_files=, float_files=, alpha=, auto_sense=, correct_opengl=, affect_picker=, convert_8bit_to_float=)` | Set colour spaces by name (e.g. `final_render="sRGB"`); unknown names are refused before anything is sent. |
 | `lw_get_render_options()` | Read the Render tab: raytrace shadows/reflection/refraction, recursion limits, diffuse bounces, reflection/refraction/SSS samples. |
 | `lw_set_render_options(raytrace_shadows=, raytrace_reflection=, raytrace_refraction=, ray_recursion_limit=, ..._recursion_limit=, diffuse_bounces=, ..._samples=, ray_precision=, polygon_intersection=, noise_filter=, despike=, despike_tolerance=)` | Set the Render tab's quality settings; reads back what LightWave exposes. |
 | `lw_get_antialiasing(camera=)` | Read a camera's antialiasing: min/max samples, adaptive sampling and threshold, filter radius, and the reconstruction filter. |
@@ -595,6 +597,17 @@ this is distilled from.
   exact frame count matters. Also fixed a real bug: the counter was
   continuing to climb across separate renders in the same session
   instead of resetting. See `PLAN.md` for the full investigation.
+- **Colour space** - `lw_get_color_space()` /
+  `lw_set_color_space(...)`, the Edit > General Options > CS tab.
+  Commands from Cmd History; several don't match their labels (Picked
+  Colors is `ColorSpaceSurfaceColor`, Display is `ColorSpaceViewer`,
+  Default Final Render is `ColorSpaceOutput`), and every one takes its
+  value although the stubs declare none, so they're sent raw. Names are
+  checked case-insensitively against LightWave's live list (Linear,
+  sRGB, rec709, Cineon, ciexyz; alpha slots only the first three)
+  before sending, and everything is read back via LWColorSpaceFuncs -
+  except Default Buffer, whose reader returns nothing. These are
+  preferences and didn't survive a Layout restart in testing.
 - **Render tab quality settings** - `lw_get_render_options()` /
   `lw_set_render_options(...)`: raytraced shadows/reflection/refraction,
   ray/transparency/reflection/refraction recursion limits, diffuse

@@ -287,6 +287,59 @@ def _get_render_options():
     return result
 
 
+_COLOR_SPACE_SLOTS = (
+    ("viewer", "lwcst_viewer"),
+    ("surface_color", "lwcst_surface_color"),
+    ("light_color", "lwcst_light_color"),
+    ("palette_files", "lwcst_palette_files"),
+    ("8bit_files", "lwcst_8bit_files"),
+    ("float_files", "lwcst_float_files"),
+    ("alpha_files", "lwcst_alpha_files"),
+    ("output", "lwcst_output"),
+    ("output_alpha", "lwcst_output_alpha"),
+    ("output_vpr", "lwcst_output_vpr"),
+    ("output_vpr_alpha", "lwcst_output_alpha_vpr"),
+    ("output_buffer", "lwcst_output_buffer"),
+)
+_COLOR_SPACE_FLAGS = (
+    ("auto_sense", "ColorSpaceAutoSense"),
+    ("correct_opengl", "ColorSpaceCorrectOpenGL"),
+    ("affect_picker", "ColorSpaceAffectPicker"),
+    ("8bit_to_float", "ColorSpace8BitToFloat"),
+)
+
+
+def _get_color_space():
+    """Colour space settings via LWColorSpaceFuncs (lwcolorspace.h) -
+    read-only calls only: colorSpaceName(type) for each of the twelve
+    LWCOLORSPACETYPES slots, getColorSpaceBoolean(name) for the four
+    checkboxes, and numberOfColorSpaces/nameOfColorSpaces per layer
+    (RGB, Alpha) for the names a slot can be set to. The header's own
+    setColorSpace/setColorSpaceBoolean are deliberately not used. Each
+    call is wrapped separately so one failing doesn't hide the rest."""
+    cs = lwsdk.LWColorSpaceFuncs()
+    result = {"slots": {}, "flags": {}, "available": {}}
+    for key, const in _COLOR_SPACE_SLOTS:
+        try:
+            result["slots"][key] = cs.colorSpaceName(getattr(lwsdk, const))
+        except Exception as exc:  # noqa: BLE001
+            result["slots"][key] = "error: %s" % exc
+    for key, name in _COLOR_SPACE_FLAGS:
+        try:
+            result["flags"][key] = cs.getColorSpaceBoolean(name)
+        except Exception as exc:  # noqa: BLE001
+            result["flags"][key] = "error: %s" % exc
+    for key, const in (("rgb", "lwcsl_RGB"), ("alpha", "lwcsl_Alpha")):
+        try:
+            layer = getattr(lwsdk, const)
+            count = cs.numberOfColorSpaces(layer)
+            result["available"][key] = [cs.nameOfColorSpaces(layer, i)
+                                        for i in range(min(count, 64))]
+        except Exception as exc:  # noqa: BLE001
+            result["available"][key] = "error: %s" % exc
+    return result
+
+
 def _get_light_info(name):
     """Same live-time fix as _get_camera_info.
 
@@ -1667,6 +1720,8 @@ def _handle_query(text):
             payload = {"result": _introspect()}
         elif command == "get_selection":
             payload = {"result": _get_selection()}
+        elif command == "get_color_space":
+            payload = {"result": _get_color_space()}
         elif command == "get_render_options":
             payload = {"result": _get_render_options()}
         elif command == "get_antialiasing":
