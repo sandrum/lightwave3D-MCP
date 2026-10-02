@@ -30,8 +30,9 @@ DEFAULTS = {
 
 
 def _read_env_file(path):
-    """Parse KEY=VALUE lines; blank lines and # comments are skipped, and
-    one pair of surrounding quotes is stripped from a value."""
+    """Parse KEY=VALUE lines; blank lines and # comments are skipped, one
+    pair of surrounding quotes is stripped from a value, and an empty
+    value counts as unset (so the default applies)."""
     values = {}
     if not os.path.exists(path):
         return values
@@ -45,7 +46,8 @@ def _read_env_file(path):
             value = value.strip()
             if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
                 value = value[1:-1]
-            values[key] = value
+            if value:
+                values[key] = value
     return values
 
 

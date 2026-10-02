@@ -92,6 +92,38 @@ of the same name overrides `.env`. After changing a value, restart
 Claude Desktop **and** reload the LightWave scripts (or restart Layout).
 The ports and folders shown in the steps below are the defaults.
 
+**`.env` file format**
+
+- One setting per line, as `KEY=value`. Spaces around the `=` are
+  ignored.
+- Lines starting with `#` are comments; blank lines are ignored.
+- Quotes are optional: `LW_MCP_HOST="127.0.0.1"` and
+  `LW_MCP_HOST=127.0.0.1` mean the same thing.
+- Any setting you leave out (or leave empty) keeps its default, so your
+  `.env` only needs the lines you want to change.
+- In `LW_MCP_EXCHANGE_DIR`, `~` and `%VARIABLES%` are expanded, and the
+  folder is created if it doesn't exist.
+
+To create it from Git Bash instead of Command Prompt/PowerShell:
+
+```
+cp .env.example .env
+```
+
+**Where it has to be.** `.env` is read from the folder that contains
+`lw_mcp_config.py` - the repo folder. So load the LightWave scripts
+(`lw_enable_command_port.py`, `lw_mcp_ring.py`, ...) straight from the
+repo folder: a copy of a script placed somewhere else won't find
+`lw_mcp_config.py` or your `.env`.
+
+**If a value is wrong.** A setting that can't be used - for example a
+port that isn't a number - stops `server.py` or the LightWave script
+with an error naming the setting and the `.env` file it came from, e.g.
+`LW_MCP_MODELER_PORT must be a port number, got 'abc' (check
+C:\path\to\LightwaveMCP\.env)`. A port that LightWave can't use shows
+up as `lw_enable_command_port.py` reporting "FAILED to enable" instead
+of the `(CP: ...)` title bar.
+
 ### Quick Start
 
 **1. Enable the Command Port (once per Layout session)**
