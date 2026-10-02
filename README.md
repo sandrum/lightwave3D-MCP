@@ -59,15 +59,38 @@ leaving the chat.
 - LightWave 3D 2019.1.5 (Layout, and optionally Modeler)
 - Python 3.x
 - Claude Desktop
+- Windows (developed and tested) or macOS (expected to work, untested -
+  see below)
+
+### Platform support
+
+Everything here was developed and tested on **Windows**. **macOS** is
+expected to work but has **not been tested**: LightWave 2019 runs on
+both, `server.py` is plain Python talking to LightWave over the network
+on `localhost`, every path is built with Python's portable path
+functions, and the bundled `lwcommandport` client handles macOS itself
+(its only Windows-specific code - registry lookup for *launching*
+LightWave - isn't used here). The open question is whether macOS
+LightWave exposes every SDK call the LightWave-side scripts use in the
+same way. If you try it on a Mac, an issue reporting how it went is very
+welcome. Where the steps differ by platform, both are shown.
 
 ### Configuration (optional)
 
 Everything works out of the box with the defaults below. To change them,
 copy `.env.example` to `.env` in the repo folder and edit it - `.env` is
-git-ignored, so your values stay on your machine:
+git-ignored, so your values stay on your machine. From the repo folder:
+
+Windows (Command Prompt or PowerShell):
 
 ```
 copy .env.example .env
+```
+
+macOS (Terminal), or Git Bash on Windows:
+
+```
+cp .env.example .env
 ```
 
 | Setting | Default | What it is |
@@ -83,7 +106,10 @@ repo folder:
 ```
 LW_MCP_LAYOUT_PORT=9835
 LW_MCP_MODELER_PORT=9836
+# Windows:
 LW_MCP_EXCHANGE_DIR=%TEMP%\lightwave_mcp
+# macOS (use this line instead of the one above):
+# LW_MCP_EXCHANGE_DIR=~/lightwave_mcp
 ```
 
 Both sides read the same file through `lw_mcp_config.py`: `server.py`
@@ -101,14 +127,9 @@ The ports and folders shown in the steps below are the defaults.
   `LW_MCP_HOST=127.0.0.1` mean the same thing.
 - Any setting you leave out (or leave empty) keeps its default, so your
   `.env` only needs the lines you want to change.
-- In `LW_MCP_EXCHANGE_DIR`, `~` and `%VARIABLES%` are expanded, and the
-  folder is created if it doesn't exist.
-
-To create it from Git Bash instead of Command Prompt/PowerShell:
-
-```
-cp .env.example .env
-```
+- In `LW_MCP_EXCHANGE_DIR`, `~` (your home folder) and environment
+  variables - `%TEMP%` style on Windows, `$TMPDIR` style on macOS - are
+  expanded, and the folder is created if it doesn't exist.
 
 **Where it has to be.** `.env` is read from the folder that contains
 `lw_mcp_config.py` - the repo folder. So load the LightWave scripts
@@ -186,9 +207,20 @@ not any printed result.
 pip install "mcp[cli]" --break-system-packages
 ```
 
+On macOS, use `pip3` if `pip` isn't found.
+
 **6. Point Claude Desktop at `server.py`**
 
-In `claude_desktop_config.json`:
+Open Claude Desktop's config file - Settings → Developer → Edit Config
+opens it directly. It lives at:
+
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+Add the `lightwave` server, using the absolute path of your own clone of
+this repo.
+
+Windows (JSON needs each backslash doubled, or use forward slashes):
 
 ```json
 {
@@ -201,9 +233,22 @@ In `claude_desktop_config.json`:
 }
 ```
 
-Replace `C:\path\to\LightwaveMCP` with the absolute path of your own
-clone of this repo (JSON needs each backslash doubled, or use forward
-slashes).
+macOS (`python3`, since macOS has no `python` command by default):
+
+```json
+{
+  "mcpServers": {
+    "lightwave": {
+      "command": "python3",
+      "args": ["/path/to/LightwaveMCP/server.py"]
+    }
+  }
+}
+```
+
+If Claude Desktop can't start the server, give the full path to your
+Python instead of `python`/`python3` (`where python` on Windows,
+`which python3` on macOS).
 
 Restart Claude Desktop.
 
@@ -216,8 +261,9 @@ should reflect the live scene.
 
 If you ever see writes silently stop working (success responses but
 nothing appears in Layout), suspect a hung or duplicate Layout process
-first - Windows can end up running more than one `Layout.exe`
-simultaneously, with the MCP query listener bound to a stale one while
+first - more than one Layout process can end up running
+simultaneously (seen on Windows as several `Layout.exe` entries in Task
+Manager), with the MCP query listener bound to a stale one while
 the visible window is a different, disconnected process. Check the
 Scene Editor (Utilities → Editors → Scene Editor) against query
 responses to catch this; a clean restart of all Layout processes
