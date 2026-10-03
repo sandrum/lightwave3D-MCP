@@ -76,13 +76,13 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    sends first) before the object's regular ID became reliable on its
    own for the rest of the session. Shipped with the best available
    fix (resolve to numeric ID rather than trust the name, matching
-   every other tool here) and an honest, documented limitation rather
+   every other tool here) and a documented limitation rather
    than a guessed formula for the scoped ID - see `PLAN.md` "Scene file
    I/O" for the full investigation and why baking in an unverified
    pattern from one data point would have been worse than admitting
    the gap.
 
-4. **Camera property writes - DONE, with an honest open sub-item.**
+4. **Camera property writes - DONE, with an open sub-item.**
    Shipped `lw_set_camera`, wrapping `ZoomFactor`/`LensFStop`/
    `ApertureHeight`/`ShutterOpen`/`ShutterEfficiency`/`RollingShutter`
    into one call (following `lw_set_keyframe`'s bundled-optional-params
@@ -218,7 +218,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    argument-less toggles (Cmd History logged them bare after clicking
    the real checkboxes) - no stub fix needed, and no way to set/read a
    known state, so `lw_toggle_ik_flag` flips rather than sets, the same
-   honest limitation as the Light toggles. Real precondition found:
+   limitation as the Light toggles. Real precondition found:
    "Full-time IK" is grayed out until the item has a Goal Object
    assigned - LightWave auto-checks it as a side effect of the goal
    assignment itself, no separate command needed.
@@ -263,7 +263,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    stayed fully responsive both times, confirmed via screenshot, and a
    subsequent `lw_ping` succeeded immediately), and shipped `setFlt` as
    a permanently-disabled stub rather than guess at a fix - the same
-   "confidently wrong code is worse than an honest gap" call this
+   "confidently wrong code is worse than a known gap" call this
    project has made before.
 
    **That diagnosis turned out to be wrong**, caught before this was

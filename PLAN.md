@@ -1199,8 +1199,8 @@ selection once, its regular numeric ID becomes reliable afterward.
 would predict this exact value - but that's one data point. Committing
 an unverified numeric formula into a tool other work will depend on
 risks a repeat of this project's `LWChannelInfo`/`nextGroup` lesson in
-spirit if not in severity: confidently wrong code is worse than an
-honest gap. `lw_save_object` ships with the best *confirmed* fix
+spirit if not in severity: confidently wrong code is worse than a
+known gap. `lw_save_object` ships with the best *confirmed* fix
 (resolve to the object's real numeric ID rather than trust
 `SelectItem(name)`, consistent with every other tool in this
 connector) and a clearly documented limitation for the untested case,
@@ -1371,8 +1371,8 @@ returns the identical stale value, so there's nothing to branch on.
 Reverted to the plain one-argument call and documented this as an open,
 un-worked-around limitation in `lw_mcp_ring.py`'s `_get_light_info`
 rather than shipping speculative two-argument code that provided no
-actual benefit - matches this project's standing preference for an
-honest documented gap over a guessed fix that doesn't demonstrably help.
+actual benefit - matches this project's standing preference for a
+documented gap over a guessed fix that doesn't demonstrably help.
 
 **`LightVisibleToCamera`/`LightCastsShadows` - suspected bug, live
 verification proved it wrong.** Given the `MotionBlur`/
@@ -1581,7 +1581,7 @@ screenshot and matching Cmd History entries.
 Note for a future session: `Bone2`'s ID is `"40010000"` - the EXACT
 same value as the unexplained "differently-scoped" `SelectItem 40010000`
 Cmd History showed during item 3's investigation (see "Scene file I/O"
-above), which was left as an honest documented gap rather than a
+above), which was left as a documented gap rather than a
 guessed formula (`40000000 + index * 10000`, since `connector_01` was
 the 2nd object loaded that session, index 1). Here, `Bone2` is also the
 2nd bone in its chain (index 1), and also landed on `40010000` -
@@ -1664,7 +1664,7 @@ guess at a workaround - an "edit-session bracket" or different
 threading/marshaling approach was briefly considered but never
 attempted, since `LWSurfaceFuncs`'s own method list showed no
 `editBegin`/`editEnd`-style methods to base such a guess on, and this
-project's norm is an honest documented gap over confidently wrong code.
+project's norm is a documented gap over confidently wrong code.
 
 **That diagnosis was wrong, caught before it was finalized - a real,
 useful methodology lesson.** Before considering item 8 closed as a
@@ -2091,7 +2091,7 @@ end to end, after the consolidation - all matched the values already
 confirmed during the staged investigation, proving the cleanup
 introduced no regressions.
 
-**Honest, confirmed limitation to carry forward**: only parameters with
+**Confirmed limitation to carry forward**: only parameters with
 an existing envelope are readable. This is real value (anyone who has
 already set up keyframed shader parameters, e.g. an animated Roughness
 sweep, can now read that data back), but it does not yet answer "what
@@ -2162,7 +2162,7 @@ confirmed in this install's dropdown, so passing an unconfirmed integer
 is explicitly at the caller's own risk.
 
 **A real UI freeze occurred during live testing of both new tools,
-worth recording honestly even though it was never root-caused.** After
+worth recording even though it was never root-caused.** After
 calling `lw_toggle_object_visibility(item="connector_01",
 flag="unseen_by_camera")` and `lw_set_alpha_channel_mode(item=
 "connector_01", mode=1)` back to back through the actual wrapped tools
@@ -2188,7 +2188,7 @@ LightWave close/reopen and scene reload, with no corruption - Object
 Properties for `connector_01` displayed normally afterward, all four
 toggles correctly reset to their saved (unchecked) state, and both new
 tools were still functioning correctly post-recovery. Recorded as an
-honest operational note, not a confirmed root cause - if this recurs
+operational note, not a confirmed root cause - if this recurs
 under more controlled conditions in a future session, especially
 isolated to one specific command, it deserves the same staged
 investigation this project has given its two confirmed real crashes.
@@ -2251,10 +2251,10 @@ Carlo" as a `Type` choice in this install - no distinct "Monte Carlo
 Interpolated" *mode* (as opposed to the "Interpolated" checkbox, which
 is evidently a different, narrower thing) was ever reachable to select,
 despite the error message referencing that exact name. Left as an
-honest, unresolved gap - shipped `lw_set_gi_radiosity_tolerance` anyway
+unresolved gap - shipped `lw_set_gi_radiosity_tolerance` anyway
 since the argument itself is confirmed correct (the same call succeeded
 without an argument-count error both times), following the same
-"ship the legitimate write, document the precondition honestly" call
+"ship the legitimate write, document the precondition" call
 `lw_set_camera` made for its Motion-Blur-gated shutter properties before
 that gap was later closed.
 
@@ -2360,7 +2360,7 @@ different from every other color command tested this session
 `FogType`'s own initial staleness (which turned out to just need a UI
 interaction to redraw, not a real failure). Ambiguous whether
 this is a real no-op specific to `FogColor` or just a redraw quirk that
-would resolve with more UI interaction - left as an honest, explicitly
+would resolve with more UI interaction - left as an explicitly
 flagged unconfirmed gap in `lw_set_fog`'s docstring rather than either
 overclaiming success or dropping the parameter entirely.
 
@@ -2381,7 +2381,7 @@ this pass - deliberately left for a future session rather than further
 extending an already-large item.
 
 `ROADMAP3.md` item 4 is closed for backdrop and fog, with `FogColor`'s
-gap honestly documented rather than resolved.
+gap documented rather than resolved.
 
 ## Deeper bone rigging (ROADMAP3.md item 6)
 
@@ -2436,7 +2436,7 @@ with `AddBone`/`AddChildBone`-attached bones, no real mesh geometry or
 vertex maps at all - there was never a real weight map named
 "TestWeightMap" for the dropdown to match against. Documented as
 likely-correct-by-signature (matching the confirmed `(name)` argument
-shape) rather than independently verified, honest about the test rig's
+shape) rather than independently verified, given the test rig's
 own limitation rather than claiming success or failure either way.
 
 **`BoneLimitedRange` confirmed a real toggle that gates real

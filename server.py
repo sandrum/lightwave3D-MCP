@@ -330,7 +330,7 @@ def lw_save_object(name: str, filename: str) -> str:
     lw_get_item_id) before the object's own numeric ID reliably takes
     effect afterward. That scoped ID's exact derivation is unconfirmed
     from a single data point, so it is NOT reproduced here - baking in
-    an unverified formula would be worse than an honest limitation. If
+    an unverified formula would be worse than a known limitation. If
     this silently saves the wrong object (check lw_get_selection
     before relying on the result), click the target object once in
     Layout's Scene Editor or viewport first, then retry - this appears
@@ -751,7 +751,7 @@ def lw_get_node_channel(surface: str = "CONNECTOR", node: str = "Principled BSDF
     Confirmed live end to end: after enveloping Principled BSDF's
     "Roughness", this correctly read back value 0.1 at frame 0, matching
     the UI's "10.0%" exactly. Reports "channel not found" for any
-    parameter that hasn't been enveloped - the honest current boundary,
+    parameter that hasn't been enveloped - the current boundary,
     not a bug."""
     return json.dumps(_query("get_node_channel", "%s|%s|%s" % (surface, node, channel)))
 
@@ -2195,7 +2195,7 @@ def lw_toggle_bone_flag(item: str, flag: str) -> str:
     definitive test, not just a UI guess: passing an explicit argument
     to any of them raises a clean Python arg-count error from the stub
     itself, e.g. "takes 1 positional argument but 2 were given" -
-    proving the real command underneath truly takes none). No way to
+    proving the real command underneath takes none). No way to
     read current state back for any of them, so this flips rather than
     sets. `BoneActive` (Bone Active checkbox) defaulted to unchecked on
     a freshly-created bone in this test rig - a bone can exist and be

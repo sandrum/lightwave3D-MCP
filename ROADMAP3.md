@@ -64,7 +64,7 @@ checking Cmd History against a real UI click first.
    investigation.
 
 2. **Node Editor / surface & light node graphs, especially PrincipledBSDF
-   nodes - DONE for reading, a real limitation found and honestly
+   nodes - DONE for reading, a real limitation found and
    documented.** Shipped three tools: `lw_get_surface_nodes(surface)`
    (list every node in a surface's graph), `lw_get_node_inputs(surface,
    node)` (list a specific node's parameter names), and
@@ -115,7 +115,7 @@ checking Cmd History against a real UI click first.
    the real value (`0.1`, matching the UI's "10.0%" for Roughness
    exactly).
 
-   **Confirmed, honest limitation**: only *enveloped* parameters are
+   **Confirmed limitation**: only *enveloped* parameters are
    readable today - a fresh, never-touched Principled BSDF parameter has
    no value reachable through this connector, only a name. Writing
    (creating envelopes/keys, or connecting nodes) was out of scope for
@@ -124,7 +124,7 @@ checking Cmd History against a real UI click first.
    the complete nine-step investigation.
 
 3. **Render Globals / GI / quality settings - DONE for the confirmed
-   subset, with two honest open findings.** Shipped
+   subset, with two open findings.** Shipped
    `lw_set_render_globals(threads=, tile_size=)`,
    `lw_toggle_global_illumination()`, `lw_set_gi_interpolated(enabled)`,
    and `lw_set_gi_radiosity_tolerance(degrees)`. Closes the biggest
@@ -149,7 +149,7 @@ checking Cmd History against a real UI click first.
    mode reachable to select, even after enabling GI and Interpolated
    mode. Shipped anyway (the argument itself is confirmed correct),
    following `lw_set_camera`'s Motion-Blur-gated-shutter-properties
-   precedent, with the gap honestly documented rather than papered over.
+   precedent, with the gap documented.
 
    **`EnableRadiosity1` - DONE, definitively resolved.** Calling it live
    popped LightWave's own error dialog: "Unknown command:
@@ -316,7 +316,7 @@ checking Cmd History against a real UI click first.
    `BoneWeightMapOnly`/`BoneStrengthMultiply` also confirmed real
    toggles in the same sweep, via a new definitive test worth carrying
    forward: passing an explicit argument to a suspected toggle raises a
-   clean Python arg-count error from the stub itself if it's truly
+   clean Python arg-count error from the stub itself if it's
    bare - stronger evidence than any UI observation, since it directly
    probes the wrapped method's real signature. `BoneWeightMapOnly` also
    revealed a real precondition via LightWave's own error dialog: "This
@@ -415,7 +415,7 @@ discovery almost exactly. Item 3 (render globals) surfaced a new,
 concrete example of this project's "one-way, no delivery guarantee"
 Command Port caveat actually manifesting as a wrong logged value, not
 just a theoretical risk. Item 4 (scene environment) found a real,
-still-unresolved `FogColor` write gap, documented honestly rather than
+still-unresolved `FogColor` write gap, documented rather than
 hidden. Item 5 (visibility flags) found both a real stub bug
 (`UnseenByAlphaChannel`) and that it wasn't even the boolean its name
 suggested. Item 6 (bone rigging) found the separate "Bones
@@ -444,10 +444,9 @@ writes are, rather than just not yet found.
 
 ## Known misses - open gaps to revisit later
 
-Honest, still-unresolved gaps accumulated across `ROADMAP2.md`,
-`ROADMAP3.md`, and this session's follow-up sweep. None of these are
-guessed-at or silently swept aside - each is documented in the relevant
-tool's own docstring - but they're worth a consolidated list so a
+Still-unresolved gaps accumulated across `ROADMAP2.md`,
+`ROADMAP3.md`, and this session's follow-up sweep. Each is documented in
+the relevant tool's own docstring, but they're worth a consolidated list so a
 future session (with a richer test rig, a different LightWave install,
 or just fresh eyes) knows exactly where to start digging rather than
 re-discovering them from scratch.

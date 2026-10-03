@@ -787,7 +787,7 @@ def _get_node_channel(surf_name, node_name, channel_name):
     "Roughness" via the Graph Editor, this correctly read back
     {"value": 0.1, "frame": 0.0, ...}, matching the UI's "10.0%" exactly.
     Real, confirmed limitation: reports "channel not found" for any
-    parameter that hasn't been enveloped - this is the honest boundary
+    parameter that hasn't been enveloped - this is the boundary
     of what's readable today, not a bug to work around."""
     envelopes = _node_envelopes(surf_name, node_name)
     if "error" in envelopes:

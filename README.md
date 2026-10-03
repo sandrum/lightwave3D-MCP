@@ -49,7 +49,7 @@ leaving the chat.
   real, running LightWave 2019.1.5 session (screenshots, Cmd History, and
   LightWave's own error dialogs as ground truth), never assumed from static
   SDK docs alone. See `PLAN.md` for the full investigation log and `README`'s
-  own "Detailed Tool Notes" section below for the honest caveats that came
+  own "Detailed Tool Notes" section below for the caveats that came
   out of it.
 
 ## Installation
@@ -414,7 +414,7 @@ reliably fixes it.
 | `lw_set_keyframe(name, frame, position=, rotation=, scale=)` | Create a keyframe for an item at a given frame. |
 
 See "Detailed Tool Notes" below for what each tool's confirmed-live
-behavior, real preconditions, and honest open caveats actually are - the
+behavior, real preconditions, and open caveats actually are - the
 table above is a quick reference, not the full story.
 
 ## Example Workflow
@@ -463,11 +463,11 @@ tools shown above.
 
 ## Detailed Tool Notes (confirmed-live findings & caveats)
 
-Everything below is the full, honest write-up behind the tool table above -
+Everything below is the full write-up behind the tool table above -
 what was actually confirmed live against a running LightWave 2019.1.5
 session (screenshots, Cmd History, and LightWave's own error dialogs as
 ground truth), every real precondition found, and every gap that's still
-open rather than papered over. See `PLAN.md` for the complete build log
+open. See `PLAN.md` for the complete build log
 this is distilled from.
 
 **Layout writes**
@@ -766,7 +766,7 @@ this is distilled from.
   error dialog references a "Monte Carlo Interpolated" mode this
   install's Type dropdown never actually offered as a selectable option
   - shipped anyway since the argument itself is confirmed correct,
-  documented honestly rather than hidden. `EnableRadiosity1` (a sibling
+  documented rather than hidden. `EnableRadiosity1` (a sibling
   of the wrapped `EnableRadiosity0`) is definitively resolved as
   non-existent: calling it live popped LightWave's own error dialog,
   "Unknown command: 'EnableRadiosity1'" - proof, not a guess, that
@@ -1052,7 +1052,7 @@ install's dropdown offered). Shipped as its own tool rather than folded
 into the boolean toggles, where it would have been misleading. A UI
 freeze occurred during live testing of these two tools, not clearly
 attributable to either (both had already logged cleanly beforehand) -
-see `PLAN.md` "Per-object render-visibility flags" for the honest
+see `PLAN.md` "Per-object render-visibility flags" for the
 writeup.
 
 ## Files
