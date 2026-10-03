@@ -2,8 +2,9 @@
 
 A quick-glance summary. For the full build log and evidence behind
 every claim below, see `PLAN.md`; for the increment-by-increment
-history and rationale, see `ROADMAP.md`; for setup and the current
-tool list, see `README.md`.
+history and rationale, see `ROADMAP.md`; for setup, see
+[GETTING_STARTED.md](GETTING_STARTED.md), and for the full tool list,
+[USAGE.md](USAGE.md).
 
 ## Where this stands
 
@@ -16,7 +17,7 @@ this project's docs are demonstrably out of sync with this build in
 places, so nothing here is trusted until it's been tested against the
 real thing.
 
-**Working today** (see `README.md` for the full tool-by-tool list):
+**Working today** (see [USAGE.md](USAGE.md) for the full tool-by-tool list):
 - Layout writes: create items, run any of the ~800 native commands,
   keyframe animation.
 - Layout reads: scene info, selection, camera/light info, transform,

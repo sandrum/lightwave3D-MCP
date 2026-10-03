@@ -3365,7 +3365,7 @@ header now unpacked locally and Cmd History:
 So the reader was never wrong: the open panel was. Every earlier test
 had kept Light Properties open to watch the change. `lw_set_light` now
 refuses `falloff_type` values other than 0/1, and both light tools'
-descriptions (plus README) warn to close Light Properties before
+descriptions (plus USAGE.md) warn to close Light Properties before
 changing falloff.
 
 ## Animated node inputs (ROADMAP3.md Known misses #11)

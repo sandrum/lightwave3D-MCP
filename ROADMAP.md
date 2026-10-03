@@ -3,8 +3,8 @@
 Context: the core connector is done and verified live - Layout writes
 (`lw_create_null`, `lw_run_command`) and Layout reads (`lw_ping`,
 `lw_get_scene_info`, via the `LWComRing`-based `lw_mcp_ring.py`) all work
-end to end. See `PLAN.md` for how that was proven and `README.md` for
-setup. This doc lists the realistic next increments, in the order I'd
+end to end. See `PLAN.md` for how that was proven and
+[GETTING_STARTED.md](GETTING_STARTED.md) for setup. This doc lists the realistic next increments, in the order I'd
 tackle them, with why.
 
 ## 1. More Layout read queries - DONE
