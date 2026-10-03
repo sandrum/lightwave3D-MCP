@@ -128,7 +128,7 @@ the tool's own "success" response:
 - Frame 15 (midpoint): Position readout `3.104m, 3.104m, 3.104m` - not
   the linear midpoint (2.5), consistent with Layout's default TCB spline
   interpolation kicking in between the two keys. This is the real proof:
-  the item is genuinely animating between keyframes, not just being
+  the item is animating between keyframes, not just being
   written to twice.
 
 One documented unit mismatch: `lw_set_keyframe`'s `rotation` argument is
@@ -357,7 +357,7 @@ working:
   list).
 - **`ModCommand.execute()`'s reported result code is unreliable.**
   Enabling the port returned `result=0` ("failure" per NewTek's own
-  sample comment) both when the port was genuinely free and when it was
+  sample comment) both when the port was free and when it was
   already successfully bound and listening. Confirmed via a UDP
   bind-conflict test (the same ground-truth trick used earlier to debug
   Layout's Command Port) that the enable actually succeeded regardless
@@ -632,7 +632,7 @@ opening a dialog. `SelectItem` is the one exception: its own Cmd
 History entries (`SelectItem 10000003` for a name-based call) prove its
 command handler really does resolve names to IDs internally, unlike
 this family. This inconsistency across LightWave's native commands
-appears to be a genuine, longstanding NewTek API quirk, not something
+appears to be a real, longstanding NewTek API quirk, not something
 introduced by this connector.
 
 The IDs are sequential per item, assigned in creation order starting
@@ -835,7 +835,7 @@ multi-frame `lw_render_scene()` render, or jumps straight to done, or
 stalls - flagged as untested since ROADMAP.md item 6 shipped. Involved
 real environment trouble across several sessions (a full computer
 restart mid-investigation, a stale two-python-process situation, and a
-genuinely locked plug-in file) on top of the actual technical
+locked plug-in file) on top of the actual technical
 questions - worth recording the process, not just the final answer.
 
 **Setup friction before any real testing could start:** `FirstFrame(0)`/
@@ -1006,7 +1006,7 @@ else worth leveraging. It hadn't, on either count:
   `Ring()`'s doubled-brace format-string bug (`"{{0}} {1}".format(...)`
   producing a literal `"{0} message"`), and `SetRenderDisplay(self)`
   taking zero arguments despite the native command accepting one. Both
-  are apparently genuine, longstanding bugs in NewTek's own bundled SDK
+  are apparently real, longstanding bugs in NewTek's own bundled SDK
   sample code, uncaught anywhere else and carried forward unfixed even
   in the current 2025 distribution.
 - Modeler's command surface (`lwcommandport/modeler/__init__.py`) is
@@ -1042,7 +1042,7 @@ than just trusting Cmd History's logged IDs:
    `SelectItem 20000000` / `IncludeObject 10000000` (correctly resolved
    IDs). Screenshot of Light Properties > Objects tab confirmed
    `BoneTestObject` listed with the "Exclude" checkbox unchecked - i.e.
-   genuinely in Include mode, not just "some entry appeared."
+   in Include mode, not just "some entry appeared."
 2. `lw_exclude_object_light("BoneTestObject", "Light")` - the same
    relationship, set from the *other* item's side via the *other*
    native command (`ExcludeLight` instead of `ExcludeObject`).
@@ -1207,7 +1207,7 @@ connector) and a clearly documented limitation for the untested case,
 rather than a plausible-looking guess. With `SaveObject` finally
 targeting the right item (once activated), the saved file was checked
 byte-level, not just its existence: a real `FORM....LWO3TAGS` header
-followed by genuine surface/tag data (`connector.lwo`, `CONNECTOR`,
+followed by real surface/tag data (`connector.lwo`, `CONNECTOR`,
 `Generic_CreateConnector`) - a valid, non-corrupted LWO3 file.
 
 **Follow-up worth doing, not attempted this session:** test the
@@ -1243,7 +1243,7 @@ setting `aperture_height` alone (0.6) changed `focal_length_mm` from
 **`f_stop` silently no-op'd on the first attempt** - set to 2.8, but
 `lw_get_camera_info` still read back the old 4.0. Not a repeat of any
 previously-known failure mode (numeric ID was already correct, per the
-fix above) - a genuinely new kind of problem: a real LightWave
+fix above) - a new kind of problem: a real LightWave
 precondition, not a connector bug. Confirmed by triggering the same
 write via `lw_run_command` directly and asking the user to check for a
 popup: "This option only applies when Depth of Field is turned on."
@@ -1395,7 +1395,7 @@ switching Light Type and finding it becomes clickable under Spot or
 Distant only) and clicked live. Cmd History showed a bare
 `LightVisibleToCamera` with no argument following. Same test for "Cast
 Shadows" (Light Properties > Shadows tab) showed a bare
-`LightCastsShadows`, also no argument. Both are genuine argument-less
+`LightCastsShadows`, also no argument. Both are real argument-less
 toggles - the original docstring's claim before this investigation
 turned out to be correct, and the stub needed no fix. This is exactly
 the scenario the project's live-verification norm exists to prevent
@@ -1444,7 +1444,7 @@ Object category down to one, confirmed only that one was
 `selected: true`, then `AddToSelection(second Object's id)`.
 `lw_get_selection` correctly showed BOTH Objects as `selected: true`
 simultaneously afterward, and a live Scene Editor screenshot confirmed
-both rows were genuinely highlighted, not a read-side illusion. Tested
+both rows were highlighted, not a read-side illusion. Tested
 `RemoveFromSelection` the same way - correctly dropped one item back to
 `selected: false` while leaving the other selected.
 
@@ -1461,7 +1461,7 @@ then removed it again, both correctly reflected in `lw_get_selection`.
 
 **The real finding, and why this doesn't fully deliver on the item's
 original hope.** Tested whether a write command would apply to the
-whole selection once two items were genuinely multi-selected: sent
+whole selection once two items were multi-selected: sent
 `AddPosition(1, 0, 0)` with both `BoneTestObject` and
 `lightwavemcp_test_object_out` reading `selected: true`. Only
 `lightwavemcp_test_object_out` (the one most recently touched, via
@@ -1499,11 +1499,11 @@ real `*args` and an argument-count check - no repeat of the
 command family. Five candidates were wrapped bare, no arguments at
 all: `UnaffectedByIK`, `EnableIK`, `EnableDeformations`, `EnableMC`,
 `FullTimeIK` - the same shape that's turned out to be a real bug three
-times this phase and a genuine toggle twice. Only investigated the two
+times this phase and a real toggle twice. Only investigated the two
 this item's own description actually named (`FullTimeIK`,
 `UnaffectedByIK`) rather than chasing all five blind.
 
-**Both confirmed live as genuine argument-less toggles, matching the
+**Both confirmed live as real argument-less toggles, matching the
 `LightVisibleToCamera` precedent, not the `MotionBlur` one.** Selected
 a real bone (`Bone1`, part of an actual `BoneTestObject`/`Bone1`/`Bone2`
 chain) and opened Motion Options > IK and Modifiers. Clicked
@@ -1588,7 +1588,7 @@ the 2nd object loaded that session, index 1). Here, `Bone2` is also the
 completely independent contexts (one-time object-selection activation
 vs. a bone's permanent item ID) producing the identical number for
 "index 1" is real, if still circumstantial, support for that formula
-being a genuine general LightWave convention (some kind of
+being a real general LightWave convention (some kind of
 position-within-a-collection ID scheme), not coincidence. Still only
 two data points from two different phenomena, not a confirmed formula
 for item 3's original object-selection case specifically - worth the
@@ -1601,7 +1601,7 @@ since it's new, separate scope from item 7.
 ## Surface/material writes (ROADMAP2.md item 8)
 
 Goal: `lw_set_surface`, the write-side counterpart to
-`lw_get_surface_info`. Genuinely new territory going in: `SurfaceEditor`
+`lw_get_surface_info`. New territory going in: `SurfaceEditor`
 in the command list just opens the UI panel, it takes no settable
 arguments, so there is no native Command Port command for this at all -
 the real path is `lwsdk.LWSurfaceFuncs()`'s setter methods, the same
@@ -1617,7 +1617,7 @@ pre-existing but unexposed `_introspect()` diagnostic already in
 session, since this SDK's Python bindings have already been found to
 diverge from the C docs more than once (`byName`/`getFlt` return plain
 Python lists/floats, not C-style out-params). Confirmed live:
-`LWSurfaceFuncs` genuinely exposes `setFlt`/`setColorVMap`/`setImg`/
+`LWSurfaceFuncs` exposes `setFlt`/`setColorVMap`/`setImg`/
 `setMaterial`/`setInt`/`setShadingModel`/`setTex` as real bound methods,
 not just a C-docs claim - `setFlt` (the counterpart to `getFlt`, already
 used for every scalar `lw_get_surface_info` field, including the vec3
@@ -1703,7 +1703,7 @@ broken. Reloaded the plugin and re-verified live from scratch, not just
 trusting the fix on paper: `diffuse=0.5` alone first - Surface Editor
 screenshot showed "Diffuse 50.0%", `lw_get_surface_info` read back
 `0.5`. Then `color=[1,0,0]` + `glossiness=0.8` together in one call -
-screenshot showed a genuinely red color swatch (255/0/0, "Glossiness
+screenshot showed a red color swatch (255/0/0, "Glossiness
 80.0%" visible though grayed out, a real precondition since Specular
 was 0% - not a sign of a problem), both matching `lw_get_surface_info`'s
 read-back exactly. `setFlt(surf, SURF_COLR, (r,g,b))` accepting a plain
@@ -1716,7 +1716,7 @@ crash (message logged, then silence) does not by itself prove the same
 failure mode recurred. The two situations can look identical from the
 log's point of view while having completely different root causes -
 here, a transport-level parsing bug that never reached the SDK call at
-all, versus `LWChannelInfo`'s genuine, immediate native crash. The fix
+all, versus `LWChannelInfo`'s real, immediate native crash. The fix
 that actually mattered was writing the smallest possible standalone
 reproduction of the specific mechanism in question (a three-line regex
 test) rather than re-testing the same live symptom again and trusting a
@@ -1745,7 +1745,7 @@ disabled stub since ROADMAP.md item 1b, blocked "until NewTek's actual
 SDK docs/header... can be consulted, or until someone finds a working
 reference sample."
 
-**A genuinely new lead, found by reviewing an unrelated introspection
+**A new lead, found by reviewing an unrelated introspection
 dump.** The original crash passed an item's own `NodeID` (from
 `LWItemInfo`, e.g. via `_find_item`) as `nextGroup`'s first argument -
 this was always just "the only ID this connector had on hand," never
@@ -1766,7 +1766,7 @@ previously-untested call in this SDK area:**
    `target()`/`goal()`/`pole()`). Called it and reported its `repr()`/
    `type()` without ever touching `LWChannelInfo`. Confirmed live:
    returns a `NodeID`-typed SWIG object - same *type* as an item's own
-   ID, but a genuinely different underlying handle (different memory
+   ID, but a different underlying handle (different memory
    address), a real, distinct value worth trying.
 
 2. **The single cautious call, explicitly approved first.** Asked the
@@ -1831,7 +1831,7 @@ previously-untested call in this SDK area:**
    Every test so far only ever asked for the *first* result
    (`prev=None`). Explicitly flagged this gap and asked before testing
    it. Confirmed live, with the user's go-ahead: a second call to
-   `nextChannel(group, first_channel)` returned a genuine second channel
+   `nextChannel(group, first_channel)` returned a real second channel
    (`"Position.Y"` - the pattern continues correctly, not a one-shot
    fluke), and a second call to `nextKey(envelope, first_key)` on a
    channel with only one implicit key returned Python `None` cleanly -
@@ -1861,7 +1861,7 @@ clean baseline case. Then created a fresh Null
 (position `[0,0,0]`) and frame 30 (position `[10,5,0]`, rotation/scale
 untouched). `lw_get_channels` correctly showed the real multi-key data
 for Position.X/Y/Z (three keys each: frame 0, frame 30, and a bonus
-key - see below) - and surfaced a genuinely new, previously-
+key - see below) - and surfaced a new, previously-
 unobservable LightWave behavior in the process:
 
 - Every channel, including ones never explicitly touched, got an extra
@@ -1913,7 +1913,7 @@ Directory) - Cmd History logged it cleanly, no error, no dialog.
 "Change Content Directory?" dialog appeared this time, the scene loaded
 silently, and `lw_get_scene_info` confirmed every item
 (`BoneTestObject`, `connector_01`, `KeyframeTestNull`, `Light`,
-`Camera`) came back intact. This is a genuine fix, not just a
+`Camera`) came back intact. This is a real fix, not just a
 workaround: the previous approach needed a human present to click "No"
 every single load; this needs one command sent once per session before
 the first load from an unfamiliar path.
@@ -1959,7 +1959,7 @@ architectural shift `ROADMAP2.md` item 8 required for flat surface
 properties, one level deeper still.
 
 **Staged the investigation exactly the way item 8 and item 9 both
-did**, given this was genuinely new, unmapped SDK territory: dir()-only
+did**, given this was new, unmapped SDK territory: dir()-only
 introspection first (zero risk), then one live call at a time, asking
 for explicit approval before every new untested call - nine steps in
 total.
@@ -1993,7 +1993,7 @@ shape, not an open-ended `first`/`next` traversal - deliberately chosen
 to avoid re-guessing at a termination sentinel in a brand new class when
 a safer shape was available) with `LWNodeFuncs`'s `nodeName`/
 `serverUserName` to identify each one. Confirmed live, and found a
-genuine surprise: `CONNECTOR` (using the classic flat "Standard"
+real surprise: `CONNECTOR` (using the classic flat "Standard"
 material panel, never manually node-edited) already had a real 3-node
 graph - `"Surface"` (the graph's root/output), `"Input"`, and
 `"Standard (1)"`. LightWave 2019's nodal architecture underlies *every*
@@ -2115,7 +2115,7 @@ Goal: `UnseenByCamera`/`UnseenByRays`/`UnseenByAlphaChannel`/
 `ROADMAP3.md` survey, all wrapped bare (no arguments) in the stub, the
 same shape that's turned out to be a real bug four times
 (`Ring`/`SetRenderDisplay`/`MotionBlur`/`LightFalloffType`) and a
-genuine toggle four times (`LightVisibleToCamera`/`LightCastsShadows`/
+real toggle four times (`LightVisibleToCamera`/`LightCastsShadows`/
 `UnaffectedByIK`/`FullTimeIK`) across the first two roadmaps. Checked
 live rather than assumed either way, per this project's established
 rule for this exact shape.
@@ -2127,7 +2127,7 @@ Radiosity`/`Unaffected by Fog`), the fifth (`Unseen by Alpha Channel`)
 not present as its own button at all - only an "Alpha Channel" dropdown
 currently showing "Use Surface Settings" was visible instead.
 
-**The four buttons: confirmed genuine toggles, no stub bug.** Clicked
+**The four buttons: confirmed real toggles, no stub bug.** Clicked
 each one in turn, checking Cmd History after each: `UnseenByCamera`,
 `UnseenByRays`, `UnseenByRadiosity`, `UnaffectedByFog` all logged bare,
 no argument following, exactly matching the current stub. All four
@@ -2229,11 +2229,11 @@ no separate precondition command needed at all - a cleaner result than
 dropdown showing only "Monte Carlo" - clicking it revealed no second
 option ("monte carlo is the only option, strangely"). Toggled "Enable
 GI" on/off repeatedly while checking Cmd History: `EnableRadiosity0`
-logged bare every single time, confirming a genuine argument-less
+logged bare every single time, confirming a real argument-less
 toggle, no stub bug. Clicking "Bake Scene" (under "Interpolated Cache")
 required "Enable Caching" first, then triggered a real, visible render/
 bake process (a "Render Status" progress window, "Preprocessing
-Frame...") - confirming `BakeRadiosityScene` is a genuine one-shot
+Frame...") - confirming `BakeRadiosityScene` is a real one-shot
 render-trigger action, not a persistent setting, the same category as
 `MatchGoalOrientation`/`KeepGoalWithinReach` found (and deliberately
 left unwrapped) during `ROADMAP2.md` item 7's bone work.
@@ -2246,7 +2246,7 @@ Illumination Mode is set to Monte Carlo Interpolated." Tried satisfying
 it: `RadiosityInterpolation(1)` correctly checked the "Interpolated"
 checkbox (confirmed live via screenshot) - but resending
 `ObjGIRadiosityTolerance(45)` produced the *exact same* precondition
-error again, unchanged. The dropdown genuinely only ever offered "Monte
+error again, unchanged. The dropdown only ever offered "Monte
 Carlo" as a `Type` choice in this install - no distinct "Monte Carlo
 Interpolated" *mode* (as opposed to the "Interpolated" checkbox, which
 is evidently a different, narrower thing) was ever reachable to select,
@@ -2258,7 +2258,7 @@ without an argument-count error both times), following the same
 `lw_set_camera` made for its Motion-Blur-gated shutter properties before
 that gap was later closed.
 
-**A genuinely new operational finding, not specific to this item.**
+**A new operational finding, not specific to this item.**
 Tested all four new tools together via one parallel tool-call batch
 (`lw_set_render_globals(threads=2, tile_size=16)`,
 `lw_toggle_global_illumination()`, `lw_set_gi_interpolated(1)`,
@@ -2315,13 +2315,13 @@ History immediately - confirming `Backdrop()` is a panel-opener command,
 the same category as `SurfaceEditor`/`ItemProperties`, not a setting to
 wrap.
 
-**`GradientBackdrop` confirmed a genuine toggle** - unchecking the real
+**`GradientBackdrop` confirmed a real toggle** - unchecking the real
 "Gradient Backdrop" checkbox logged it bare, and the Zenith/Sky/Ground/
 Nadir Color fields correctly grayed out, confirming it gates them.
 
 **`BackdropColor`/`SkyColor` confirmed live with real color swatches** -
-`BackdropColor(1, 0, 0)` showed genuinely red (255/0/0); after
-re-enabling Gradient Backdrop, `SkyColor(0, 1, 0)` showed genuinely
+`BackdropColor(1, 0, 0)` showed red (255/0/0); after
+re-enabling Gradient Backdrop, `SkyColor(0, 1, 0)` showed
 green. `ZenithColor`/`GroundColor`/`NadirColor` (same panel, identical
 confirmed `(red, green, blue)` signature) were found in the stub but not
 independently live-tested this pass, given how consistently this exact
@@ -2337,7 +2337,7 @@ investigated. The real match was found instead under Render Properties'
 Volumetrics", "Fog Type", "Min/Max Distance", "Min/Max Amount", and "Fog
 Color" fields matching the survey's command list closely.
 
-**`EnableVolumetrics` confirmed a genuine toggle with a real, important
+**`EnableVolumetrics` confirmed a real toggle with a real, important
 precondition role.** Sent `FogType(1)`/`FogColor(0, 0, 1)` while
 "Enable Volumetrics" was unchecked - both were accepted without error
 and logged cleanly in Cmd History, but Fog Type stayed "Off" and Fog
@@ -2358,7 +2358,7 @@ Color swatch stayed white (255/255/255), never showing blue. This is
 different from every other color command tested this session
 (`BackdropColor`/`SkyColor` both updated correctly), and different from
 `FogType`'s own initial staleness (which turned out to just need a UI
-interaction to redraw, not a real failure). Genuinely ambiguous whether
+interaction to redraw, not a real failure). Ambiguous whether
 this is a real no-op specific to `FogColor` or just a redraw quirk that
 would resolve with more UI interaction - left as an honest, explicitly
 flagged unconfirmed gap in `lw_set_fog`'s docstring rather than either
@@ -2369,7 +2369,7 @@ Shipped four tools consolidating these findings: `lw_set_backdrop`,
 Re-verified `lw_set_backdrop(color=[0,0,1])` and
 `lw_toggle_gradient_backdrop()` through the actual wrapped tools after a
 Claude Desktop restart - both logged correctly and the Backdrop Color
-swatch showed genuinely blue, confirming the wrappers introduce no bugs
+swatch showed blue, confirming the wrappers introduce no bugs
 of their own.
 
 Per-light `LightVolumetricSamples`/`LightVolumetricIntensity` (natural
@@ -2401,7 +2401,7 @@ in `ROADMAP2.md` item 7) - no bone-specific rigging fields at all. The
 generic Modify tab (Translate/Rotate/Transform tools) didn't have them
 either. The actual panel turned out to be reachable via the "Properties"
 button in the bottom status bar while a bone is the current item, which
-opens a "Bones for BoneTestObject" panel - a genuinely different,
+opens a "Bones for BoneTestObject" panel - a different,
 bone-specific properties dialog from both Motion Options and Item
 Properties.
 
@@ -2415,10 +2415,10 @@ bone is currently selected there. `BoneFalloffType` specifically targets
 the OBJECT-WIDE dropdown, not a per-bone one - worth remembering since
 its name alone doesn't signal that scope.
 
-**`BoneActive` confirmed a genuine toggle, with a real, interesting
+**`BoneActive` confirmed a real toggle, with a real, interesting
 default.** Clicking the checkbox live logged `BoneActive` bare in Cmd
 History - no stub bug. Also found: a real, already-existing bone
-(`Bone1`, part of a genuine 2-bone chain used throughout this project's
+(`Bone1`, part of a real 2-bone chain used throughout this project's
 bone work) had "Bone Active" UNCHECKED by default, confirming a bone
 can exist, be parented, and participate in a hierarchy while still
 being inactive - a real LightWave rigging concept, not a connector
@@ -2439,7 +2439,7 @@ likely-correct-by-signature (matching the confirmed `(name)` argument
 shape) rather than independently verified, honest about the test rig's
 own limitation rather than claiming success or failure either way.
 
-**`BoneLimitedRange` confirmed a genuine toggle that gates real
+**`BoneLimitedRange` confirmed a real toggle that gates real
 fields** - checking it live correctly ungrayed the "Min"/"Max" fields
 underneath (previously grayed at their defaults, 0m/1m) - the same
 DOF/Motion-Blur precondition shape from earlier roadmaps, now confirmed
@@ -2448,7 +2448,7 @@ for bones too.
 **`BoneFalloffType(2)` confirmed live and object-wide** - the dropdown
 at the top of the panel (shared across all bones on the object) changed
 from "Inverse Distance ^16" to "Inverse Distance ^2", confirming both
-that the write works and that it's genuinely object-scoped, not
+that the write works and that it's object-scoped, not
 per-bone, exactly as its position in the panel suggested.
 
 Shipped `lw_set_bone` (bundling `BoneStrength`/`BoneRestLength`/
@@ -2471,7 +2471,7 @@ confirming the wrappers and `_resolve_item_id`'s numeric-passthrough
 The muscle/joint-compensation family (`BoneJointComp*`/
 `BoneMuscleFlex*`/`BoneTwist*`/`BoneBulge*`) and
 `BoneWeightMapOnly`/`BoneStrengthMultiply` were surveyed (all visible in
-the same panel) but deliberately not wrapped this pass - genuinely real
+the same panel) but deliberately not wrapped this pass - real
 organic-deformation features, but ones that would benefit from a real
 mesh with actual weight maps to test against meaningfully, rather than
 this session's plain-Null test rig. Left for a future, dedicated
@@ -2555,7 +2555,7 @@ together (Gradient Backdrop already enabled from earlier work) -
 Zenith showed yellow (255/255/0), Ground showed magenta (255/0/255),
 Nadir showed cyan (0/255/255), all exact matches, no reordering issues
 this time despite being sent as one parallel batch (unlike item 3's
-earlier finding - each targeted a genuinely different field, so even
+earlier finding - each targeted a different field, so even
 had reordering occurred it couldn't have corrupted any single field's
 final value the way `RadiosityInterpolation` was corrupted before).
 
@@ -2563,7 +2563,7 @@ final value the way `RadiosityInterpolation` was corrupted before).
 `BoneRestRotation`.** Re-enabled Limited Range first (it had been left
 toggled off at the end of item 6's original session).
 `BoneMinRange(0.5)`/`BoneMaxRange(3)` showed "Min: 500mm"/"Max: 3m"
-correctly. `BoneRestPosition`/`BoneRestRotation` produced a genuinely
+correctly. `BoneRestPosition`/`BoneRestRotation` produced a
 useful UI discovery: they look like plain, inert-looking buttons in the
 Bones panel, not value fields - but clicking either one opens a real
 "Set Bone Rest Position"/"Set Bone Rest Rotation" requester,
@@ -2576,7 +2576,7 @@ in this SDK - the button isn't just an action trigger, it's a live
 requester reflecting current state, giving a clean confirmation path
 even when a field isn't a simple inline text box.
 
-**`EnableVolumetricLights` - confirmed genuine, but with a real,
+**`EnableVolumetricLights` - confirmed real, but with a real,
 important methodology correction.** Sent the bare command three times
 via `lw_run_command` with no arguments each time. Cmd History showed
 `EnableVolumetricLights 0`, then `1`, then `0` - alternating, as if a
@@ -2588,7 +2588,7 @@ than assume this pattern repeated and start editing the stub, ran the
 actual definitive test instead: sent `EnableVolumetricLights` WITH an
 explicit argument (`[1]`) and confirmed it raised
 `"Layout.EnableVolumetricLights() takes 1 positional argument but 2
-were given"` - the same error shape a genuinely bare-only stub method
+were given"` - the same error shape a bare-only stub method
 always produces when called with too many arguments. This proves the
 wrapped method itself only accepts zero arguments, meaning none of the
 three earlier bare calls could possibly have sent a real argument
@@ -2597,7 +2597,7 @@ display convention (echoing some toggle commands' resulting boolean
 state into the log for human readability) rather than evidence of what
 was actually transmitted over the wire.
 
-This is a genuinely important, generalizable finding for this
+This is a important, generalizable finding for this
 project's whole toggle-verification methodology going forward: **a
 numeric suffix appearing in Cmd History is not, by itself, reliable
 proof that a command takes an argument.** Only some toggle-shaped
@@ -2608,12 +2608,12 @@ after the command name at all), so this was the first time the
 distinction actually mattered. The reliable, definitive test going
 forward is: does passing an explicit argument to the wrapped stub raise
 a Python arg-count `TypeError`? If yes, the stub (and, by inference,
-the real command) is genuinely argument-less; if the extra argument is
+the real command) is argument-less; if the extra argument is
 silently accepted instead, that's the real signal a stub fix is needed
 - not whatever Cmd History happens to display.
 
 Also confirmed via the same technique: `BoneWeightMapOnly` and
-`BoneStrengthMultiply` (bone rigging) are both genuine toggles.
+`BoneStrengthMultiply` (bone rigging) are both real toggles.
 `BoneWeightMapOnly` additionally popped a real LightWave error dialog,
 "This option only applies when using a weight map" - a real
 precondition, consistent with this test rig never having had a real
@@ -2655,7 +2655,7 @@ the literal panel label string. Sent
 `lw_run_command` - Cmd History logged `ContentTypeDirectory Objects
 C:\...\TestObjDir`, and a screenshot of the Paths tab showed the
 "Objects" button's own label had changed to "TestObjDir". This was a
-genuinely useful discovery beyond just confirming the argument shape:
+useful discovery beyond just confirming the argument shape:
 these per-type buttons double as a *live display* of the current
 sub-path, not fixed captions - the same "button is also a live state
 readout" pattern already found for bone Rest Position/Rotation earlier
@@ -2676,7 +2676,7 @@ the panel's own visible labels and shipped with that caveat rather than
 claimed as independently confirmed.
 
 **`SaveEndomorph`/`UseMorphedPositions`.** Definitive arg-count test
-confirmed `UseMorphedPositions` is a genuine argument-less toggle
+confirmed `UseMorphedPositions` is a real argument-less toggle
 (explicit-argument call raised the stub's own arg-count `TypeError`).
 Hunting for its real UI checkbox took several rounds: a web search
 surfaced "Use Morphed Positions" as a Bone Properties checkbox that
@@ -2695,7 +2695,7 @@ entries like Morphing/Bones/Subdivision) - still nothing. Concluded
 this checkbox likely doesn't exist as such in 2019.1.5, or is gated
 behind a state (a real Endomorph plus active bones) this Null-based
 test rig can't produce, and shipped `lw_toggle_use_morphed_positions()`
-as a confirmed-genuine bare toggle with that UI-location caveat spelled
+as a confirmed-real bare toggle with that UI-location caveat spelled
 out, rather than continuing to chase a moving target.
 
 That same full-panel Bones screenshot incidentally resolved an earlier
@@ -2708,13 +2708,13 @@ this fuller one shows it did.
 `SaveEndomorph(name)` was tested by sending it directly against
 `BoneTestObject` - it immediately popped a real LightWave error
 dialog: "Null objects are automatically saved with the scene."
-`BoneTestObject` is a Null, so this is a genuine, confirmed
+`BoneTestObject` is a Null, so this is a real, confirmed
 precondition (SaveEndomorph refuses Nulls outright), not a stub bug.
 Shipped as `lw_save_endomorph(item, name)` with this precondition
 documented, but the actual successful bake - a new named Endomorph
 appearing with correct deformed positions on a real mesh - is left
 unconfirmed for a future session with a real loaded mesh object that
-has genuine point deformation (bones or Morph Mixer) applied to it.
+has real point deformation (bones or Morph Mixer) applied to it.
 
 **The bone muscle/joint-compensation family.** The stub revealed a
 clean pattern before any live testing was needed: `BoneJointComp()`/
@@ -2734,11 +2734,11 @@ Verified the whole family live in one pass: sent `BoneJointComp()`
 then `BoneJointCompAmounts(0.3, 0.6)` - a screenshot confirmed "Joint
 Compensation" checked and reading 30.0%, "Joint Comp for Parent"
 reading 60.0% but still UNCHECKED (I never called
-`BoneJointCompParent()`) - proving these two rows are genuinely
+`BoneJointCompParent()`) - proving these two rows are
 independent toggles, and that the Amounts command sets both numeric
 fields regardless of either checkbox's state. Then sent `BoneTwist()`
 alone: it immediately popped a real LightWave error dialog, "This
-option does not apply to the current bone type" - a genuine
+option does not apply to the current bone type" - a real
 precondition, consistent with the "Twist" row already appearing grayed
 out in every screenshot of this panel (this test rig's bones are
 Z-axis type). Then sent `BoneMuscleFlex()`, `BoneMuscleFlexAmounts(0.4,
@@ -2752,7 +2752,7 @@ Flex showed a real asymmetry: both "Muscle Flexing" AND "Parental
 Muscle Flexing" appeared checked despite only calling
 `BoneMuscleFlex()` - never `BoneMuscleFlexParent()`. Suspecting a
 misread, asked for a zoomed screenshot specifically of those two rows;
-the user confirmed both genuinely were checked. This means
+the user confirmed both were checked. This means
 `BoneMuscleFlex()` controls both checkboxes together, unlike the
 joint-comp/bulge pairs - documented as a real, confirmed asymmetry
 rather than assumed to be identical to its siblings.
@@ -2762,7 +2762,7 @@ Shipped as seven new `lw_toggle_bone_flag` flags (`joint_comp`/
 `bulge_parent`/`twist`) plus a new `lw_set_bone_deform(item, ...)` tool
 bundling the five amount setters with the same "send self/parent
 together, defaulting the omitted one to 0.0" shape lw_set_camera-style
-tools in this file already use for genuinely paired native commands.
+tools in this file already use for paired native commands.
 
 Along the way, revisited `UseMorphedPositions` (shipped in the
 previous item's follow-up pass with a "couldn't find its UI checkbox"
@@ -2779,10 +2779,10 @@ accordingly.
 
 **`EnableRadiosity1` - definitively resolved, a new category of
 finding for this project.** Every prior "surveyed but not confirmed"
-command in this project turned out to be either a genuine toggle, a
+command in this project turned out to be either a real toggle, a
 real stub bug (missing `*args`), or gated behind a real precondition.
 This one is different: the definitive arg-count test first confirmed
-it's a genuine bare command (passing an argument raised the stub's own
+it's a real bare command (passing an argument raised the stub's own
 arg-count `TypeError`), but sending it bare produced LightWave's own
 error dialog - not a precondition message, but "Unknown command:
 'EnableRadiosity1'". LightWave's command parser itself doesn't
@@ -2855,7 +2855,7 @@ from the read investigation (a real API, but for plugin authors, not
 for scripting an existing graph). This means the un-enveloped-
 parameter-read gap this project already carries forward likely has no
 write-side answer here either - `addNode`/`connect`/`destroyNode`/
-`setXY` still look like genuine graph-editing operations worth
+`setXY` still look like real graph-editing operations worth
 pursuing, just not a full solution to that specific older gap.
 
 **Step 3, EXPLICITLY APPROVED - the first real scene-mutating test.**
@@ -2866,7 +2866,7 @@ surface's node editor (the same `getNodeEditor()` call
 `addNode(editor, "Principled BSDF")` against `CONNECTOR` succeeded,
 returned a real `NodeID`-typed handle, and - confirmed via a user
 screenshot of the actual Node Editor UI, not just a clean return value
-- a new "Principled BSDF (1)" node genuinely appeared in the graph.
+- a new "Principled BSDF (1)" node appeared in the graph.
 `node_type` is exactly the `server_user_name` string
 `lw_get_surface_nodes` already reports (e.g. "Principled BSDF"), not
 the instance-suffixed `node_name`. The new node is added disconnected
@@ -2896,14 +2896,14 @@ issue this project has documented before) - but a screenshot of the
 actual frozen screen revealed the real cause: the dialog itself, not a
 listener problem, and the Master Plugins list still showed the ring
 listener correctly checked the whole time. The user reasonably
-described this as Layout "crashing" - a genuinely indistinguishable
+described this as Layout "crashing" - a indistinguishable
 symptom from the outside (frozen, unresponsive, no visible cause) until
 that screenshot revealed the actual blocking dialog underneath.
 Dismissing it with "No" and restarting Layout/reloading plugins/
 restarting Claude Desktop fully recovered the session with zero
 corruption - confirmed via `lw_ping` succeeding again immediately
 after. This is the exact same failure shape as the Content Directory
-dialog from `ROADMAP2.md` item 3: a genuinely blocking dialog a
+dialog from `ROADMAP2.md` item 3: a blocking dialog a
 one-way, fire-and-forget command has no way to dismiss on its own.
 
 **Lesson, now baked into `lw_add_node`'s own docstring as a CRITICAL
@@ -2933,7 +2933,7 @@ byIndex` - is an open sub-question not yet answered), `destroyNode`
 context needed), and `setXY` (reposition a node in the graph view - 3
 args, presumably node/x/y). `lw_probe_node_write`/`lw_probe_node_write_sigs`
 are left in place as reusable diagnostic tools for that follow-up work
-rather than removed, since the investigation is genuinely unfinished,
+rather than removed, since the investigation is unfinished,
 unlike `_probe_add_node` which is now fully superseded by the
 permanent tool.
 
@@ -3406,3 +3406,35 @@ Graph Editor, and Metallic at 25%.
 Still open: writing animation keys, which would need the SDK's
 LWEnvelopeFuncs editing calls - unused and untested here, so not
 attempted given this project's record with the node SDK's mutators.
+
+## Fog commands have no effect (ROADMAP3.md Known misses #2)
+
+`FogColor` had been logged as "accepted but the swatch never updates -
+no-op or redraw quirk?". The SDK has a fog reader, `LWFogInfo`
+(`lwrender.h`: `type`, `flags`, and `minDist`/`maxDist`/`minAmt`/
+`maxAmt`/`color` as functions of time), so `lw_get_fog` was added to
+settle it by read-back, and `lw_set_fog` was made to read back too.
+
+Live, with Volumetrics enabled (the checkbox was already on after a
+Layout restart - no `EnableVolumetrics` in Cmd History):
+
+- `lw_set_fog` sent fog type 2, distances 1/20, amounts 0.1/0.8 and
+  red: Cmd History logged all six (`FogType 2` ... `FogColor 1 0 0`),
+  but the panel still showed Off/0 m/1 m/0%/100%/white and
+  `lw_get_fog` read the same defaults.
+- `FogType 1` alone, twice, with the panel open: logged, no change.
+- The user set Fog Type to Linear **by hand**: Cmd History logged no
+  `FogType` at all (just `Refresh`), and `lw_get_fog` then read type 1
+  "Linear" - so the reader follows the panel.
+- With "Use Legacy Volumetrics" ticked (which also logs nothing), the
+  full set of six commands again changed nothing; the read-back still
+  showed the hand-set Linear and defaults.
+
+So in this LightWave 2019 setup the `Fog*` commands are accepted and
+logged but are no-ops: the panel's fog belongs to the Volume Integrator
+plug-in (the Volumetrics tab's "Volumetric" dropdown), whose settings
+aren't reachable through those commands. This also explains the
+original `FogColor` observation, and means the earlier note that
+`FogType 1` "correctly showed Linear" can't be reproduced. `lw_set_fog`
+is kept in `server.py` for reference but no longer registered as a
+tool; `lw_get_fog` is shipped, confirmed to follow hand changes.

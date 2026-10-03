@@ -19,7 +19,7 @@ nothing about a command's real behavior until it's been exercised
 against a live Layout session. Several items below list argument-less
 toggle candidates; per this project's established finding, some of
 these turn out to be real stub bugs (missing `*args`) and some turn out
-to be genuine toggles (`LightVisibleToCamera`/`LightCastsShadows`/
+to be real toggles (`LightVisibleToCamera`/`LightCastsShadows`/
 `UnaffectedByIK`/`FullTimeIK`) - never assume either way without
 checking Cmd History against a real UI click first.
 
@@ -85,7 +85,7 @@ checking Cmd History against a real UI click first.
    before any code was written around it.
 
    Explored in nine separate, explicitly-approved staged steps (the same
-   discipline `ROADMAP2.md` items 8/9 established for genuinely new SDK
+   discipline `ROADMAP2.md` items 8/9 established for new SDK
    territory - dir()-only recon first, then one live call at a time,
    asking before each new untested call): `LWSurfaceFuncs().
    getNodeEditor(surf)` (confirmed safe), `LWNodeEditorFuncs`'s
@@ -136,7 +136,7 @@ checking Cmd History against a real UI click first.
    32); `threads` updated "Multithreading Limit" AND correctly
    auto-unchecked "Automatic Multithreading" as a side effect, cleaner
    than `lw_set_camera`'s Motion Blur precondition ever was.
-   `EnableRadiosity0` confirmed live as a genuine argument-less toggle
+   `EnableRadiosity0` confirmed live as a real argument-less toggle
    for the "Enable GI" checkbox (Cmd History logged it bare, repeatedly).
    `RadiosityInterpolation(1)` confirmed live to check the "Interpolated"
    checkbox correctly.
@@ -194,12 +194,12 @@ checking Cmd History against a real UI click first.
    Found live that `Backdrop()` (despite its central-looking name) is
    just a panel-opener, matching `SurfaceEditor`/`ItemProperties` -
    opening Effects > Backdrop itself logged a bare `Backdrop`, not a
-   setting to wrap. `GradientBackdrop` confirmed a genuine argument-less
+   setting to wrap. `GradientBackdrop` confirmed a real argument-less
    toggle. All five backdrop colors confirmed live: `BackdropColor`/
    `SkyColor` first (red, then green), then `ZenithColor`/`GroundColor`/
    `NadirColor` together (yellow/magenta/cyan), all exact matches.
 
-   `EnableVolumetrics` confirmed a genuine toggle, and confirmed to gate
+   `EnableVolumetrics` confirmed a real toggle, and confirmed to gate
    the *entire* Fog panel as a real precondition - Fog settings sent
    before enabling it are silently accepted (no error, logged cleanly in
    Cmd History) but have zero visible effect, exactly the DOF/Motion
@@ -232,22 +232,22 @@ checking Cmd History against a real UI click first.
    investigation.
 
 5. **Per-object render-visibility flags - DONE, plus a real stub bug and
-   a genuine surprise finding.** Shipped `lw_toggle_object_visibility(
+   a real surprise finding.** Shipped `lw_toggle_object_visibility(
    item, flag)` (flag is one of `"unseen_by_rays"`, `"unseen_by_camera"`,
    `"unseen_by_radiosity"`, `"unaffected_by_fog"`) and
    `lw_set_alpha_channel_mode(item, mode)`.
 
    `UnseenByRays`/`UnseenByCamera`/`UnseenByRadiosity`/`UnaffectedByFog`
-   confirmed live to be genuine argument-less toggles - Cmd History
+   confirmed live to be real argument-less toggles - Cmd History
    logged each one bare after clicking the real "Object Properties >
-   Render" buttons, no stub fix needed. These are genuinely different
+   Render" buttons, no stub fix needed. These are different
    from `ROADMAP2.md` item 1's light/object illumination linking
    (`IncludeObject`/`ExcludeObject`/etc., which control which objects a
    light lights) - this cluster is about whether an object is visible to
    the camera, reflection/refraction rays, radiosity calculations, or
    fog at all, a distinct rendering-control axis.
 
-   `UnseenByAlphaChannel` turned out to be a genuine surprise on two
+   `UnseenByAlphaChannel` turned out to be a real surprise on two
    counts. First, a real bug: it's wrapped bare in the stub, same shape
    as the other four, but Cmd History showed `UnseenByAlphaChannel 1`
    after a real UI interaction - it actually takes an argument, the same
@@ -296,7 +296,7 @@ checking Cmd History against a real UI click first.
    50.0%"; `BoneRestLength(2)` showed "Rest Length: 2m";
    `BoneFalloffType(2)` (the object-wide dropdown) changed "Falloff
    Type" from "Inverse Distance ^16" to "Inverse Distance ^2";
-   `BoneActive`/`BoneLimitedRange` both confirmed genuine argument-less
+   `BoneActive`/`BoneLimitedRange` both confirmed real argument-less
    toggles (a freshly-created bone defaulted to `BoneActive` unchecked -
    a bone can exist and be parented into a chain while still inactive).
    `BoneWeightMapName` was sent and logged cleanly but couldn't be
@@ -313,7 +313,7 @@ checking Cmd History against a real UI click first.
    `BoneMaxRange(3)` correctly showed "Min: 500mm"/"Max: 3m" once
    Limited Range was re-enabled.
 
-   `BoneWeightMapOnly`/`BoneStrengthMultiply` also confirmed genuine
+   `BoneWeightMapOnly`/`BoneStrengthMultiply` also confirmed real
    toggles in the same sweep, via a new definitive test worth carrying
    forward: passing an explicit argument to a suspected toggle raises a
    clean Python arg-count error from the stub itself if it's truly
@@ -334,7 +334,7 @@ checking Cmd History against a real UI click first.
    end-to-end bake (a new named Endomorph with correct deformed
    positions) is not independently confirmed against this Null-based
    test rig, only that the command exists and enforces this
-   precondition. `UseMorphedPositions` is confirmed a genuine
+   precondition. `UseMorphedPositions` is confirmed a real
    argument-less toggle via the definitive arg-count test; its own
    checkbox couldn't be found as a visible UI element anywhere in
    LightWave 2019.1.5 (checked the full Bones panel, Motion Options,
@@ -342,7 +342,7 @@ checking Cmd History against a real UI click first.
    a real error dialog: "Use Morphed Positions not supported with the
    current bone mode" - closely matching the 2025 documentation's "not
    supported with Limited Bones" claim, confirming the feature and its
-   precondition are both genuinely real in 2019.1.5, just gated behind
+   precondition are both real in 2019.1.5, just gated behind
    a bone mode this test rig's bones don't have.
 
    **DONE - the muscle/joint-compensation family** (`BoneJointComp*`/
@@ -356,7 +356,7 @@ checking Cmd History against a real UI click first.
    `BoneJointComp()` + `BoneJointCompAmounts(0.3, 0.6)` showed "Joint
    Compensation: 30.0%"/"Joint Comp for Parent: 60.0%" exactly, with
    only the "Joint Compensation" checkbox toggled on - confirming
-   `joint_comp`/`joint_comp_parent` are genuinely independent
+   `joint_comp`/`joint_comp_parent` are independent
    checkboxes. Same independence confirmed for `bulge`/`bulge_parent`
    (`BoneBulge()`+`BoneBulgeParent()` both explicitly toggled, both
    showed checked; amounts `0.55`/`0.8` matched exactly). A real
@@ -408,7 +408,7 @@ checking Cmd History against a real UI click first.
 ## Status: all 7 items done
 
 Item 2 (Node graphs) was the deepest investigation on this roadmap -
-nine explicitly-approved staged steps, one genuine dead end spotted from
+nine explicitly-approved staged steps, one real dead end spotted from
 method names alone (`LWBSDFFuncs`) before wasting live-call budget on
 it, and a final answer that mirrored `ROADMAP2.md` item 9's keyframe
 discovery almost exactly. Item 3 (render globals) surfaced a new,
@@ -416,9 +416,9 @@ concrete example of this project's "one-way, no delivery guarantee"
 Command Port caveat actually manifesting as a wrong logged value, not
 just a theoretical risk. Item 4 (scene environment) found a real,
 still-unresolved `FogColor` write gap, documented honestly rather than
-hidden. Item 5 (visibility flags) found both a genuine stub bug
+hidden. Item 5 (visibility flags) found both a real stub bug
 (`UnseenByAlphaChannel`) and that it wasn't even the boolean its name
-suggested. Item 6 (bone rigging) found the genuinely separate "Bones
+suggested. Item 6 (bone rigging) found the separate "Bones
 for &lt;object&gt;" panel, distinct from both Motion Options and Item
 Properties. Item 7 (morph) found its real precondition purely through
 LightWave's own error dialog, without ever locating a dedicated UI
@@ -460,11 +460,13 @@ re-discovering them from scratch.
    earlier test had the panel open. `lw_set_light` now accepts only 0/1
    and both tools warn to close the panel first. See `PLAN.md` "Light
    falloff read-back, resolved".
-2. **`FogColor` never visibly updates** even after its
-   `EnableVolumetrics` precondition is satisfied, unlike every other
-   color command tested (`BackdropColor`/`SkyColor`/gradient colors all
-   worked). Genuinely ambiguous whether this is a real no-op or a redraw
-   quirk - never resolved either way.
+2. **`FogColor` never visibly updates - RESOLVED: no-op.** Not a
+   redraw quirk: none of the `Fog*` commands have any effect in
+   LightWave 2019 (confirmed live against the new `lw_get_fog`
+   reader, with and without "Use Legacy Volumetrics"). The panel's fog
+   belongs to the Volume Integrator plug-in and logs no command when
+   changed by hand. `lw_set_fog` was withdrawn; `lw_get_fog` reads the
+   fog. See `PLAN.md` "Fog commands have no effect".
 3. **`ObjGIRadiosityTolerance`'s precondition is never actually
    satisfiable** in this install - the error message references a
    "Monte Carlo Interpolated" GI mode that the Type dropdown never
@@ -484,10 +486,10 @@ re-discovering them from scratch.
 5. **`SaveEndomorph`'s actual bake was never confirmed end to end** -
    only that it enforces a real "Null objects are automatically saved
    with the scene" precondition. Needs a real mesh object (via
-   `lw_load_object`) with genuine point deformation applied to bake a
+   `lw_load_object`) with real point deformation applied to bake a
    verifiable Endomorph against.
 6. **`UseMorphedPositions`'s positive effect was never observed** -
-   confirmed a genuine toggle with a real "not supported with the
+   confirmed a real toggle with a real "not supported with the
    current bone mode" precondition, but no bone mode was ever found in
    this test rig where the toggle actually succeeds and does something
    visible.
@@ -571,7 +573,6 @@ each would add to the connector, most valuable first:
    Chasing down why "Monte Carlo Interpolated" never appears as a
    selectable Type in this install - polish on an already-shipped tool,
    not new capability.
-7. **`FogColor`'s dead swatch.** The narrowest, most cosmetic item left
-   - a single atmospheric-effect color property that may just need a
-   different write approach (or may be a genuine no-op); low practical
-   impact either way.
+7. **`FogColor`'s dead swatch - RESOLVED** (Known misses #2): the
+   whole `Fog*` command family is a no-op in 2019. Fog is now
+   read-only via `lw_get_fog`.

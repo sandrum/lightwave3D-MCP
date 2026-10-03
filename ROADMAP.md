@@ -80,7 +80,7 @@ Two things that didn't go as expected, both documented in `PLAN.md`:
   single-shot scripts do. It has to be separately invoked via Utilities
   > Additional afterward.
 - `ModCommand.execute()`'s reported result code is unreliable - it said
-  "failure" both for a genuinely free port and for one already
+  "failure" both for a free port and for one already
   successfully bound. Confirmed via a UDP bind-conflict test that it
   actually worked regardless. Third confirmed SDK/binding bug found this
   project, after `LWMessageFuncs.info()` and `IMaster.__init__`'s
@@ -127,7 +127,7 @@ version's SDK).
 
 Shipped `lw_render_frame`, `lw_render_scene`, `lw_abort_render`,
 `lw_set_camera_resolution`, and `lw_get_render_status`. The last one is
-the real deliverable here: a genuine completion signal instead of
+the real deliverable here: a real completion signal instead of
 guessing after firing a one-way render command, built on
 `lwsdk.IFrameBuffer` (NewTek's "Render Display" plug-in architecture -
 found via NewTek's official docs, not live probing), which gets real
@@ -175,7 +175,7 @@ of Nulls, which stayed unparented).
 
 The real root cause, found via Utilities > Commands > Cmd History
 (logs the literal native command LightWave runs for any UI action):
-a genuine manual reparent via Motion Options logs as `ParentItem
+a real manual reparent via Motion Options logs as `ParentItem
 10000000` - a plain numeric ID, not a name - while this connector's
 name-based attempts logged as `TargetItem 0`, proving the argument
 silently coerces to a bogus/no-op ID when it can't parse a name.
@@ -374,14 +374,14 @@ already proven (1, done), then opened the next major surface using a
 pattern already validated once (2, done). Item 3 turned out to need a
 real docs lookup rather than more live probing - once that was done
 (see PLAN.md), both sub-items shipped quickly and safely. Item 5 was
-investigated thoroughly and turned out to be a genuine dead end, not
+investigated thoroughly and turned out to be a real dead end, not
 just an unexplored option - documented rather than left open. Item 4
 built convenience on top of proven native commands and was the fastest
 item yet, confirming the project's core mechanisms are now solid. Item
 6 needed one more real docs lookup (the Frame Buffer/Render Display
 plug-in architecture) rather than guessing at a polling scheme. Item 7
 was added mid-stream from a real user need rather than pre-planned, and
-surfaced a genuine new gap (parenting via `lw_run_command` doesn't work)
+surfaced a real new gap (parenting via `lw_run_command` doesn't work)
 that item 8 came back to close. Item 8 is the project's clearest
 example yet of live ground-truth beating guesswork: several plausible
 theories (modal dialog, needs a UI redraw, needs more elapsed time)
@@ -400,7 +400,7 @@ real substance once actually checked, not just a formality to confirm.
 Item 11 closed the last real open item on STATUS.md's list by staging
 the risk down in cautious, verifiable steps rather than writing the
 real traversal loop on faith - exactly the discipline this project's
-one genuine crash (`LWChannelInfo`/`nextGroup`) should have taught from
+one real crash (`LWChannelInfo`/`nextGroup`) should have taught from
 the start. With this, every roadmap item is done except item 5
 (Modeler reads), which remains a documented, confirmed dead end.
 

@@ -346,6 +346,46 @@ def _get_color_space():
     return result
 
 
+_FOG_TYPES = {0: "Off", 1: "Linear", 2: "Nonlinear 1", 3: "Nonlinear 2", 4: "Realistic"}
+
+
+def _get_fog():
+    """Scene fog via LWFogInfo (lwrender.h): `type` (LWFOG_NONE 0,
+    LINEAR 1, NONLINEAR1 2, NONLINEAR2 3, REALISTIC 4) and `flags` are
+    plain fields; minDist/maxDist/minAmt/maxAmt(time) and
+    color(time, col[3]) are functions of time, evaluated at the live
+    playhead. Each field is read separately so one failing doesn't hide
+    the rest - the colour's out-parameter shape in Python is unverified,
+    so an odd return is reported raw rather than guessed at."""
+    fi = lwsdk.LWFogInfo()
+    t = _current_time()
+    result = {"evaluated_at_time": t}
+    try:
+        result["type"] = int(fi.type)
+        result["type_name"] = _FOG_TYPES.get(result["type"], "unknown")
+    except Exception as exc:  # noqa: BLE001
+        result["type_error"] = str(exc)
+    try:
+        result["flags"] = int(fi.flags)
+    except Exception as exc:  # noqa: BLE001
+        result["flags_error"] = str(exc)
+    for key, attr in (("min_distance", "minDist"), ("max_distance", "maxDist"),
+                      ("min_amount", "minAmt"), ("max_amount", "maxAmt")):
+        try:
+            result[key] = getattr(fi, attr)(t)
+        except Exception as exc:  # noqa: BLE001
+            result[key + "_error"] = str(exc)
+    try:
+        col = fi.color(t)
+        try:
+            result["color"] = [float(c) for c in col]
+        except TypeError:
+            result["color_raw"] = repr(col)
+    except Exception as exc:  # noqa: BLE001
+        result["color_error"] = str(exc)
+    return result
+
+
 def _get_light_info(name):
     """Same live-time fix as _get_camera_info.
 
@@ -486,7 +526,7 @@ def _set_surface(arg):
     trusting the fix on paper: setFlt(surf, SURF_DIFF, 0.5) alone first
     (Surface Editor showed 50.0%, lw_get_surface_info read back 0.5),
     then setFlt(surf, SURF_COLR, (1,0,0)) + setFlt(surf, SURF_GLOS, 0.8)
-    together in one call (screenshot showed a genuinely red color
+    together in one call (screenshot showed a red color
     swatch and "Glossiness 80.0%", both matching the read-back exactly).
     setFlt(surf, SURF_COLR, (r,g,b)) accepting a plain 3-tuple, the same
     as getFlt returns, is now confirmed symmetric, not just assumed."""
@@ -560,7 +600,7 @@ def _get_channels(name):
         groupName(), not needed here).
       - nextChannel(group, prev)/nextKey(envelope, prev): prev=None for
         the first result, the previous real result to continue: a
-        second real call in both cases returned a genuine next
+        second real call in both cases returned a real next
         result (channel: "Position.Y"; a fresh confirmation the pattern
         continues correctly, not just works once) and confirmed live
         that Python None (not a crash, not an exception, not
@@ -1761,6 +1801,8 @@ def _handle_query(text):
             payload = {"result": _get_selection()}
         elif command == "get_color_space":
             payload = {"result": _get_color_space()}
+        elif command == "get_fog":
+            payload = {"result": _get_fog()}
         elif command == "get_render_options":
             payload = {"result": _get_render_options()}
         elif command == "get_antialiasing":

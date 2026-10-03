@@ -405,7 +405,7 @@ reliably fixes it.
 | `lw_toggle_gradient_backdrop()` | Flip "Gradient Backdrop". |
 | `lw_toggle_volumetrics()` | Flip the scene's "Enable Volumetrics" (Fog panel gate). |
 | `lw_toggle_volumetric_lights()` | Flip the scene-wide "Enable Volumetric Lights". |
-| `lw_set_fog(fog_type=, min_distance=, max_distance=, min_amount=, max_amount=, color=)` | Set scene fog type, distance range, and amount. |
+| `lw_get_fog()` | Read the scene fog: type, distance range, amount range, and color. (Fog can't be *set* from here - see below.) |
 
 **Animation**
 
@@ -495,7 +495,7 @@ this is distilled from.
   `lw_save_object` has a real, documented limitation: for a freshly
   loaded multi-layer object (via `lw_load_object`), `SelectItem` by
   name or by its regular numeric ID may not switch the current object
-  the *first* time this session - a genuine manual click was needed
+  the *first* time this session - a real manual click was needed
   once before automation-only selection became reliable for that
   object. See `PLAN.md` "Scene file I/O" for the full investigation.
 - `lw_run_command` - generic passthrough to any of the ~800 native
@@ -533,7 +533,7 @@ this is distilled from.
   selection without disturbing the rest. Confirmed live end to end (by
   name, through the numeric-ID resolver): `lw_get_selection` correctly
   showed two Objects `selected: true` simultaneously, matching a Scene
-  Editor screenshot with both rows genuinely highlighted. The earlier
+  Editor screenshot with both rows highlighted. The earlier
   suspicion that `AddToSelection` "does nothing" was a broken-read
   artifact (checking `flags() & LWITEMF_SELECTED`, not
   `LWItemInfo().selected()`), not a real bug. **Real limitation
@@ -569,7 +569,7 @@ this is distilled from.
   confirmed live end to end (Roughness read back as `0.1`, matching the
   UI's "10.0%").
   See `PLAN.md` "Node Editor / PrincipledBSDF nodes" for the full
-  nine-step staged investigation, including a genuine dead end
+  nine-step staged investigation, including a real dead end
   (`LWBSDFFuncs` turned out to be a shader-plugin-authoring API, not a
   way to read an existing node's parameters).
 
@@ -629,7 +629,7 @@ this is distilled from.
   `lw_get_hierarchy`'s bone traversal used. Confirmed live two ways: a
   static Null showed all 9 channels with one implicit key each at frame
   0 (real LightWave defaults); a Null keyframed at frames 0 and 30
-  showed the real multi-key data, and surfaced a genuinely new,
+  showed the real multi-key data, and surfaced a new,
   previously-unobservable behavior - every channel gets an automatic
   extra key at the scene's end frame, and a channel whose value never
   actually changed only gets that bonus key, not a redundant real one.
@@ -684,7 +684,7 @@ this is distilled from.
   unreachable. Deliberately does **not** wrap `LightVisibleToCamera`/
   `LightCastsShadows` - both were suspected of having the same
   missing-argument bug as `MotionBlur`, but live verification (clicking
-  their real checkboxes and checking Cmd History) proved they're genuine
+  their real checkboxes and checking Cmd History) proved they're real
   argument-less toggles with no way to set or read a known state; use
   `lw_run_command` directly for those two. Also confirmed live:
   "Visible to Camera" is disabled in the UI for Point lights, only
@@ -759,7 +759,7 @@ this is distilled from.
   "can trigger renders but can't configure them" gap. `threads`/
   `tile_size` confirmed live with zero preconditions - `threads` even
   auto-unchecked "Automatic Multithreading" as a side effect.
-  `lw_toggle_global_illumination` confirmed live as a genuine
+  `lw_toggle_global_illumination` confirmed live as a real
   argument-less toggle for "Enable GI". `lw_set_gi_interpolated(1)`
   confirmed live to check the "Interpolated" checkbox. `lw_set_gi_
   radiosity_tolerance` hit a real, unresolved precondition - LightWave's
@@ -790,11 +790,10 @@ this is distilled from.
   `lw_set_backdrop(color=, zenith_color=, sky_color=, ground_color=,
   nadir_color=)`, `lw_toggle_gradient_backdrop()`,
   `lw_toggle_volumetrics()`, `lw_toggle_volumetric_lights()`,
-  `lw_set_fog(fog_type=, min_distance=,
-  max_distance=, min_amount=, max_amount=, color=)`. `Backdrop()`
+  `lw_get_fog()`. `Backdrop()`
   (despite the central-looking name) turned out to just be a panel-opener
   like `SurfaceEditor` - opening Effects > Backdrop logged it bare, not a
-  setting. `GradientBackdrop` confirmed a genuine toggle; all five
+  setting. `GradientBackdrop` confirmed a real toggle; all five
   backdrop colors confirmed live with real color swatches -
   `BackdropColor`/`SkyColor` (red, then green), and with Gradient
   Backdrop on, `zenith_color`/`ground_color`/`nadir_color` sent together
@@ -802,10 +801,10 @@ this is distilled from.
   Properties > Volumetrics
   (not the "Legacy Volumetrics" Effects tab, which turned out to be an
   unrelated plugin-based system - Ground Fog/HyperVoxels/PixieDust) -
-  `EnableVolumetrics` confirmed a genuine toggle that gates the *entire*
-  Fog panel as a precondition, same shape as DOF/Motion Blur; `FogType`
-  confirmed live with enum value `1` = "Linear". `lw_toggle_volumetric_lights()`
-  wraps the scene-wide `EnableVolumetricLights` toggle, confirmed genuine
+  `EnableVolumetrics` confirmed a real toggle that gates the *entire*
+  Fog panel as a precondition, same shape as DOF/Motion Blur.
+  `lw_toggle_volumetric_lights()`
+  wraps the scene-wide `EnableVolumetricLights` toggle, confirmed real
   via a new definitive test (see "Methodology" note below), distinct
   from per-light `volumetric_samples`/`volumetric_intensity` on
   `lw_set_light` and from this section's scene Volumetrics/Fog panel.
@@ -817,19 +816,23 @@ this is distilled from.
   definitive test resolved it: passing an explicit argument to the
   wrapped stub raised a Python arg-count `TypeError`
   ("takes 1 positional argument but 2 were given"), proving the stub -
-  and by inference the real command - genuinely takes none. The Cmd
+  and by inference the real command - takes none. The Cmd
   History suffix turned out to be LightWave's own display convention
   for echoing a toggle's resulting boolean state, not evidence of a
   real argument on the wire. A numeric suffix in Cmd History alone is
   **not** reliable proof a command takes an argument; the arg-count
   test is.
 
-  **Real, unresolved gap**: `FogColor` is accepted and logged cleanly in
-  Cmd History both before and after satisfying the Volumetrics
-  precondition, but the swatch never visibly updates - unlike every
-  other color command tested this item. Shipped with this explicitly
-  flagged as unconfirmed rather than proven working. See `PLAN.md`
-  "Scene environment/atmosphere" for the full investigation.
+  **Fog is read-only.** The `Fog*` commands (`FogType`,
+  `FogMinDistance`, `FogMaxDistance`, `FogMinAmount`, `FogMaxAmount`,
+  `FogColor`) are accepted and logged in Cmd History but change
+  nothing in LightWave 2019 - confirmed live with Volumetrics enabled,
+  both with and without "Use Legacy Volumetrics". The panel's fog
+  belongs to the Volume Integrator plug-in, and changing it by hand
+  logs no command at all. `lw_get_fog()` reads it correctly (it
+  followed a hand change to Linear), so the former `lw_set_fog` was
+  withdrawn rather than left reporting "sent" for changes that never
+  happen. See `PLAN.md` "Fog commands have no effect".
 - **Deeper bone rigging** (ROADMAP3.md item 6) - `lw_set_bone(item,
   strength=, rest_length=, rest_position=, rest_rotation=,
   weight_map_name=, falloff_type=, min_range=, max_range=)` and
@@ -847,7 +850,7 @@ this is distilled from.
   "Strength: 50.0%"; `rest_length=2` showed "Rest Length: 2m";
   `falloff_type=2` (object-wide, not per-bone) changed "Inverse Distance
   ^16" to "Inverse Distance ^2"; `BoneActive`/`BoneLimitedRange`
-  confirmed genuine argument-less toggles - a real bone defaulted to
+  confirmed real argument-less toggles - a real bone defaulted to
   inactive, confirming a bone can exist and be parented while still
   off. `weight_map_name` sent cleanly but couldn't be visually confirmed
   since this test rig's bones have no real mesh/vmap to match against.
@@ -860,7 +863,7 @@ this is distilled from.
   Position"/"...Rotation" requester pre-populated with the
   already-written value - a reusable confirmation technique for any
   other button-styled field. `weight_map_only`/`strength_multiply`
-  confirmed genuine argument-less toggles via the same definitive
+  confirmed real argument-less toggles via the same definitive
   arg-count test described above; `weight_map_only` has a real
   precondition, LightWave's own error dialog: "This option only applies
   when using a weight map". `BoneStrengthMultiply` maps to "Multiply
@@ -870,7 +873,7 @@ this is distilled from.
   `bulge`/`bulge_parent`/`twist` on `lw_toggle_bone_flag`, plus
   `lw_set_bone_deform` for their amounts) is now also confirmed live:
   `joint_comp`/`joint_comp_parent` and `bulge`/`bulge_parent` are each
-  genuinely independent checkboxes, but `muscle_flex` checks BOTH
+  independent checkboxes, but `muscle_flex` checks BOTH
   "Muscle Flexing" AND "Parental Muscle Flexing" together - a real,
   confirmed asymmetry, not a bug. `twist` has a real precondition,
   LightWave's own error dialog: "This option does not apply to the
@@ -884,14 +887,14 @@ this is distilled from.
   are automatically saved with the scene" - it refuses Null objects
   outright, so the actual end-to-end bake onto a real mesh is left
   unconfirmed against this project's Null-based test rig.
-  `UseMorphedPositions` is confirmed a genuine argument-less toggle via
+  `UseMorphedPositions` is confirmed a real argument-less toggle via
   the arg-count test; its own checkbox isn't visible anywhere in
   LightWave 2019.1.5's UI (checked the full Bones panel, Motion
   Options, General Options, and Object Properties), but calling it live
   DID pop a real error dialog, "Use Morphed Positions not supported
   with the current bone mode" - closely matching a web search hit's
   LightWave 2025 documentation ("not supported with Limited Bones"),
-  confirming the feature and precondition are genuinely real in
+  confirming the feature and precondition are real in
   2019.1.5 too, just gated behind a bone mode this test rig doesn't
   have. Shipped as a bare toggle with that
   caveat. See `PLAN.md` "Follow-up sweep: closing the easy/moderate
@@ -958,7 +961,7 @@ left and where to look first.
 Strength: 0.9" / "IK/FK Blending: 30.0%" right after sending them - the
 0.0-1.0-as-percent convention already known from `lw_set_camera`'s
 `shutter_efficiency`). `full_time_ik`/`unaffected_by_ik` are confirmed
-genuine argument-less toggles (Cmd History logged them bare after
+real argument-less toggles (Cmd History logged them bare after
 clicking the real checkboxes) with no way to read a known state back,
 so `lw_toggle_ik_flag` flips rather than sets - same limitation as
 `lw_set_light`'s unwrapped `LightVisibleToCamera`/`LightCastsShadows`.
@@ -994,7 +997,7 @@ instead of the one-way Command Port, since there's no native
 `lwsdk.LWSurfaceFuncs()`'s `setFlt()` is the only real path. Confirmed
 live end to end against a real surface (`CONNECTOR`, on a loaded
 `.lwo`): `diffuse=0.5` alone showed "Diffuse 50.0%" in Surface Editor;
-`color=[1,0,0]` + `glossiness=0.8` together showed a genuinely red
+`color=[1,0,0]` + `glossiness=0.8` together showed a red
 color swatch and "Glossiness 80.0%", both matching
 `lw_get_surface_info`'s read-back exactly.
 
@@ -1031,10 +1034,10 @@ updated the same list entry rather than creating duplicates.
 `lw_toggle_object_visibility(item, flag)` (`flag` is one of
 `"unseen_by_rays"`, `"unseen_by_camera"`, `"unseen_by_radiosity"`,
 `"unaffected_by_fog"`) and `lw_set_alpha_channel_mode(item, mode)`.
-Genuinely different from the light/object illumination linking above -
+Different from the light/object illumination linking above -
 this is about whether an object is visible to the camera, reflection/
 refraction rays, radiosity, or fog at all, not which light illuminates
-it. The four toggle flags confirmed live to be genuine argument-less
+it. The four toggle flags confirmed live to be real argument-less
 toggles (Cmd History logged each bare after clicking the real Object
 Properties > Render buttons) - no way to read them back, so the tool
 flips rather than sets, same limitation as the Light/IK toggles.

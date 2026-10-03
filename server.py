@@ -266,7 +266,7 @@ def lw_save_scene_as(filename: str) -> str:
     useful for a fresh unnamed scene, which is what every scene in this
     connector's testing has been so far). filename must be an absolute
     path LightWave's process can write to. Confirmed live: the saved
-    file genuinely reflects real scene state (correct item names and
+    file reflects real scene state (correct item names and
     numeric IDs), not a stub."""
     try:
         _layout().SaveSceneAs(filename)
@@ -324,7 +324,7 @@ def lw_save_object(name: str, filename: str) -> str:
     this for Camera/Light; it now also applies here). Resolving to the
     item's numeric ID (like every other lw_set_* tool does) is closer
     but still not sufficient on its own the FIRST time a freshly-loaded
-    object is selected this session - Cmd History showed a genuine
+    object is selected this session - Cmd History showed a real
     manual click sends a second, differently-scoped SelectItem call
     first (e.g. "SelectItem 40010000", not the object's own ID from
     lw_get_item_id) before the object's own numeric ID reliably takes
@@ -449,7 +449,7 @@ def lw_add_to_selection(item: str) -> str:
     Confirmed live end to end: after SelectItem on one Object then this
     on a second, lw_get_selection correctly showed BOTH as
     selected: true, and a Scene Editor screenshot confirmed both rows
-    genuinely highlighted - not just an artifact of the read side. This
+    highlighted - not just an artifact of the read side. This
     closes out the original suspicion that AddToSelection "does
     nothing" (see PLAN.md "Multi-item / bulk selection investigation")
     - that read used the unreliable flags() & LWITEMF_SELECTED check
@@ -605,7 +605,7 @@ def lw_set_surface(surface: str, color: list = None, diffuse: float = None,
     ("CONNECTOR", from a loaded .lwo): sent diffuse=0.5 alone first, a
     Surface Editor screenshot showed 50.0% and lw_get_surface_info read
     back 0.5; then color=[1,0,0]+glossiness=0.8 in one call, screenshot
-    showed a genuinely red color swatch (255/0/0) and "Glossiness 80.0%"
+    showed a red color swatch (255/0/0) and "Glossiness 80.0%"
     (grayed out since Specular is 0% - a real UI precondition, not a
     sign anything's wrong), both matching lw_get_surface_info's
     read-back exactly.
@@ -676,7 +676,7 @@ def lw_get_channels(name: str) -> str:
     (Position 0.0, Rotation 0.0, Scale 1.0 - LightWave's real defaults).
     A Null keyframed via lw_set_keyframe at frames 0 and 30 (position
     only) correctly showed the real multi-key data - and surfaced a
-    genuinely new, previously-unobservable LightWave behavior: every
+    new, previously-unobservable LightWave behavior: every
     channel also got an extra key at the scene's configured end frame
     (holding its last value), and channels whose value never actually
     changed between the two lw_set_keyframe calls (Rotation/Scale) got
@@ -1251,7 +1251,7 @@ def lw_set_render_options(raytrace_shadows: bool = None, raytrace_reflection: bo
 def lw_toggle_global_illumination() -> str:
     """Flip the "Enable GI" checkbox (Render Properties > Global
     Illumination) (ROADMAP3.md item 3). Wraps EnableRadiosity0 -
-    confirmed live to be a genuine argument-less TOGGLE (Cmd History
+    confirmed live to be a real argument-less TOGGLE (Cmd History
     logged it bare, repeatedly, after clicking the real checkbox
     on/off several times) - same limitation as every other confirmed
     toggle in this connector (lw_toggle_ik_flag, lw_toggle_object_
@@ -1369,7 +1369,7 @@ def lw_set_backdrop(color: list = None, zenith_color: list = None, sky_color: li
 def lw_toggle_gradient_backdrop() -> str:
     """Flip the "Gradient Backdrop" checkbox (Effects > Backdrop)
     (ROADMAP3.md item 4). Wraps GradientBackdrop - confirmed live to be
-    a genuine argument-less TOGGLE (Cmd History logged it bare after
+    a real argument-less TOGGLE (Cmd History logged it bare after
     clicking the real checkbox on and off). No way to read current
     state back, so this flips rather than sets - same limitation as
     every other confirmed toggle in this connector.
@@ -1390,7 +1390,7 @@ def lw_toggle_gradient_backdrop() -> str:
 def lw_toggle_volumetrics() -> str:
     """Flip the "Enable Volumetrics" checkbox (Render Properties >
     Volumetrics) (ROADMAP3.md item 4). Wraps EnableVolumetrics -
-    confirmed live to be a genuine argument-less TOGGLE. No way to read
+    confirmed live to be a real argument-less TOGGLE. No way to read
     current state back, so this flips rather than sets.
 
     Real precondition confirmed live for the whole Volumetrics panel,
@@ -1413,7 +1413,7 @@ def lw_toggle_volumetrics() -> str:
 def lw_toggle_volumetric_lights() -> str:
     """Flip the scene-wide "Enable Volumetric Lights" toggle
     (ROADMAP3.md item 4/6). Wraps EnableVolumetricLights - confirmed
-    live to be a genuine argument-less TOGGLE via the definitive test
+    live to be a real argument-less TOGGLE via the definitive test
     (passing an explicit argument raises a clean Python arg-count error
     from the stub: "takes 1 positional argument but 2 were given").
 
@@ -1437,6 +1437,26 @@ def lw_toggle_volumetric_lights() -> str:
 
 
 @mcp.tool()
+def lw_get_fog() -> str:
+    """Read the scene fog (Render Properties > Volumetrics) via
+    LWFogInfo: `type` and `type_name` (0 Off, 1 Linear, 2 Nonlinear 1,
+    3 Nonlinear 2, 4 Realistic - lwrender.h's LWFOG_* values),
+    `min_distance`, `max_distance`, `min_amount`, `max_amount` and
+    `color` ([r, g, b], 0-1), evaluated at the live playhead.
+
+    Confirmed live to follow the Volumetrics panel: setting Fog Type to
+    Linear by hand read back as type 1. Read-only - there is no working
+    way to set fog from here: the Fog* commands are accepted but have no
+    effect in LightWave 2019, and a hand change in the panel logs no
+    command at all."""
+    return json.dumps(_query("get_fog"))
+
+
+# DELIBERATELY NOT REGISTERED as an MCP tool: in LightWave 2019 the Fog*
+# commands are accepted and logged in Cmd History but change nothing -
+# confirmed live against lw_get_fog, both with and without "Use Legacy
+# Volumetrics". See PLAN.md "Fog commands have no effect". Kept for
+# reference; use lw_get_fog to read the fog and the UI to set it.
 def lw_set_fog(fog_type: int = None, min_distance: float = None, max_distance: float = None,
                min_amount: float = None, max_amount: float = None, color: list = None) -> str:
     """Set scene fog (Render Properties > Volumetrics > Fog Type/Min-Max
@@ -1456,7 +1476,9 @@ def lw_set_fog(fog_type: int = None, min_distance: float = None, max_distance: f
     `min_amount`/`max_amount` (FogMinDistance/FogMaxDistance/
     FogMinAmount/FogMaxAmount) were NOT independently tested live -
     same confirmed-`*args` signature shape as every other command in
-    this survey, shipped by pattern-confidence, not verified.
+    this survey, shipped by pattern-confidence, not verified. After
+    sending, the fog is read back (lw_get_fog) and returned as `state`,
+    so each of these can now be checked against what LightWave holds.
 
     `color` (FogColor) has a real, unresolved gap: sent successfully
     (logged cleanly in Cmd History, no error) both before AND after
@@ -1490,9 +1512,11 @@ def lw_set_fog(fog_type: int = None, min_distance: float = None, max_distance: f
         if color is not None:
             lw.FogColor(*color)
             sent.append("FogColor")
-        return json.dumps({"result": "set %s" % sent})
     except Exception as exc:  # noqa: BLE001
-        return json.dumps({"error": str(exc)})
+        return json.dumps({"error": str(exc), "sent": sent})
+    time.sleep(0.3)
+    state = _query("get_fog")
+    return json.dumps({"sent": sent, "state": state.get("result", state)})
 
 
 @mcp.tool()
@@ -1664,7 +1688,7 @@ def lw_set_light(light: str, intensity: float = None, color: list = None,
     independently visually confirmed the way falloff_type was.
 
     Deliberately does NOT cover LightVisibleToCamera/LightCastsShadows.
-    Both are confirmed-live, genuine argument-less TOGGLES (Cmd History
+    Both are confirmed-live, real argument-less TOGGLES (Cmd History
     shows a bare "LightVisibleToCamera"/"LightCastsShadows" with no
     following number after clicking their checkboxes - unlike
     MotionBlur, which looked the same way but turned out to take a real
@@ -1972,7 +1996,7 @@ def lw_toggle_ik_flag(item: str, flag: str) -> str:
     (ROADMAP2.md item 7). flag must be "full_time_ik" or
     "unaffected_by_ik".
 
-    Both are confirmed live to be genuine argument-less TOGGLES, same
+    Both are confirmed live to be real argument-less TOGGLES, same
     situation as lw_set_light's deliberately-unwrapped
     LightVisibleToCamera/LightCastsShadows: Cmd History showed a bare
     "FullTimeIK"/"UnaffectedByIK" with no argument following after
@@ -2009,7 +2033,7 @@ def lw_toggle_object_visibility(item: str, flag: str) -> str:
     flag must be one of "unseen_by_rays", "unseen_by_camera",
     "unseen_by_radiosity", "unaffected_by_fog".
 
-    All four confirmed live to be genuine argument-less TOGGLES, same
+    All four confirmed live to be real argument-less TOGGLES, same
     shape and same finding as lw_toggle_ik_flag's FullTimeIK/
     UnaffectedByIK: Cmd History showed each command bare, no argument
     following, after clicking every one of the four real "Object
@@ -2055,7 +2079,7 @@ def lw_toggle_object_visibility(item: str, flag: str) -> str:
 def lw_set_alpha_channel_mode(item: str, mode: int) -> str:
     """Set an object's Alpha Channel mode (ROADMAP3.md item 5). Wraps
     UnseenByAlphaChannel(mode) - a real, confirmed bug found while
-    investigating this: the native command genuinely takes an argument
+    investigating this: the native command takes an argument
     (confirmed live via Cmd History: "UnseenByAlphaChannel 1"), but the
     bundled lwcommandport stub had it wrapped with no way to pass one at
     all, the same class of bug as Ring()/SetRenderDisplay()/MotionBlur()
@@ -2167,7 +2191,7 @@ def lw_toggle_bone_flag(item: str, flag: str) -> str:
     or `"twist"`. `item` must be a bone's numeric ID (see lw_set_bone's
     docstring for why).
 
-    The first four confirmed live to be genuine argument-less TOGGLES (a
+    The first four confirmed live to be real argument-less TOGGLES (a
     definitive test, not just a UI guess: passing an explicit argument
     to any of them raises a clean Python arg-count error from the stub
     itself, e.g. "takes 1 positional argument but 2 were given" -
@@ -2192,7 +2216,7 @@ def lw_toggle_bone_flag(item: str, flag: str) -> str:
     matching amount setters). All confirmed live via the Bones panel's
     "Bone Displacement"/"Parent Displacement" section: `joint_comp`
     ("Joint Compensation") and `bulge`/`bulge_parent` ("Muscle
-    Bulge"/"Parental Muscle Bulge") are each genuinely independent
+    Bulge"/"Parental Muscle Bulge") are each independent
     checkboxes - toggling one leaves the other's checked state alone,
     confirmed by toggling only `joint_comp` and seeing only that row
     checked. `muscle_flex` (`BoneMuscleFlex`) is NOT independent of its
@@ -2371,7 +2395,7 @@ def lw_toggle_use_morphed_positions() -> str:
     morphs instead of before, and is documented there as not supported
     with Limited Bones. Wraps the native UseMorphedPositions() command.
 
-    Confirmed live to be a genuine argument-less TOGGLE via the
+    Confirmed live to be a real argument-less TOGGLE via the
     definitive arg-count test (passing an explicit argument raises a
     clean Python "takes 1 positional argument but 2 were given" error
     from the stub). Its own checkbox could not be located as a visible

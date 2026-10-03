@@ -31,7 +31,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    `server.py` tools. This turns out to control which objects a light
    illuminates (Light Properties > Objects tab, or equivalently an
    object's own Item Properties > Lights tab - the same underlying
-   data either way). Confirmed the relationship is genuinely
+   data either way). Confirmed the relationship is
    bidirectional and stays in sync: setting it from the light's side
    (`IncludeObject`) and later toggling it from the object's side
    (`ExcludeLight`) both correctly updated the same shared list entry,
@@ -60,18 +60,18 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    `lw_clear_scene`, and `lw_save_object`. Confirmed live end to end:
    a full save -> clear -> reload round trip correctly restored every
    item, and the saved `.lws` file's own content was checked directly
-   (not just that a file appeared) to confirm it genuinely referenced
+   (not just that a file appeared) to confirm it referenced
    the real items with their correct numeric IDs. One real UI gotcha
    found and documented: loading from outside LightWave's configured
    Content Directory pops a blocking confirmation dialog a one-way
    command can't dismiss (answering "No" still lets the load proceed).
 
-   `lw_save_object` surfaced a genuinely new, unsolved wrinkle in this
+   `lw_save_object` surfaced a new, unsolved wrinkle in this
    connector's numeric-ID story: for a real multi-layer object loaded
    via `lw_load_object`, neither `SelectItem(name)` NOR `SelectItem`
    with the object's regular numeric ID (from `lw_get_item_id`)
    reliably switched the current object the first time this session -
-   a genuine manual click was needed once (revealing, via Cmd History,
+   a real manual click was needed once (revealing, via Cmd History,
    a second, differently-scoped `SelectItem` call LightWave's own UI
    sends first) before the object's regular ID became reliable on its
    own for the rest of the session. Shipped with the best available
@@ -146,7 +146,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    Python `TypeError`. Live verification proved that wrong: clicking
    their real checkboxes in the UI and checking Cmd History showed a
    bare `LightVisibleToCamera`/`LightCastsShadows` with no argument
-   following - both are genuine argument-less toggles, and the
+   following - both are real argument-less toggles, and the
    `TypeError` was simply Python correctly rejecting an argument that
    was never valid to begin with. This is exactly the failure mode this
    project's live-verification norm exists to catch: a wrapper-level
@@ -177,7 +177,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    correctly add/remove one item at a time from a real multi-selection
    without disturbing the rest, verified against both
    `lw_get_selection` and a Scene Editor screenshot showing both rows
-   genuinely highlighted.
+   highlighted.
 
    **But this doesn't unlock the batch-write efficiency this item was
    hoping for.** Confirmed live: with two Objects selected this way,
@@ -187,7 +187,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    Command Port acts on a single "current item" pointer, not the
    highlighted selection set as a whole - the same "current item"
    concept `_set_reference_item` already works around via `SelectItem`.
-   These two tools are genuinely useful for building/inspecting a
+   These two tools are useful for building/inspecting a
    selection-state result (e.g. handing a user a specific multi-select
    for their own subsequent manual work), but every write tool in this
    connector still needs its own per-item loop - there's no shortcut
@@ -204,7 +204,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    `UnaffectedByIK`/`FullTimeIK`/`EnableIK`/`EnableDeformations`/
    `EnableMC` were the only bare zero-arg candidates, matching the
    shape that turned out to be a real bug three times this phase
-   (`Ring`/`SetRenderDisplay`/`MotionBlur`) and a genuine toggle twice
+   (`Ring`/`SetRenderDisplay`/`MotionBlur`) and a real toggle twice
    (`LightVisibleToCamera`/`LightCastsShadows`) - checked the two named
    in this item's own description live rather than assuming either way.
 
@@ -214,7 +214,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    Options showed "Goal Strength: 0.9" / "IK/FK Blending: 30.0%"
    right after sending 0.9 / 0.3 - the same 0.0-1.0-fraction-as-percent
    convention as `lw_set_camera`'s `shutter_efficiency`).
-   `UnaffectedByIK`/`FullTimeIK` are both confirmed genuine
+   `UnaffectedByIK`/`FullTimeIK` are both confirmed real
    argument-less toggles (Cmd History logged them bare after clicking
    the real checkboxes) - no stub fix needed, and no way to set/read a
    known state, so `lw_toggle_ik_flag` flips rather than sets, the same
@@ -226,7 +226,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    **The real discovery: bones have no name this connector could
    resolve at all.** `lw_get_item_id`/`_resolve_item_id` only search
    Objects/Lights/Cameras (`_find_item`'s item-type list never included
-   `LWI_BONE`) - a bone genuinely could not be targeted by name through
+   `LWI_BONE`) - a bone could not be targeted by name through
    any tool here, IK-related or not. Fixed two ways: `_get_bones` (in
    `lw_mcp_ring.py`) now reports each bone's own numeric "id" via
    `lwsdk.itemid_to_str()`, exposed through `lw_get_hierarchy`; and
@@ -250,7 +250,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    doesn't take settable arguments, so `lwsdk.LWSurfaceFuncs()` (the
    same class `lw_get_surface_info` already reads through) via its
    `setFlt()` method was the only real path. A temporary `lw_introspect`
-   diagnostic tool (since removed) confirmed `LWSurfaceFuncs` genuinely
+   diagnostic tool (since removed) confirmed `LWSurfaceFuncs`
    exposes `setFlt`/`setColorVMap`/`setImg`/`setMaterial`/`setInt`/
    `setShadingModel`/`setTex` as real bound methods before writing
    anything against them.
@@ -280,7 +280,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    regex's first group non-greedy, then fully reverted the disabled
    stub and re-verified live from scratch: `diffuse=0.5` alone (Surface
    Editor showed 50.0%), then `color=[1,0,0]` + `glossiness=0.8`
-   together (a genuinely red color swatch and "Glossiness 80.0%"),
+   together (a red color swatch and "Glossiness 80.0%"),
    both matching `lw_get_surface_info`'s read-back exactly.
 
    Real, reusable lesson for this project's own methodology: a
@@ -321,7 +321,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
    9 channels with one implicit key each at frame 0 (real LightWave
    defaults - Position 0.0, Rotation 0.0, Scale 1.0). A Null keyframed at
    frames 0 and 30 (position only, via `lw_set_keyframe`) correctly
-   showed the real multi-key data, and surfaced a genuinely new,
+   showed the real multi-key data, and surfaced a new,
    previously-unobservable LightWave behavior in the process: every
    channel also gets an automatic extra key at the scene's configured
    end frame, and a channel whose value never actually changed between
@@ -332,7 +332,7 @@ documented crash (`LWChannelInfo`/`nextGroup`).
 
 ## Status: all 9 items done
 
-Item 6 turned out to have a mixed result (`AddToSelection` genuinely
+Item 6 turned out to have a mixed result (`AddToSelection`
 works, but doesn't unlock batched writes the way it was hoped to).
 Item 8 had a real scare mid-investigation (a false "hangs forever"
 diagnosis that looked exactly like this project's one other crash,

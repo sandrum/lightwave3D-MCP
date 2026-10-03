@@ -22,7 +22,7 @@ that big command list) to actually run.
 
 ALSO CONFIRMED LIVE: mod.execute()'s reported result code is unreliable
 - it returned 0 ("failure" per NewTek's own sample comment) both when
-the port was genuinely fresh/never bound AND when the port was already
+the port was fresh/never bound AND when the port was already
 successfully bound and listening (verified via a UDP bind-conflict test:
 binding 0.0.0.0:9736 from a second socket failed with "address already
 in use" immediately after this script ran, proving Modeler really was
