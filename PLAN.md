@@ -3438,3 +3438,62 @@ original `FogColor` observation, and means the earlier note that
 `FogType 1` "correctly showed Linear" can't be reproduced. `lw_set_fog`
 is kept in `server.py` for reference but no longer registered as a
 tool; `lw_get_fog` is shipped, confirmed to follow hand changes.
+
+## Per-object global illumination (ROADMAP3.md Known misses #3)
+
+`ObjGIRadiosityTolerance` had been shipped as `lw_set_gi_radiosity_tolerance`
+targeting Render Properties' Angular Tolerance, and always failed with
+"This option only applies when Global Illumination Mode is set to Monte
+Carlo Interpolated" - a mode the Render Properties Type dropdown never
+offers. The `Obj` prefix was the clue: the command list has a whole
+per-object family (`ObjGIUseGlobal(mode)`, `ObjGIBruteForceRays`,
+`ObjGIRaysPerEvaluation`, `ObjGISecondaryBounceRays`,
+`ObjGIMissingSampleRays`, `ObjGIRadiosityTolerance`,
+`ObjGIMin/MaxPixelSpacing`), and `lwrender.h`'s LWObjectInfo has a
+matching getter for each (`giMode`, `bruteForceRays`, `primaryRays`,
+`secondaryRays`, `missingSampleRays`, `angularTolerance`,
+`minimum/maximumPixelSpacing`).
+
+Cmd History, with the user changing things by hand:
+
+- Render Properties > Global Illumination: ticking Interpolated and
+  setting Angular Tolerance to 30 logged nothing (just `Refresh`), and
+  the object's own tolerance stayed 20 - the global panel doesn't go
+  through commands.
+- Object Properties > **Global Illum** tab: a "Global Illumination
+  Mode" dropdown - Use Global, Monte Carlo Brute Force, **Monte Carlo
+  Interpolated** - logging `ObjGIUseGlobal <n>`.
+- Changing the object's tolerance with Enable GI off popped a modal
+  "This option only applies when Enable Radiosity is turned on". With
+  GI on and the mode Interpolated, setting 30 logged
+  `ObjGIRadiosityTolerance 0.1339746`.
+
+0.1339746 is 1 - cos(30 deg), so the first version of `lw_set_object_gi`
+converted degrees that way. The read-back disproved it: sending 0.234
+stored 0.234, and sending a plain 40 stored 40 (and the Object
+Properties panel showed 40.0 deg). The command takes degrees; Cmd
+History just displays 1 - cos of the value - it showed the 0.234 as
+`8.34465e-06` and the 40 as `0.2339556`.
+
+Live results, each confirmed by `lw_get_object_gi` and then in the
+panel: mode 0/1/2 = Use Global / Brute Force / Interpolated; primary
+rays 200 (`ObjGIRaysPerEvaluation`), secondary rays 80
+(`ObjGISecondaryBounceRays`), pixel spacing 3 / 50, tolerance 40 and
+35, brute-force rays 4. `ObjGIMissingSampleRays 20` changed nothing
+(stayed 16) and never appeared in Cmd History - LightWave drops it, and
+the setting isn't on the tab - so it isn't offered.
+
+`lw_set_object_gi` replaces `lw_set_gi_radiosity_tolerance`. It
+selects the object by numeric ID, and before sending anything checks
+the preconditions LightWave enforces with modal dialogs: Enable GI on
+(read from LWSceneInfo renderOpts' LWROPT_RADIOSITY bit, now reported
+by `lw_get_object_gi` as `gi_enabled` - which also gives the Enable GI
+toggle a read-back), mode "interpolated" for the interpolated settings
+and "brute_force" for `brute_force_rays`. Both refusals were confirmed
+live with nothing sent. The scene's Enable GI was on as loaded.
+
+Side fix: `_query` in server.py could raise FileNotFoundError when it
+checked the reply file at the instant lw_mcp_ring.py was replacing it
+(the ring removes the old file, then renames the new one in) - seen
+once on an `lw_ping`. The modification-time check now treats a missing
+file as "no reply yet".

@@ -127,7 +127,8 @@ checking Cmd History against a real UI click first.
    subset, with two open findings.** Shipped
    `lw_set_render_globals(threads=, tile_size=)`,
    `lw_toggle_global_illumination()`, `lw_set_gi_interpolated(enabled)`,
-   and `lw_set_gi_radiosity_tolerance(degrees)`. Closes the biggest
+   and `lw_set_gi_radiosity_tolerance(degrees)` (since replaced by
+   `lw_set_object_gi` - see Known misses #3). Closes the biggest
    remaining "can run renders but can't configure them" gap - this
    connector could only trigger renders and read completion before this.
 
@@ -466,12 +467,14 @@ re-discovering them from scratch.
    belongs to the Volume Integrator plug-in and logs no command when
    changed by hand. `lw_set_fog` was withdrawn; `lw_get_fog` reads the
    fog. See `PLAN.md` "Fog commands have no effect".
-3. **`ObjGIRadiosityTolerance`'s precondition is never actually
-   satisfiable** in this install - the error message references a
-   "Monte Carlo Interpolated" GI mode that the Type dropdown never
-   offers as a selectable option, even after enabling GI and checking
-   "Interpolated". Shipped anyway since the argument itself is
-   confirmed correct.
+3. **`ObjGIRadiosityTolerance`'s precondition - RESOLVED.** It's a
+   per-object setting: "Monte Carlo Interpolated" is an option of the
+   object's own Global Illumination Mode (Object Properties > Global
+   Illum), not of Render Properties' Type dropdown, and Enable GI must
+   also be on. `lw_set_object_gi` sets the mode and tolerance (in
+   degrees) and the rest of the per-object GI settings, checking both
+   preconditions first; `lw_get_object_gi` reads them back. See
+   `PLAN.md` "Per-object global illumination".
 4. **An unexplained UI freeze** occurred once during `ROADMAP3.md` item
    5 testing (Object Properties/Scene Editor/Cmd History/Master Plugins
    windows stopped responding to mouse input while Cmd History kept
@@ -568,10 +571,9 @@ each would add to the connector, most valuable first:
 5. **Enveloped (animated) node inputs - DONE** (Known misses #11):
    detected and reported with their keys, and refused for setting.
    Writing animation keys remains open.
-6. **`ObjGIRadiosityTolerance`'s unreachable precondition mode.**
-   Chasing down why "Monte Carlo Interpolated" never appears as a
-   selectable Type in this install - polish on an already-shipped tool,
-   not new capability.
+6. **`ObjGIRadiosityTolerance`'s precondition mode - RESOLVED**
+   (Known misses #3): the mode is per-object. Replaced by
+   `lw_set_object_gi` / `lw_get_object_gi`.
 7. **`FogColor`'s dead swatch - RESOLVED** (Known misses #2): the
    whole `Fog*` command family is a no-op in 2019. Fog is now
    read-only via `lw_get_fog`.

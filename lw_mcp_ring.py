@@ -346,6 +346,50 @@ def _get_color_space():
     return result
 
 
+_OBJECT_GI_MODES = {0: "global", 1: "brute_force", 2: "interpolated"}
+
+
+def _get_object_gi(name):
+    """Per-object global illumination settings (Object Properties) via
+    LWObjectInfo's version-12 getters in lwrender.h: giMode,
+    bruteForceRays, primaryRays, secondaryRays, missingSampleRays,
+    angularTolerance, minimumPixelSpacing, maximumPixelSpacing - one
+    per command in the ObjGI* family. giMode is the Object Properties
+    > Global Illum "Global Illumination Mode" dropdown: 0 Use Global,
+    1 Monte Carlo Brute Force, 2 Monte Carlo Interpolated (all confirmed
+    live). angularTolerance is in degrees, the same unit the
+    ObjGIRadiosityTolerance command takes. Also reports `gi_enabled`, the scene-wide Enable GI
+    (LWSceneInfo renderOpts' LWROPT_RADIOSITY bit), which every ObjGI*
+    setting needs. Each field is read separately so one failing doesn't
+    hide the rest."""
+    obj_id = _find_item(name)
+    if obj_id is None:
+        return {"error": "object not found: %s" % name}
+    oi = lwsdk.LWObjectInfo()
+    result = {"name": name}
+    try:
+        result["gi_enabled"] = bool(int(lwsdk.LWSceneInfo().renderOpts) & (1 << 15))
+    except Exception as exc:  # noqa: BLE001
+        result["gi_enabled_error"] = str(exc)
+    for key, attr in (
+        ("gi_mode", "giMode"),
+        ("brute_force_rays", "bruteForceRays"),
+        ("primary_rays", "primaryRays"),
+        ("secondary_rays", "secondaryRays"),
+        ("missing_sample_rays", "missingSampleRays"),
+        ("angular_tolerance", "angularTolerance"),
+        ("min_pixel_spacing", "minimumPixelSpacing"),
+        ("max_pixel_spacing", "maximumPixelSpacing"),
+    ):
+        try:
+            result[key] = getattr(oi, attr)(obj_id)
+        except Exception as exc:  # noqa: BLE001
+            result[key + "_error"] = str(exc)
+    if "gi_mode" in result:
+        result["gi_mode_name"] = _OBJECT_GI_MODES.get(result["gi_mode"], "unknown")
+    return result
+
+
 _FOG_TYPES = {0: "Off", 1: "Linear", 2: "Nonlinear 1", 3: "Nonlinear 2", 4: "Realistic"}
 
 
@@ -1801,6 +1845,8 @@ def _handle_query(text):
             payload = {"result": _get_selection()}
         elif command == "get_color_space":
             payload = {"result": _get_color_space()}
+        elif command == "get_object_gi":
+            payload = {"result": _get_object_gi(arg)}
         elif command == "get_fog":
             payload = {"result": _get_fog()}
         elif command == "get_render_options":

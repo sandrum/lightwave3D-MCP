@@ -130,7 +130,8 @@ installation and setup, see [GETTING_STARTED.md](GETTING_STARTED.md).
 | `lw_set_antialiasing(camera=, min_samples=, max_samples=, adaptive_sampling=, adaptive_threshold=, filter_radius=)` | Set a camera's antialiasing (draft vs. final quality); reads every value back to confirm. |
 | `lw_toggle_global_illumination()` | Flip "Enable GI". |
 | `lw_set_gi_interpolated(enabled)` | Set GI's "Interpolated" mode. |
-| `lw_set_gi_radiosity_tolerance(degrees)` | Set GI's Angular Tolerance. |
+| `lw_get_object_gi(item)` | Read an object's own GI settings (mode, rays, pixel spacing, angular tolerance) and whether Enable GI is on. |
+| `lw_set_object_gi(item, mode=, angular_tolerance=, brute_force_rays=, primary_rays=, secondary_rays=, min_pixel_spacing=, max_pixel_spacing=)` | Set an object's own GI settings (Object Properties > Global Illum); checks the preconditions first. |
 
 **Scene environment**
 
@@ -490,18 +491,31 @@ this is distilled from.
 - **Render Globals / GI quality settings** (ROADMAP3.md item 3) -
   `lw_set_render_globals(threads=, tile_size=)`, `lw_toggle_global_
   illumination()`, `lw_set_gi_interpolated(enabled)`,
-  `lw_set_gi_radiosity_tolerance(degrees)`. Closes the biggest remaining
+  `lw_get_object_gi(item)`, `lw_set_object_gi(item, ...)`. Closes the biggest remaining
   "can trigger renders but can't configure them" gap. `threads`/
   `tile_size` confirmed live with zero preconditions - `threads` even
   auto-unchecked "Automatic Multithreading" as a side effect.
   `lw_toggle_global_illumination` confirmed live as a real
   argument-less toggle for "Enable GI". `lw_set_gi_interpolated(1)`
-  confirmed live to check the "Interpolated" checkbox. `lw_set_gi_
-  radiosity_tolerance` hit a real, unresolved precondition - LightWave's
-  error dialog references a "Monte Carlo Interpolated" mode this
-  install's Type dropdown never actually offered as a selectable option
-  - shipped anyway since the argument itself is confirmed correct,
-  documented rather than hidden. `EnableRadiosity1` (a sibling
+  confirmed live to check the "Interpolated" checkbox. Angular
+  tolerance, which the old `lw_set_gi_radiosity_tolerance` could never
+  set, turned out to be a **per-object** setting: Object Properties >
+  Global Illum has its own "Global Illumination Mode" (Use Global /
+  Monte Carlo Brute Force / Monte Carlo Interpolated - the "Monte Carlo
+  Interpolated" that LightWave's error message names), and the whole
+  `ObjGI*` command family acts on the selected object.
+  `lw_set_object_gi(item, mode=, angular_tolerance=, brute_force_rays=,
+  primary_rays=, secondary_rays=, min_pixel_spacing=,
+  max_pixel_spacing=)` replaces it: it selects the object by ID,
+  checks the two preconditions LightWave enforces with modal error
+  dialogs (Enable GI on; the interpolated settings need mode
+  "interpolated", `brute_force_rays` needs "brute_force") and refuses
+  instead of sending, then reads everything back via
+  `lw_get_object_gi`. Tolerance is in plain degrees - Cmd History shows
+  it as 1 - cos(angle), but that's only how it's logged. All values
+  confirmed live against the read-back and the Object Properties panel.
+  `ObjGIMissingSampleRays` isn't offered: LightWave drops it without
+  logging it, and it isn't on the tab. `EnableRadiosity1` (a sibling
   of the wrapped `EnableRadiosity0`) is definitively resolved as
   non-existent: calling it live popped LightWave's own error dialog,
   "Unknown command: 'EnableRadiosity1'" - proof, not a guess, that

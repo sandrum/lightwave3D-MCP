@@ -386,21 +386,32 @@ def lw_set_keyframe(name: str, frame: int, position: list = None, rotation: list
 RING_TOPIC = "MCP"
 
 
+def _mtime(path):
+    """A file's modification time, or None if it doesn't exist - including
+    the moment lw_mcp_ring.py replaces the reply file (it removes the old
+    one, then renames the new one in), which used to surface as a
+    FileNotFoundError from a bare exists()/getmtime() pair."""
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
 def _query(command, arg="", timeout=5.0):
     """Read path over LWComRing. Requires lw_mcp_ring.py to be loaded AND
     activated (Utilities > Master Plugins) in the current Layout session -
     see lw_mcp_ring.py's docstring for the two-step setup. Sends
     "{MCP} <command> <arg>" via the (bug-fixed) Ring() method, then polls
     _mcp_response.json for the plug-in's answer."""
-    before_mtime = os.path.getmtime(RESPONSE_PATH) if os.path.exists(RESPONSE_PATH) else None
+    before_mtime = _mtime(RESPONSE_PATH)
 
     cmd_string = ("%s %s" % (command, arg)).strip()
     _layout().Ring(RING_TOPIC, cmd_string)
 
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if os.path.exists(RESPONSE_PATH):
-            mtime = os.path.getmtime(RESPONSE_PATH)
+        mtime = _mtime(RESPONSE_PATH)
+        if mtime is not None:
             if before_mtime is None or mtime > before_mtime:
                 try:
                     with open(RESPONSE_PATH) as f:
@@ -1255,8 +1266,8 @@ def lw_toggle_global_illumination() -> str:
     logged it bare, repeatedly, after clicking the real checkbox
     on/off several times) - same limitation as every other confirmed
     toggle in this connector (lw_toggle_ik_flag, lw_toggle_object_
-    visibility): no way to read current state back, so this flips
-    rather than sets.
+    visibility): it flips rather than sets. To see the current state,
+    read `gi_enabled` from lw_get_object_gi (any object).
 
     A sibling command, EnableRadiosity1, was found in the same survey
     and definitively resolved this follow-up sweep: calling it live
@@ -1285,9 +1296,10 @@ def lw_set_gi_interpolated(enabled: int) -> str:
     name and argument-count requirement - treat with slightly less
     confidence than the confirmed `1` case.
 
-    This gates lw_set_gi_radiosity_tolerance's precondition, but not
-    completely - see that tool's docstring for a real, still-open
-    limitation found while testing this."""
+    This is the scene-wide "Interpolated" checkbox. It is NOT the
+    "Monte Carlo Interpolated" mode that per-object angular tolerance
+    needs - that's the object's own Global Illumination Mode, set with
+    lw_set_object_gi(mode="interpolated")."""
     try:
         _layout().RadiosityInterpolation(enabled)
         return json.dumps({"result": "sent RadiosityInterpolation %s" % enabled})
@@ -1295,36 +1307,86 @@ def lw_set_gi_interpolated(enabled: int) -> str:
         return json.dumps({"error": str(exc)})
 
 
-@mcp.tool()
-def lw_set_gi_radiosity_tolerance(degrees: float) -> str:
-    """Set Global Illumination's Angular Tolerance (Render Properties >
-    Global Illumination > Interpolated > "Angular Tolerance")
-    (ROADMAP3.md item 3). Wraps ObjGIRadiosityTolerance(degrees),
-    already correctly taking a real argument in the stub.
+_OBJECT_GI_MODES = {"global": 0, "brute_force": 1, "interpolated": 2}
 
-    Real, unresolved precondition found live: LightWave pops "This
-    option only applies when Global Illumination Mode is set to Monte
-    Carlo Interpolated" - and this persisted even after enabling GI
-    (lw_toggle_global_illumination) AND setting Interpolated mode
-    (lw_set_gi_interpolated(1)), both confirmed to have taken visible
-    effect in the UI beforehand. The "Type" dropdown this install
-    offers only has one option, "Monte Carlo" - no distinct "Monte
-    Carlo Interpolated" mode was ever reachable to select, despite the
-    error message referencing it by that exact name. Shipped anyway,
-    following the same precedent as lw_set_camera's MotionBlur-gated
-    shutter properties: the write command itself is legitimate and its
-    argument is confirmed correct, it just couldn't be exercised to a
-    visible effect in this install this session. Also worth noting: two
-    calls to this command were silently dropped somewhere between this
-    connector and Layout during testing (never appeared in Cmd History
-    at all, not even as the precondition error) - the one-way Command
-    Port has no delivery guarantee, so an apparently-silent call here
-    isn't necessarily this command's own fault."""
+
+@mcp.tool()
+def lw_set_object_gi(item: str, mode: str = None, angular_tolerance: float = None,
+                     brute_force_rays: int = None, primary_rays: int = None,
+                     secondary_rays: int = None, min_pixel_spacing: float = None,
+                     max_pixel_spacing: float = None) -> str:
+    """Set an object's own global illumination settings - Object
+    Properties > Global Illum. Any parameter left as None is not
+    touched; `item` is the object's name.
+
+    `mode` is the "Global Illumination Mode" dropdown: "global" (Use
+    Global), "brute_force" (Monte Carlo Brute Force) or "interpolated"
+    (Monte Carlo Interpolated). `angular_tolerance` is in degrees.
+
+    Preconditions, checked before anything is sent (LightWave answers a
+    violation with a modal error dialog that blocks Layout): the scene's
+    Enable GI must be on for any setting except `mode` - confirmed live,
+    "This option only applies when Enable Radiosity is turned on" - and
+    the interpolated settings (`angular_tolerance`, `primary_rays`,
+    `secondary_rays`, `min/max_pixel_spacing`) need mode "interpolated", `brute_force_rays` mode "brute_force"
+    (those fields are greyed out in the other modes). Turn Enable GI on
+    with lw_toggle_global_illumination.
+
+    The mode logs `ObjGIUseGlobal <n>` in Cmd History: Use Global 0,
+    Monte Carlo Brute Force 1, Monte Carlo Interpolated 2 (all three
+    confirmed live by read-back). Angular tolerance is sent in plain
+    degrees: Cmd History shows a hand-set 30 as `ObjGIRadiosityTolerance
+    0.1339746` (1 - cos 30), but that's only how it's logged - sending
+    0.234 stored 0.234, sending 40 stored 40. Every value here was
+    confirmed by read-back (`ObjGIRaysPerEvaluation` is Primary Rays,
+    `ObjGISecondaryBounceRays` Secondary Rays). Not offered:
+    `ObjGIMissingSampleRays` - sending it changed nothing, and the
+    setting isn't on the object's GI tab. Each command is preceded by
+    SelectItem with the object's numeric ID. After sending, reads
+    everything back (lw_get_object_gi) and returns it as `state`."""
+    if mode is not None and mode not in _OBJECT_GI_MODES:
+        return json.dumps({"error": "mode must be one of %s" % sorted(_OBJECT_GI_MODES)})
+    settings = [(angular_tolerance, "ObjGIRadiosityTolerance", "interpolated"),
+                (primary_rays, "ObjGIRaysPerEvaluation", "interpolated"),
+                (secondary_rays, "ObjGISecondaryBounceRays", "interpolated"),
+                (min_pixel_spacing, "ObjGIMinPixelSpacing", "interpolated"),
+                (max_pixel_spacing, "ObjGIMaxPixelSpacing", "interpolated"),
+                (brute_force_rays, "ObjGIBruteForceRays", "brute_force")]
+    wanted = [(v, c, m) for v, c, m in settings if v is not None]
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve object: %s" % item, "detail": id_resp})
+    if wanted:
+        current = _query("get_object_gi", item).get("result", {})
+        if "gi_mode_name" not in current or "gi_enabled" not in current:
+            return json.dumps({"error": "couldn't read the object's GI state, so nothing "
+                                        "was sent", "detail": current})
+        if not current["gi_enabled"]:
+            return json.dumps({"error": "Enable GI is off - turn it on first "
+                                        "(lw_toggle_global_illumination); nothing was sent"})
+        effective = mode if mode is not None else current["gi_mode_name"]
+        blocked = [c for _v, c, m in wanted if m != effective]
+        if blocked:
+            return json.dumps({"error": "%s need(s) a different mode than %r "
+                                        "(interpolated settings need 'interpolated', "
+                                        "brute_force_rays needs 'brute_force'); nothing was sent"
+                                        % (blocked, effective)})
+    lw = _layout()
+    sent = []
     try:
-        _layout().ObjGIRadiosityTolerance(degrees)
-        return json.dumps({"result": "sent ObjGIRadiosityTolerance %s" % degrees})
+        lw.SelectItem(item_id)
+        if mode is not None:
+            lw._send_command("ObjGIUseGlobal", [_OBJECT_GI_MODES[mode]])
+            sent.append("ObjGIUseGlobal %d" % _OBJECT_GI_MODES[mode])
+        for value, command, _m in wanted:
+            lw._send_command(command, [value])
+            sent.append("%s %s" % (command, value))
     except Exception as exc:  # noqa: BLE001
-        return json.dumps({"error": str(exc)})
+        return json.dumps({"error": str(exc), "sent": sent})
+    time.sleep(0.3)
+    state = _query("get_object_gi", item)
+    return json.dumps({"item": item, "id": item_id, "sent": sent,
+                       "state": state.get("result", state)})
 
 
 @mcp.tool()
@@ -2025,6 +2087,16 @@ def lw_toggle_ik_flag(item: str, flag: str) -> str:
         return json.dumps({"result": "toggled %s on %s (id %s)" % (command, item, item_id)})
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def lw_get_object_gi(item: str) -> str:
+    """Read an object's own global illumination settings (Object
+    Properties): `gi_mode`, `brute_force_rays`, `primary_rays`,
+    `secondary_rays`, `missing_sample_rays`, `angular_tolerance`,
+    `min_pixel_spacing`, `max_pixel_spacing` - via LWObjectInfo's
+    per-object GI getters. `item` is the object's name."""
+    return json.dumps(_query("get_object_gi", item))
 
 
 @mcp.tool()
