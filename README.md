@@ -351,8 +351,8 @@ reliably fixes it.
 | `lw_get_surface_nodes(surface=)` | List every node in a surface's node graph. |
 | `lw_get_node_inputs(surface=, node=)` | List a specific node's real parameter names. |
 | `lw_get_node_channel(surface=, node=, channel=)` | Read a node parameter's actual keyframe data. |
-| `lw_get_node_values(node, surface=)` | Read every stored input value of a node (e.g. Principled's Color, Roughness), with its units. |
-| `lw_set_node_input(node, input_name, value, surface=)` | Set one input value - one number, or three 0-1 numbers for a color. Percent is a fraction (35% = `0.35`). |
+| `lw_get_node_values(node, surface=)` | Read every stored input value of a node (e.g. Principled's Color, Roughness), with its units; animated inputs are marked `enveloped` and include their keys. |
+| `lw_set_node_input(node, input_name, value, surface=)` | Set one input value - one number, or three 0-1 numbers for a color. Percent is a fraction (35% = `0.35`). Refuses animated (enveloped) inputs. |
 | `lw_add_node(surface=, node_type=, x=, y=)` | Create a new node (added disconnected; at the graph's origin unless `x`/`y` are given). **`node_type` must be a confirmed-real `server_user_name`, never a guess - an invalid one freezes Layout with a blocking dialog.** |
 | `lw_connect_nodes(surface=, from_node=, to_node=, input_name=, output_name=)` | Wire one node's output into another's input, replacing what fed it (`to_node="Surface"` is the root, e.g. its `Material` input). Reports the connections LightWave actually has afterwards. |
 | `lw_disconnect_nodes(surface=, to_node=, input_name=)` | Remove the wire feeding one input. |

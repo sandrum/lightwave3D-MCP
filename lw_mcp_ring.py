@@ -749,12 +749,26 @@ def _get_node_channel(surf_name, node_name, channel_name):
     Real, confirmed limitation: reports "channel not found" for any
     parameter that hasn't been enveloped - this is the honest boundary
     of what's readable today, not a bug to work around."""
+    envelopes = _node_envelopes(surf_name, node_name)
+    if "error" in envelopes:
+        return envelopes
+    if channel_name not in envelopes["channels"]:
+        return {"error": "channel not found (not enveloped?): %s" % channel_name}
+    return {"surface": surf_name, "node": node_name, "channel": channel_name,
+            "keys": envelopes["channels"][channel_name]}
+
+
+def _node_envelopes(surf_name, node_name):
+    """Every enveloped (animated) input of one node, as
+    {"channels": {channel_name: [key, ...]}} - the channel walk
+    _get_node_channel documents (surface chanGrp -> "Nodes" group ->
+    the node's own group -> its channels -> keys). An input only has a
+    channel once it's enveloped, so a node with no animated inputs - or
+    no channel group of its own yet - just yields an empty dict."""
     surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
     if not surf_ids:
         return {"error": "surface not found: %s" % surf_name}
-    surf = surf_ids[0]
-    sf = lwsdk.LWSurfaceFuncs()
-    top_group = sf.chanGrp(surf)
+    top_group = lwsdk.LWSurfaceFuncs().chanGrp(surf_ids[0])
 
     ci = lwsdk.LWChannelInfo()
     ef = lwsdk.LWEnvelopeFuncs()
@@ -762,7 +776,7 @@ def _get_node_channel(surf_name, node_name, channel_name):
 
     nodes_group = ci.nextGroup(top_group, None)
     if nodes_group is None:
-        return {"error": "no 'Nodes' sub-group found on %s" % surf_name}
+        return {"channels": {}}
 
     target_group = None
     group = None
@@ -774,32 +788,37 @@ def _get_node_channel(surf_name, node_name, channel_name):
             target_group = group
             break
     if target_group is None:
-        return {"error": "node group not found: %s" % node_name}
+        return {"channels": {}}
 
-    target_chan = None
+    channels = {}
     chan = None
     for _ in range(_MAX_SURFACE_CHANNELS):
         chan = ci.nextChannel(target_group, chan)
         if chan is None:
             break
-        if ci.channelName(chan) == channel_name:
-            target_chan = chan
-            break
-    if target_chan is None:
-        return {"error": "channel not found (not enveloped?): %s" % channel_name}
+        env = ci.channelEnvelope(chan)
+        keys = []
+        key = None
+        for _ in range(_MAX_KEYS_PER_CHANNEL):
+            key = ef.nextKey(env, key)
+            if key is None:
+                break
+            _, t = ef.keyGet(env, key, lwsdk.LWKEY_TIME)
+            _, v = ef.keyGet(env, key, lwsdk.LWKEY_VALUE)
+            _, shape = ef.keyGet(env, key, lwsdk.LWKEY_SHAPE)
+            keys.append({"time_seconds": t, "frame": t * fps if fps else None,
+                         "value": v, "shape": shape})
+        channels[ci.channelName(chan)] = keys
+    return {"channels": channels}
 
-    env = ci.channelEnvelope(target_chan)
-    keys = []
-    key = None
-    for _ in range(_MAX_KEYS_PER_CHANNEL):
-        key = ef.nextKey(env, key)
-        if key is None:
-            break
-        _, t = ef.keyGet(env, key, lwsdk.LWKEY_TIME)
-        _, v = ef.keyGet(env, key, lwsdk.LWKEY_VALUE)
-        _, shape = ef.keyGet(env, key, lwsdk.LWKEY_SHAPE)
-        keys.append({"time_seconds": t, "frame": t * fps if fps else None, "value": v, "shape": shape})
-    return {"surface": surf_name, "node": node_name, "channel": channel_name, "keys": keys}
+
+def _input_envelope(channels, input_name):
+    """Envelope keys belonging to one input: its own channel, or - for a
+    multi-value input such as a colour, whose per-component channel
+    names haven't been seen live yet - any channel named
+    "<input>.<something>"."""
+    return dict((name, keys) for name, keys in channels.items()
+                if name == input_name or name.startswith(input_name + "."))
 
 
 def _add_node(surf_name, node_type, x=0, y=0):
@@ -1321,8 +1340,18 @@ def _get_node_values(surf_name, node_name):
             os.remove(path)
         except OSError:
             pass
-    return {"surface": surf_name, "node": node_name,
-            "inputs": [_public_attr(a) for a in attrs]}
+    inputs = [_public_attr(a) for a in attrs]
+    result = {"surface": surf_name, "node": node_name, "inputs": inputs}
+    envelopes = _node_envelopes(surf_name, node_name)
+    if "error" in envelopes:
+        result["envelope_check_error"] = envelopes["error"]
+        return result
+    for entry in inputs:
+        found = _input_envelope(envelopes["channels"], entry["name"])
+        entry["enveloped"] = bool(found)
+        if found:
+            entry["envelope"] = found
+    return result
 
 
 def _format_value(shape, values):
@@ -1349,6 +1378,15 @@ def _set_node_input(surf_name, node_name, input_name, values):
     if _find_node(nef, nf, editor, node_name) is None:
         return {"error": "node not found: %s (available: %s)"
                          % (node_name, _node_names(nef, nf, editor))}
+
+    envelopes = _node_envelopes(surf_name, node_name)
+    if "error" in envelopes:
+        return envelopes
+    found = _input_envelope(envelopes["channels"], input_name)
+    if found:
+        return {"error": "%s is animated (it has an envelope), so its stored value "
+                         "is overridden - not changed. Its keys: %s"
+                         % (input_name, found)}
 
     path = lw_mcp_config.exchange_path(_REWIRE_SCRATCH)
     try:

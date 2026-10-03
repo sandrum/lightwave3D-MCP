@@ -3367,3 +3367,42 @@ had kept Light Properties open to watch the change. `lw_set_light` now
 refuses `falloff_type` values other than 0/1, and both light tools'
 descriptions (plus README) warn to close Light Properties before
 changing falloff.
+
+## Animated node inputs (ROADMAP3.md Known misses #11)
+
+Expected an enveloped input to appear in the saved graph in a new
+shape that `lw_get_node_values` would report as "unsupported". Live,
+with Principled BSDF's Roughness enveloped by hand (Graph Editor keys:
+frame 0 = 10%, frame 30 = 50%), it still came back as a plain `"vparam"`
+`0.1`: the envelope isn't in the node's saved `{ Attr }` data at all.
+`lw_get_node_channel` read both keys exactly - the animation lives in
+the surface's channel groups (surface `chanGrp` -> "Nodes" -> the
+node's group -> one channel per enveloped input), and an input only has
+a channel once it's enveloped.
+
+So the value tools were silently misleading for animated inputs:
+reporting a static value the envelope overrides, and letting
+`lw_set_node_input` change a value that would have no effect. Fixed by
+factoring `_get_node_channel`'s channel walk into `_node_envelopes`
+(all of a node's enveloped channels and their keys) and matching each
+input to its channel - by exact name, or `"<input>.<something>"` for
+multi-value inputs such as colours, whose per-component channel names
+haven't been seen live yet (offline-checked that "Specular" doesn't
+match "Specular Tint"):
+
+- `lw_get_node_values` reports `enveloped` for every input, plus
+  `envelope` (the keys) for animated ones.
+- `lw_set_node_input` refuses an animated input, listing its keys.
+
+Live: before the envelope, all 24 inputs read `enveloped: false` (a
+node with no channel group of its own is handled); after it, only
+Roughness read `true`, with both keys. Setting Roughness was refused;
+setting Metallic to 0.25 worked - and since every node write reloads
+the whole graph from text, the envelope was checked again afterwards:
+still present by the channel read, and the user confirmed the Surface
+Editor still showed Roughness's E button lit with both keys in the
+Graph Editor, and Metallic at 25%.
+
+Still open: writing animation keys, which would need the SDK's
+LWEnvelopeFuncs editing calls - unused and untested here, so not
+attempted given this project's record with the node SDK's mutators.

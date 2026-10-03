@@ -944,9 +944,17 @@ def lw_get_node_values(node: str, surface: str = "CONNECTOR") -> str:
     0.784), "Distance" is in metres, "Float" is a plain number. `type`
     is "vparam" (one number), "vparam3" (three) or "int" (a whole
     number); "unsupported" means a shape this connector doesn't parse
-    (an enveloped input, say), with no value. Inputs that only take a
-    wire (e.g. Principled's Projection, Normal, Bump) have no stored
-    value and aren't listed.
+    (none seen yet), with no value. Inputs that only take a wire (e.g.
+    Principled's Projection, Normal, Bump) have no stored value and
+    aren't listed.
+
+    Each input also reports `enveloped`. An animated (enveloped) input's
+    animation is NOT in the saved graph - confirmed live, Roughness
+    keyed 10% -> 50% still showed its plain stored 0.1 there - so its
+    `value` is only the static base value, which the envelope
+    overrides. For those, `envelope` holds the real keys (frame, value,
+    shape) from the surface's animation channels, the same data
+    lw_get_node_channel reads.
 
     Works by saving the surface's graph as ASCII and parsing the node's
     block - read-only, nothing is loaded back."""
@@ -971,8 +979,10 @@ def lw_set_node_input(node: str, input_name: str, value: float | list[float],
     input's value line in the saved graph, loads it back, then re-saves
     and reports `before`, the `value` LightWave actually holds, and
     `set`. Adds a `warning` when a wire feeds the input, since the wire
-    then overrides the value. Close and reopen an open Surface Editor
-    to see the change."""
+    then overrides the value. Refuses an animated (enveloped) input,
+    listing its keys instead - its stored value is overridden by the
+    envelope, so changing it would do nothing. Close and reopen an open
+    Surface Editor to see the change."""
     return json.dumps(_query("set_node_input", "%s|%s|%s|%s"
                              % (surface, node, input_name, json.dumps(value))))
 

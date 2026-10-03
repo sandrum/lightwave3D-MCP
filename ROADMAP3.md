@@ -510,27 +510,19 @@ re-discovering them from scratch.
     `"Images"`, etc.) are inferred from the Preferences > Paths panel's
     own visible labels, never tested against a real UI change one by
     one.
-11. **Node input values with an envelope (animated inputs) can't be
-    read or set by `lw_get_node_values`/`lw_set_node_input`.** The
-    mirror image of the gap this item used to describe (un-enveloped
-    values, now readable). Both tools parse each input's `{ Attr }`
-    block in the saved graph, and handle only the three plain shapes
-    seen so far (`"vparam"` one number, `"vparam3"` three, `"int"` a
-    whole number). An enveloped input is presumably stored differently
-    - but no enveloped input has ever been inspected, so that's a guess.
-    By design, such an input is reported as type `"unsupported"` with no
-    value, and `lw_set_node_input` refuses it with nothing changed - but
-    that path has never run live either. `lw_get_node_channel` still
-    reads an enveloped input's keyframes. **To pick this up:** in the
-    Node Editor, add an envelope to one Principled BSDF input (its "E"
-    button) and key a couple of values; check `lw_get_node_values`
-    reports it as `"unsupported"`; then look at that input's raw
-    `{ Attr }` text - nothing currently exposes the raw saved graph
-    (the old `lw_probe_save_node_graph` was removed), so a small
-    temporary dump is needed. Then decide what "setting" an animated
-    input should mean - edit the current key, drop the envelope, or
-    refuse - before writing anything. See `PLAN.md` "Node Editor
-    writing", step 7.
+11. **Animated (enveloped) node inputs - RESOLVED.** The guess here
+    was wrong: an envelope is NOT stored in the node's saved `{ Attr }`
+    data - that keeps its plain static value (confirmed live: Roughness
+    keyed 10% -> 50% still saved as `0.1`). The animation lives in the
+    surface's channel groups, the data `lw_get_node_channel` reads, and
+    an input only has a channel once enveloped. So `lw_get_node_values`
+    now marks each input `enveloped` true/false and, for animated ones,
+    includes the keys; `lw_set_node_input` refuses an animated input
+    (its stored value is overridden by the envelope), listing its keys.
+    Confirmed live; a node write on another input left the envelope
+    intact. Not done: *setting* animation keys (would need the SDK's
+    envelope-editing calls, untested). See `PLAN.md` "Animated node
+    inputs".
 
 ## Remaining work, ranked by usefulness
 
@@ -572,12 +564,9 @@ each would add to the connector, most valuable first:
    checkboxes, confirmed live. Default Buffer can be set but not read
    back (LightWave's reader returns nothing for it). See `PLAN.md`
    "Colour space".
-5. **Enveloped (animated) node inputs in `lw_get_node_values`/
-   `lw_set_node_input`** (Known misses #11). A completeness item for
-   the node-value tools - narrower than anything above, since plain
-   values already work and `lw_get_node_channel` already reads an
-   enveloped input's keyframes. (The item that used to sit here,
-   reading un-enveloped node parameters, is done.)
+5. **Enveloped (animated) node inputs - DONE** (Known misses #11):
+   detected and reported with their keys, and refused for setting.
+   Writing animation keys remains open.
 6. **`ObjGIRadiosityTolerance`'s unreachable precondition mode.**
    Chasing down why "Monte Carlo Interpolated" never appears as a
    selectable Type in this install - polish on an already-shipped tool,
