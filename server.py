@@ -2463,9 +2463,15 @@ def lw_save_endomorph(item: str, name: str) -> str:
     bake - a new named Endomorph appearing with correct deformed
     positions - is NOT independently confirmed end to end, only that
     the command exists, takes a name argument, and enforces this real
-    precondition. Left for a future session with a real mesh object
-    (loaded via lw_load_object) that has some actual point deformation
-    (bones/Morph Mixer) applied to bake."""
+    precondition.
+
+    Confirmed end to end on a real mesh (test_assets/WeightTest_rig.lws,
+    WT_Upper bent 45 deg): SaveEndomorph Bent logged with no dialog, and
+    a copy of the object saved afterwards (lw_save_object) contained a
+    new MORF vmap "Bent" whose per-point offsets follow the bend - ~0 at
+    the bottom, up to (+0.31, -0.05) m near the top. Points that didn't
+    move are left out of the map. The morph lives on the object in
+    memory; save the object to keep it."""
     item_id, id_resp = _resolve_item_id(item)
     if not item_id:
         return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})

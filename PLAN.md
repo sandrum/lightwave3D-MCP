@@ -3543,3 +3543,12 @@ toggle). `lw_set_bone_deform(twist=0.5)` then logged `BoneTwistAmount
 "does not apply to the current bone type" refusal was the Z axis type.
 `lw_set_bone` gained `bone_type` ("z_axis"/"joint", sent raw as
 `BoneType <n>`); 1 = Joint confirmed, 0 = Z axis by list order.
+
+Endomorph bake (#5): with WT_Upper back to Z axis, map "Upper" and
+weight-map-only off (the clear 45-degree bend), `lw_save_endomorph
+("WeightTest", "Bent")` logged `SelectItem 10000000` / `SaveEndomorph
+Bent`, no dialog. To check the result objectively, `lw_save_object`
+wrote a copy to a temp file (LightWave saves LWO3), parsed back: a new
+`VMAP MORF "Bent"`, 40 of 44 points (unmoved ones omitted), offsets
+~0 at y = 0.1-0.3, (0.06, 0.03) at 0.6, (0.18, -0.16) at 0.8, (0.31,
+-0.05) at 0.9 - matching the bend. The weight maps were preserved.

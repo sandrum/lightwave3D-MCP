@@ -485,11 +485,11 @@ re-discovering them from scratch.
    recurs, especially isolated to one specific command, it deserves the
    same staged investigation this project gave its two confirmed real
    crashes (`LWChannelInfo`/`nextGroup`, `_TOPIC_RE`).
-5. **`SaveEndomorph`'s actual bake was never confirmed end to end** -
-   only that it enforces a real "Null objects are automatically saved
-   with the scene" precondition. Needs a real mesh object (via
-   `lw_load_object`) with real point deformation applied to bake a
-   verifiable Endomorph against.
+5. **`SaveEndomorph` - RESOLVED.** On the weight-mapped test rig with
+   WT_Upper bent 45 degrees, `lw_save_endomorph("WeightTest", "Bent")`
+   ran with no dialog, and a saved copy of the object contained a new
+   MORF map "Bent" whose offsets follow the bend (~0 at the bottom, up
+   to +0.31 m sideways near the top).
 6. **`UseMorphedPositions`'s positive effect was never observed** -
    confirmed a real toggle with a real "not supported with the
    current bone mode" precondition, but no bone mode was ever found in
