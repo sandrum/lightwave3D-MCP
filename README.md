@@ -15,16 +15,6 @@ including every confirmed dead end before each working mechanism was found,
 and `ROADMAP.md`/`ROADMAP2.md`/`ROADMAP3.md` for what's been built, in order,
 and why.
 
-## What is an MCP?
-
-If MCP is a new term for you: a Model Context Protocol server wraps a program
-or API in a way that lets an AI assistant like Claude call it directly, in
-response to plain-English requests, instead of you writing and running a
-script by hand. This connector wraps LightWave's own Command Port so you can
-ask Claude to build a scene, rig a character, adjust lighting, or kick off a
-render - and have it actually happen in a running LightWave session - without
-leaving the chat.
-
 ## Features
 
 - **Full scene management** - create/load/save objects and scenes, manage
