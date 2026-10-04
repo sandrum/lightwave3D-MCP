@@ -1,5 +1,7 @@
 # Claude ↔ LightWave 2019 MCP connector
 
+[![tests](https://github.com/sandrum/lightwaveMCP/actions/workflows/tests.yml/badge.svg)](https://github.com/sandrum/lightwaveMCP/actions/workflows/tests.yml)
+
 A Model Context Protocol (MCP) server that gives Claude direct, live control
 over a running LightWave 2019 session - both Layout and, for writes only,
 Modeler - via LightWave's official Command Port. **Both writes and reads are
@@ -73,6 +75,7 @@ leaving the chat.
 - `lw_mcp_config.py` — shared settings (host, ports, exchange folder) read by `server.py` and every LightWave-side script, from `.env` if present. Not a plug-in; don't load it into LightWave.
 - `.env.example` — documented template for `.env` (see [GETTING_STARTED.md](GETTING_STARTED.md#configuration-optional)).
 - `server.py` — MCP server Claude Desktop launches. Layout writes/reads, animation, render/camera automation, hierarchy queries, and Modeler writes all work; Modeler reads do not (see above).
+- `tests/` — offline test suite (no LightWave needed), run on every push by GitHub Actions; see Tests below.
 - `test_assets/` — test fixtures: `make_weight_test.py` generates `WeightTest.lwo` (a 1 m column with "Upper"/"Lower" weight maps - none of LightWave's own sample objects has a weight map), and `WeightTest_rig.lws` loads it with a two-bone rig (`WT_Lower`, `WT_Upper`). Set the Content Directory to `test_assets/` before loading the scene.
 - `lwcommandport/` — NewTek's official Command Port client (copied from the LightWave install), with one real bug fixed in `Ring()` (see `PLAN.md`).
 - `lw_mcp_master.py`, `lw_mcp_query.py` — two earlier, unsuccessful attempts at solving Layout reads, kept for reference/history. Do not load.
@@ -81,6 +84,24 @@ leaving the chat.
 - `README.md`, `GETTING_STARTED.md`, `USAGE.md`, `STATUS.md` — overview, setup guide, tool guide, and current status.
 - `PLAN.md` — full build log: what's verified, what failed, what to try next.
 - `ROADMAP.md` — what's been built, in order, and why; the current state of every planned increment.
+
+## Tests
+
+The suite in `tests/` runs without LightWave, so it works on any machine
+and in CI. It covers the code that doesn't talk to LightWave: the node
+graph text rewriting behind the node tools, `.env` loading, the input
+checks that stop the server sending something LightWave would answer with
+a blocking dialog, the exact commands each tool sends, and static checks
+(every private name used is defined, every tool is registered, no local
+paths in tracked files).
+
+```
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+What LightWave does with those commands can only be checked live, in a
+running Layout - see `PLAN.md` for how each tool was verified.
 
 ## License
 

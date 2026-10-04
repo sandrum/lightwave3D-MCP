@@ -1,0 +1,634 @@
+{ Root
+  Location 0 0
+  Zoom 1
+  Disabled 1
+}
+Version 1
+{ Nodes
+  Server "Surface"
+  { Tag
+    RealName "Surface"
+    Name "Surface"
+    Coordinates -10 -10
+    Mode 1
+    Selected 0
+    { Data
+    }
+    Preview ""
+    Comment ""
+  }
+  Server "Input"
+  { Tag
+    RealName "Input"
+    Name "Input"
+    Coordinates -30 -10
+    Mode 1
+    Selected 0
+    { Data
+    }
+    Preview "Item ID"
+    Placement 1
+  }
+  Server "Standard"
+  { Tag
+    RealName "Standard"
+    Name "Standard (1)"
+    Coordinates 0 0
+    Mode 1
+    Selected 0
+    { Data
+      { StandardAttributes
+        { Metadata
+          Version 1
+          Enumerations 0
+          { AttributeData
+            { Attr
+              Name "Color"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Color"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam3"
+                { Value
+                  3
+                  0.78431373834609985352 0.78431373834609985352 0.78431373834609985352
+                }
+              }
+            }
+            { Attr
+              Name "Luminosity"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Diffuse"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  1
+                }
+              }
+            }
+            { Attr
+              Name "Specular"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Glossiness"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0.4000000000000000222
+                }
+              }
+            }
+            { Attr
+              Name "Reflection"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Transparency"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Refraction Index"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Float"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  1
+                }
+              }
+            }
+            { Attr
+              Name "Refraction Blur"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Translucency"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Color Highlight"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Color Filter"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Diffuse Sharpness"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Bump"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "TEXTURE" "On"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam3"
+                { Value
+                  3
+                  1 1 1
+                }
+              }
+            }
+            { Attr
+              Name "Bump Height"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    Preview "Material"
+    Placement 3
+  }
+  Server "Principled BSDF"
+  { Tag
+    RealName "Principled BSDF"
+    Name "Principled BSDF (1)"
+    Coordinates 0 0
+    Mode 1
+    Selected 0
+    { Data
+      { Attributes
+        { Metadata
+          Version 1
+          Enumerations 0
+          { AttributeData
+            { Attr
+              Name "Color"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Color"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam3"
+                { Value
+                  3
+                  0.50200000000000000178 0.50200000000000000178 0.50200000000000000178
+                }
+              }
+            }
+            { Attr
+              Name "Roughness"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0.10000000000000000555
+                }
+              }
+            }
+            { Attr
+              Name "Specular"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0.5
+                }
+              }
+            }
+            { Attr
+              Name "Specular Tint"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Sheen"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Sheen Tint"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Thin"
+              Flags 0
+              Tag "FORMAT" "Float"
+              Tag "NodeInputID" ""
+              { Value
+                "int"
+                0
+              }
+            }
+            { Attr
+              Name "Translucency"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Flatness"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Subsurface"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Subsurface Color"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Color"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam3"
+                { Value
+                  3
+                  0.50200000000000000178 0.50200000000000000178 0.50200000000000000178
+                }
+              }
+            }
+            { Attr
+              Name "Distance"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Distance"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0.10000000000000000555
+                }
+              }
+            }
+            { Attr
+              Name "Luminous"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Luminous Color"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Color"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam3"
+                { Value
+                  3
+                  0.50200000000000000178 0.50200000000000000178 0.50200000000000000178
+                }
+              }
+            }
+            { Attr
+              Name "Metallic"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Anisotropic"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Rotation"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Clearcoat"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Clearcoat Gloss"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  1
+                }
+              }
+            }
+            { Attr
+              Name "Transparency"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  0
+                }
+              }
+            }
+            { Attr
+              Name "Transmittance"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Color"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam3"
+                { Value
+                  3
+                  0.50200000000000000178 0.50200000000000000178 0.50200000000000000178
+                }
+              }
+            }
+            { Attr
+              Name "Transmittance Distance"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Distance"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  1
+                }
+              }
+            }
+            { Attr
+              Name "Refraction Index"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Float"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  1.5
+                }
+              }
+            }
+            { Attr
+              Name "Bump Height"
+              Flags 0
+              Tag "ENVELOPE" "On"
+              Tag "FORMAT" "Percent"
+              Tag "NodeInputID" ""
+              { Value
+                "vparam"
+                { Value
+                  1
+                  1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    Preview "Material"
+    Placement 3
+  }
+}
+{ Connections
+  NodeName "Surface"
+  InputName "Material"
+  InputNodeName "Principled BSDF (1)"
+  InputOutputName "Material"
+}
