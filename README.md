@@ -73,6 +73,7 @@ leaving the chat.
 - `lw_mcp_config.py` — shared settings (host, ports, exchange folder) read by `server.py` and every LightWave-side script, from `.env` if present. Not a plug-in; don't load it into LightWave.
 - `.env.example` — documented template for `.env` (see [GETTING_STARTED.md](GETTING_STARTED.md#configuration-optional)).
 - `server.py` — MCP server Claude Desktop launches. Layout writes/reads, animation, render/camera automation, hierarchy queries, and Modeler writes all work; Modeler reads do not (see above).
+- `test_assets/` — test fixtures: `make_weight_test.py` generates `WeightTest.lwo` (a 1 m column with "Upper"/"Lower" weight maps - none of LightWave's own sample objects has a weight map), and `WeightTest_rig.lws` loads it with a two-bone rig (`WT_Lower`, `WT_Upper`). Set the Content Directory to `test_assets/` before loading the scene.
 - `lwcommandport/` — NewTek's official Command Port client (copied from the LightWave install), with one real bug fixed in `Ring()` (see `PLAN.md`).
 - `lw_mcp_master.py`, `lw_mcp_query.py` — two earlier, unsuccessful attempts at solving Layout reads, kept for reference/history. Do not load.
 - `lw_socket_master.py` — superseded very first draft. Do not load.
