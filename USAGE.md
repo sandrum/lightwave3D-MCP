@@ -86,6 +86,8 @@ installation and setup, see [GETTING_STARTED.md](GETTING_STARTED.md).
 | `lw_get_surface_nodes(surface=)` | List every node in a surface's node graph. |
 | `lw_get_node_inputs(surface=, node=)` | List a specific node's real parameter names. |
 | `lw_get_node_channel(surface=, node=, channel=)` | Read a node parameter's actual keyframe data. |
+| `lw_set_node_key(node, channel, frame, value, surface=)` | On an animated node input, change the key at `frame` or add one there (value in the same units as `lw_get_node_values`). |
+| `lw_delete_node_key(node, channel, frame, surface=)` | Delete the key at `frame` on an animated node input (won't delete the last key). |
 | `lw_get_node_values(node, surface=)` | Read every stored input value of a node (e.g. Principled's Color, Roughness), with its units; animated inputs are marked `enveloped` and include their keys. |
 | `lw_set_node_input(node, input_name, value, surface=)` | Set one input value - one number, or three 0-1 numbers for a color. Percent is a fraction (35% = `0.35`). Refuses animated (enveloped) inputs. |
 | `lw_add_node(surface=, node_type=, x=, y=)` | Create a new node (added disconnected; at the graph's origin unless `x`/`y` are given). **`node_type` must be a confirmed-real `server_user_name`, never a guess - an invalid one freezes Layout with a blocking dialog.** |

@@ -173,3 +173,11 @@ def test_set_node_input_encodes_lists_as_json(server, fake_query):
     server.lw_set_node_input("Principled BSDF (1)", "Color", [1, 0, 0])
     assert fake_query.asked[-1] == ("set_node_input",
                                     "CONNECTOR|Principled BSDF (1)|Color|[1, 0, 0]")
+
+
+def test_node_key_tools_pass_their_arguments_to_the_plug_in(server, fake_query):
+    server.lw_set_node_key("Principled BSDF (1)", "Roughness", 30, 0.7)
+    assert fake_query.asked[-1] == ("set_node_key", "CONNECTOR|Principled BSDF (1)|Roughness|30|0.7")
+    server.lw_delete_node_key("Principled BSDF (1)", "Roughness", 15)
+    assert fake_query.asked[-1] == ("delete_node_key", "CONNECTOR|Principled BSDF (1)|Roughness|15")
+

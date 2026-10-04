@@ -194,3 +194,60 @@ def test_set_node_input_warns_when_a_wire_overrides_it(ring, surface):
     result = ring._set_node_input("CONNECTOR", "Principled BSDF (1)", "Roughness", [0.3])
     assert result["set"] is True
     assert "wire feeds this input" in result["warning"]
+
+
+# --- animation keys -------------------------------------------------------
+
+@pytest.fixture
+def animated(surface):
+    surface.envelopes = {"Principled BSDF (1)": {"Roughness": [(0.0, 0.1, 0), (1.0, 0.5, 0)]}}
+    return surface
+
+
+def frames_and_values(result):
+    return [(k["frame"], k["value"]) for k in result["keys"]]
+
+
+def test_set_node_key_changes_an_existing_key(ring, animated):
+    result = ring._set_node_key("CONNECTOR", "Principled BSDF (1)", "Roughness", 30, 0.7)
+    assert result["action"] == "changed"
+    assert frames_and_values(result) == [(0.0, 0.1), (30.0, pytest.approx(0.7))]
+
+
+def test_set_node_key_adds_a_key_in_time_order(ring, animated):
+    result = ring._set_node_key("CONNECTOR", "Principled BSDF (1)", "Roughness", 15, 0.3)
+    assert result["action"] == "added"
+    assert frames_and_values(result) == [(0.0, 0.1), (15.0, pytest.approx(0.3)), (30.0, 0.5)]
+
+
+def test_delete_node_key(ring, animated):
+    result = ring._delete_node_key("CONNECTOR", "Principled BSDF (1)", "Roughness", 30)
+    assert result["action"] == "deleted"
+    assert frames_and_values(result) == [(0.0, 0.1)]
+
+
+def test_delete_missing_key_is_refused(ring, animated):
+    result = ring._delete_node_key("CONNECTOR", "Principled BSDF (1)", "Roughness", 15)
+    assert "no key at frame" in result["error"]
+    assert len(result["keys"]) == 2
+
+
+def test_last_key_cannot_be_deleted(ring, animated):
+    ring._delete_node_key("CONNECTOR", "Principled BSDF (1)", "Roughness", 30)
+    result = ring._delete_node_key("CONNECTOR", "Principled BSDF (1)", "Roughness", 0)
+    assert "last key" in result["error"]
+    assert len(result["keys"]) == 1
+
+
+def test_keys_need_an_animated_input(ring, animated):
+    result = ring._set_node_key("CONNECTOR", "Principled BSDF (1)", "Metallic", 0, 0.5)
+    assert "isn't animated" in result["error"]
+    assert result["animated_inputs"] == ["Roughness"]
+    assert "isn't animated" in ring._delete_node_key("CONNECTOR", "Principled BSDF (1)",
+                                                     "Metallic", 0)["error"]
+
+
+def test_key_tools_on_an_unknown_surface(ring, animated):
+    assert "surface not found" in ring._set_node_key("NOPE", "Principled BSDF (1)",
+                                                     "Roughness", 0, 0.5)["error"]
+

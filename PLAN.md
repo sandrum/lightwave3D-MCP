@@ -3578,3 +3578,35 @@ logged `BoneMuscleFlexParent`. Then `lw_toggle_bone_flag("muscle_flex")`
 unticked only Muscle Flexing, and `("muscle_flex_parent")` only Parental
 Muscle Flexing. Independent one-to-one toggles, like the joint-comp and
 bulge pairs; the earlier note that `muscle_flex` ticked both was wrong.
+
+## Node animation keys
+
+Reading a node input's animation already worked (`lw_get_node_channel`,
+via the surface's channel groups). Writing uses the same envelopes and
+`lwenvel.h`'s key calls: `createKey(env, time, value)`,
+`destroyKey(env, key)`, `findKey(env, time)`, `keySet(env, key, tag,
+value)`. A zero-argument probe (Python rejects the call before anything
+reaches LightWave) confirmed the argument counts match the header, and
+listed the tags: LWKEY_VALUE 0, LWKEY_TIME 1, LWKEY_SHAPE 2, plus
+tension/continuity/bias, tangents and params.
+
+`lw_set_node_key(node, channel, frame, value)` changes the key at
+`frame` (findKey + keySet LWKEY_VALUE) or adds one (createKey);
+`lw_delete_node_key` uses findKey + destroyKey and refuses a missing key
+or an envelope's last key. Both refuse an unanimated input (listing the
+animated ones) and report every key afterwards. The channel walk was
+split out of `_node_envelopes` so read and write share it.
+
+Live, on CONNECTOR's Principled BSDF with Roughness keyed 0 -> 10%,
+30 -> 50% by hand: before the envelope existed, the tool refused ("isn't
+animated"). Then frame 30 set to 0.7 ("changed") - the Graph Editor
+showed "Value = 70.00 %"; a key added at frame 15 = 0.3 ("added", keys
+in time order) - the Graph Editor showed it, curve passing through;
+frame 15 deleted ("deleted") - the curve went back to two keys; deleting
+it again was refused. No dialogs, and Layout stayed responsive
+throughout - including edits made with the Graph Editor and Surface
+Editor open, unlike the light-falloff case.
+
+Not done: adding an envelope to an input that has none. `LWEnvelopeFuncs
+.create` exists, but the envelope would also have to be attached to the
+node input, and nothing found so far does that.

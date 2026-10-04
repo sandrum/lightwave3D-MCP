@@ -34,7 +34,9 @@ LANGID_USENGLISH = 2
 LWMAST_LAYOUT = 0
 
 LWIO_ASCII = 0
-LWKEY_TIME, LWKEY_VALUE, LWKEY_SHAPE = 0, 1, 2
+# LightWave's real tag numbers (confirmed live: VALUE 0, TIME 1, SHAPE 2).
+LWKEY_VALUE, LWKEY_TIME, LWKEY_SHAPE = 0, 1, 2
+_KEY_FIELD = {LWKEY_TIME: 0, LWKEY_VALUE: 1, LWKEY_SHAPE: 2}
 
 # --- sockets per node type ------------------------------------------------
 # The root "Surface" node lists an unnamed entry at index 0, as the real one
@@ -61,6 +63,7 @@ class Surface(object):
         self.name = name
         self.text = text
         self.envelopes = {}      # {node_name: {channel_name: [(time, value, shape), ...]}}
+        # keys are kept sorted by time; a key's ID is its index
         self.loads = 0           # how many times a graph was loaded into it
 
 
@@ -230,8 +233,29 @@ class LWEnvelopeFuncs(object):
         index = 0 if previous is None else previous + 1
         return index if index < len(env) else None
 
-    def keyGet(self, env, key, which):
-        return 1, env[key][which]
+    def keyGet(self, env, key, tag):
+        return 1, env[key][_KEY_FIELD[tag]]
+
+    def findKey(self, env, time):
+        for index, key in enumerate(env):
+            if abs(key[0] - time) < 1e-6:
+                return index
+        return None
+
+    def keySet(self, env, key, tag, value):
+        entry = list(env[key])
+        entry[_KEY_FIELD[tag]] = value
+        env[key] = tuple(entry)
+        env.sort(key=lambda k: k[0])
+        return 1
+
+    def createKey(self, env, time, value):
+        env.append((time, value, 0))
+        env.sort(key=lambda k: k[0])
+        return self.findKey(env, time)
+
+    def destroyKey(self, env, key):
+        del env[key]
 
 
 class LWSceneInfo(object):

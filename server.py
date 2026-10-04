@@ -314,6 +314,35 @@ _BONE_MODES = {"full": 0, "full_morphed_positions": 1, "faster": 2, "limited": 3
 
 
 @mcp.tool()
+def lw_set_node_key(node: str, channel: str, frame: float, value: float,
+                    surface: str = "CONNECTOR") -> str:
+    """Set an animation key on an animated (enveloped) node input - e.g.
+    a Principled BSDF's Roughness keyed over time. If there's a key at
+    `frame`, its value changes; otherwise a key is added there. `value`
+    uses the same internal units as lw_get_node_values (Percent as a
+    fraction: 70% = 0.7). `node` is a node_name, `channel` an input
+    name. Reports every key afterwards.
+
+    Only works on inputs that are already animated: an envelope must be
+    added first (the input's "E" button / Graph Editor). For a plain,
+    unanimated value use lw_set_node_input. Works through the SDK's
+    envelope calls (createKey/keySet), not the node-graph save/load the
+    other node tools use - animation isn't stored in the node graph."""
+    return json.dumps(_query("set_node_key", "%s|%s|%s|%s|%s"
+                             % (surface, node, channel, frame, value)))
+
+
+@mcp.tool()
+def lw_delete_node_key(node: str, channel: str, frame: float,
+                       surface: str = "CONNECTOR") -> str:
+    """Delete the animation key at `frame` on an animated node input.
+    Refuses if there's no key there, and won't delete an envelope's
+    last key. Reports every key afterwards."""
+    return json.dumps(_query("delete_node_key", "%s|%s|%s|%s"
+                             % (surface, node, channel, frame)))
+
+
+@mcp.tool()
 def lw_get_bone_mode(item: str) -> str:
     """Read an object's bone mode (Bones panel, the dropdown under
     Falloff Type) via LWObjectInfo.boneMode: `bone_mode` is "full",

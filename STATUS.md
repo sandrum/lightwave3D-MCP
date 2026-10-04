@@ -52,7 +52,9 @@ real thing.
 - Node graphs: add, remove, move and wire/unwire nodes, and read/set
   their input values (`lw_add_node`, `lw_remove_node`, `lw_move_node`,
   `lw_connect_nodes`, `lw_disconnect_nodes`, `lw_get_node_values`,
-  `lw_set_node_input`) - e.g. switch a surface's material to a red
+  `lw_set_node_input`), and change, add or delete animation keys on an
+  animated input (`lw_set_node_key`, `lw_delete_node_key`) - e.g.
+  switch a surface's material to a red
   Principled BSDF. Works by saving the graph as text,
   editing it and loading it back, because the SDK's own `addNode` and
   `connect` turned out to hang or freeze Layout (see `PLAN.md` "Node

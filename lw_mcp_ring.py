@@ -874,18 +874,26 @@ def _node_envelopes(surf_name, node_name):
     the node's own group -> its channels -> keys). An input only has a
     channel once it's enveloped, so a node with no animated inputs - or
     no channel group of its own yet - just yields an empty dict."""
+    found = _node_channel_envelopes(surf_name, node_name)
+    if "error" in found:
+        return found
+    return {"channels": dict((name, _envelope_keys(env))
+                             for name, env in found["envelopes"].items())}
+
+
+def _node_channel_envelopes(surf_name, node_name):
+    """{"envelopes": {channel_name: LWEnvelopeID}} for one node's
+    enveloped inputs - the channel walk shared by _node_envelopes (read)
+    and _set_node_key/_delete_node_key (write)."""
     surf_ids = lwsdk.LWSurfaceFuncs().byName(surf_name, None)
     if not surf_ids:
         return {"error": "surface not found: %s" % surf_name}
     top_group = lwsdk.LWSurfaceFuncs().chanGrp(surf_ids[0])
-
     ci = lwsdk.LWChannelInfo()
-    ef = lwsdk.LWEnvelopeFuncs()
-    fps = lwsdk.LWSceneInfo().framesPerSecond
 
     nodes_group = ci.nextGroup(top_group, None)
     if nodes_group is None:
-        return {"channels": {}}
+        return {"envelopes": {}}
 
     target_group = None
     group = None
@@ -897,28 +905,91 @@ def _node_envelopes(surf_name, node_name):
             target_group = group
             break
     if target_group is None:
-        return {"channels": {}}
+        return {"envelopes": {}}
 
-    channels = {}
+    envelopes = {}
     chan = None
     for _ in range(_MAX_SURFACE_CHANNELS):
         chan = ci.nextChannel(target_group, chan)
         if chan is None:
             break
-        env = ci.channelEnvelope(chan)
-        keys = []
-        key = None
-        for _ in range(_MAX_KEYS_PER_CHANNEL):
-            key = ef.nextKey(env, key)
-            if key is None:
-                break
-            _, t = ef.keyGet(env, key, lwsdk.LWKEY_TIME)
-            _, v = ef.keyGet(env, key, lwsdk.LWKEY_VALUE)
-            _, shape = ef.keyGet(env, key, lwsdk.LWKEY_SHAPE)
-            keys.append({"time_seconds": t, "frame": t * fps if fps else None,
-                         "value": v, "shape": shape})
-        channels[ci.channelName(chan)] = keys
-    return {"channels": channels}
+        envelopes[ci.channelName(chan)] = ci.channelEnvelope(chan)
+    return {"envelopes": envelopes}
+
+
+def _envelope_keys(env):
+    ef = lwsdk.LWEnvelopeFuncs()
+    fps = lwsdk.LWSceneInfo().framesPerSecond
+    keys = []
+    key = None
+    for _ in range(_MAX_KEYS_PER_CHANNEL):
+        key = ef.nextKey(env, key)
+        if key is None:
+            break
+        _, t = ef.keyGet(env, key, lwsdk.LWKEY_TIME)
+        _, v = ef.keyGet(env, key, lwsdk.LWKEY_VALUE)
+        _, shape = ef.keyGet(env, key, lwsdk.LWKEY_SHAPE)
+        keys.append({"time_seconds": t, "frame": t * fps if fps else None,
+                     "value": v, "shape": shape})
+    return keys
+
+
+def _animated_input(surf_name, node_name, channel_name):
+    """(LWEnvelopeID, None) for an animated input, or (None, error)."""
+    found = _node_channel_envelopes(surf_name, node_name)
+    if "error" in found:
+        return None, found
+    if channel_name not in found["envelopes"]:
+        return None, {"error": "%s on %s isn't animated (no envelope) - add one in the "
+                               "Graph Editor first; plain values are set with "
+                               "lw_set_node_input" % (channel_name, node_name),
+                      "animated_inputs": sorted(found["envelopes"])}
+    return found["envelopes"][channel_name], None
+
+
+def _set_node_key(surf_name, node_name, channel_name, frame, value):
+    """Set an animation key on an animated node input: change the value
+    of the key at `frame` if there is one (LWEnvelopeFuncs.keySet with
+    LWKEY_VALUE), otherwise add a key there (createKey). Uses the
+    envelope-editing calls from lwenvel.h directly (argument counts
+    confirmed by a zero-argument probe; see PLAN.md "Node animation
+    keys"). Confirmed live: changing, adding and deleting keys all show
+    in the Graph Editor, with Layout staying responsive even with the
+    Graph Editor open. Reports the keys afterwards."""
+    env, error = _animated_input(surf_name, node_name, channel_name)
+    if error:
+        return error
+    ef = lwsdk.LWEnvelopeFuncs()
+    fps = lwsdk.LWSceneInfo().framesPerSecond
+    time = float(frame) / fps
+    key = ef.findKey(env, time)
+    if key is not None:
+        ef.keySet(env, key, lwsdk.LWKEY_VALUE, float(value))
+        action = "changed"
+    else:
+        ef.createKey(env, time, float(value))
+        action = "added"
+    return {"surface": surf_name, "node": node_name, "channel": channel_name,
+            "frame": frame, "action": action, "keys": _envelope_keys(env)}
+
+
+def _delete_node_key(surf_name, node_name, channel_name, frame):
+    """Delete the animation key at `frame` on an animated node input
+    (LWEnvelopeFuncs.findKey + destroyKey). Refuses to delete an
+    envelope's last key. Reports the keys afterwards."""
+    env, error = _animated_input(surf_name, node_name, channel_name)
+    if error:
+        return error
+    ef = lwsdk.LWEnvelopeFuncs()
+    fps = lwsdk.LWSceneInfo().framesPerSecond
+    key = ef.findKey(env, float(frame) / fps)
+    if key is None:
+        return {"error": "no key at frame %s" % frame, "keys": _envelope_keys(env)}
+    if len(_envelope_keys(env)) <= 1:
+        return {"error": "won't delete the last key of an envelope", "keys": _envelope_keys(env)}
+    ef.destroyKey(env, key)
+    return {"surface": surf_name, "node": node_name, "channel": channel_name,
+            "frame": frame, "action": "deleted", "keys": _envelope_keys(env)}
 
 
 def _input_envelope(channels, input_name):
@@ -1870,6 +1941,15 @@ def _handle_query(text):
             payload = {"result": _get_selection()}
         elif command == "get_color_space":
             payload = {"result": _get_color_space()}
+        elif command == "set_node_key":
+            parts_sk = arg.split("|")
+            payload = {"result": _set_node_key(parts_sk[0] or "CONNECTOR", parts_sk[1],
+                                               parts_sk[2], float(parts_sk[3]),
+                                               float(parts_sk[4]))}
+        elif command == "delete_node_key":
+            parts_dk = arg.split("|")
+            payload = {"result": _delete_node_key(parts_dk[0] or "CONNECTOR", parts_dk[1],
+                                                  parts_dk[2], float(parts_dk[3]))}
         elif command == "get_bone_mode":
             payload = {"result": _get_bone_mode(arg)}
         elif command == "get_object_gi":

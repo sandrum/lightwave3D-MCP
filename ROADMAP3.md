@@ -530,9 +530,10 @@ re-discovering them from scratch.
     includes the keys; `lw_set_node_input` refuses an animated input
     (its stored value is overridden by the envelope), listing its keys.
     Confirmed live; a node write on another input left the envelope
-    intact. Not done: *setting* animation keys (would need the SDK's
-    envelope-editing calls, untested). See `PLAN.md` "Animated node
-    inputs".
+    intact. Writing keys is now done too: `lw_set_node_key` /
+    `lw_delete_node_key` change, add and delete keys on an animated
+    input. Not done: putting an envelope on an input that has none. See
+    `PLAN.md` "Animated node inputs" and "Node animation keys".
 
 ## Remaining work, ranked by usefulness
 
@@ -576,7 +577,8 @@ each would add to the connector, most valuable first:
    "Colour space".
 5. **Enveloped (animated) node inputs - DONE** (Known misses #11):
    detected and reported with their keys, and refused for setting.
-   Writing animation keys remains open.
+   Writing keys is done too (`lw_set_node_key`, `lw_delete_node_key`);
+   adding an envelope to an unanimated input remains open.
 6. **`ObjGIRadiosityTolerance`'s precondition mode - RESOLVED**
    (Known misses #3): the mode is per-object. Replaced by
    `lw_set_object_gi` / `lw_get_object_gi`.
