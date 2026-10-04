@@ -1,6 +1,9 @@
 # Claude ↔ LightWave 2019 MCP connector
 
 [![tests](https://github.com/sandrum/lightwave3D-MCP/actions/workflows/tests.yml/badge.svg)](https://github.com/sandrum/lightwave3D-MCP/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.10 | 3.13](https://img.shields.io/badge/python-3.10%20%7C%203.13-blue.svg)](.github/workflows/tests.yml)
+[![LightWave 2019.1.5](https://img.shields.io/badge/LightWave-2019.1.5-orange.svg)](GETTING_STARTED.md#prerequisites)
 
 A Model Context Protocol (MCP) server that gives Claude direct, live control
 over a running LightWave 2019 session - both Layout and, for writes only,
