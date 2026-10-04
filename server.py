@@ -2361,13 +2361,12 @@ def lw_toggle_bone_flag(item: str, flag: str) -> str:
     Bulge"/"Parental Muscle Bulge") are each independent
     checkboxes - toggling one leaves the other's checked state alone,
     confirmed by toggling only `joint_comp` and seeing only that row
-    checked. `muscle_flex` (`BoneMuscleFlex`) is NOT independent of its
-    parent counterpart the same way - confirmed live that toggling only
-    `muscle_flex` checked BOTH "Muscle Flexing" AND "Parental Muscle
-    Flexing" simultaneously, unlike the joint-comp/bulge pairs;
-    `muscle_flex_parent` (`BoneMuscleFlexParent`) was not independently
-    re-tested given this, and may be redundant with `muscle_flex` or
-    control something else not covered by this session's screenshots.
+    checked. `muscle_flex` (`BoneMuscleFlex`, "Muscle Flexing") and
+    `muscle_flex_parent` (`BoneMuscleFlexParent`, "Parental Muscle
+    Flexing") are independent too - confirmed via Cmd History (each
+    checkbox logs its own command) and by toggling each through this
+    tool, which flipped only its own box. An earlier note that
+    `muscle_flex` ticked both was wrong.
     `twist` (`BoneTwist`) has a real precondition, confirmed live via
     LightWave's own error dialog: "This option does not apply to the
     current bone type" - consistent with its "Twist" row appearing

@@ -3571,3 +3571,10 @@ Side note: `lw_save_object` behaves like Save As - after saving a copy
 to a temp file, the scene's object was renamed `WeightTest_baked` and
 pointed at the copy (the repo's WeightTest.lwo was untouched). Layout
 was restarted without saving before continuing.
+
+Muscle flexing (#8): on WT_Upper, both boxes started unticked; clicking
+Muscle Flexing logged `BoneMuscleFlex`, clicking Parental Muscle Flexing
+logged `BoneMuscleFlexParent`. Then `lw_toggle_bone_flag("muscle_flex")`
+unticked only Muscle Flexing, and `("muscle_flex_parent")` only Parental
+Muscle Flexing. Independent one-to-one toggles, like the joint-comp and
+bulge pairs; the earlier note that `muscle_flex` ticked both was wrong.

@@ -504,12 +504,12 @@ re-discovering them from scratch.
    assigned) turned that into a gentle lean driven by the "Upper" map;
    switching to "Lower" straightened the top. See `PLAN.md` "Weight-map
    test rig".
-8. **`muscle_flex_parent` (`BoneMuscleFlexParent`)'s real UI mapping is
-   still uncertain** - toggling `muscle_flex` alone already checks BOTH
-   "Muscle Flexing" and "Parental Muscle Flexing", so `muscle_flex_
-   parent` produced no independently observable change of its own; it
-   may be redundant, or control something outside this session's
-   screenshots.
+8. **`muscle_flex_parent` (`BoneMuscleFlexParent`) - RESOLVED.** It
+   maps to "Parental Muscle Flexing", and `muscle_flex` to "Muscle
+   Flexing": clicking each by hand logged its own command, and toggling
+   each through `lw_toggle_bone_flag` flipped only its own box. The
+   earlier "muscle_flex ticks both" observation was wrong - most likely
+   one box was already ticked.
 9. **`twist` (`BoneTwist`/`BoneTwistAmount`) - RESOLVED.** Twist needs
    Bone Type = Joint. The dropdown has only Z axis / Joint (`BoneType
    0/1`); with Joint, the Twist checkbox (a bare `BoneTwist` toggle) and

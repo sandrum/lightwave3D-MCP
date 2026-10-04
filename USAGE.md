@@ -624,9 +624,10 @@ this is distilled from.
   `bulge`/`bulge_parent`/`twist` on `lw_toggle_bone_flag`, plus
   `lw_set_bone_deform` for their amounts) is now also confirmed live:
   `joint_comp`/`joint_comp_parent` and `bulge`/`bulge_parent` are each
-  independent checkboxes, but `muscle_flex` checks BOTH
-  "Muscle Flexing" AND "Parental Muscle Flexing" together - a real,
-  confirmed asymmetry, not a bug. `twist` only works on a **Joint**
+  independent checkboxes, and so are `muscle_flex` ("Muscle Flexing")
+  and `muscle_flex_parent` ("Parental Muscle Flexing") - each flips
+  only its own box (an earlier note saying `muscle_flex` ticked both
+  was wrong). `twist` only works on a **Joint**
   bone (`lw_set_bone(bone_type="joint")`, logged as `BoneType 1`); on a
   Z axis bone LightWave refuses it with "This option does not apply to
   the current bone type". Confirmed on the weight-mapped test rig:
