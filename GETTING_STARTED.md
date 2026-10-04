@@ -153,12 +153,12 @@ not any printed result.
 **5. Install the MCP server's dependency**
 
 ```
-pip install "mcp[cli]<2" --break-system-packages
+pip install "mcp[cli]>=1.20,<3" --break-system-packages
 ```
 
-On macOS, use `pip3` if `pip` isn't found. The `<2` matters: version 2 of
-the `mcp` package removed the `FastMCP` class `server.py` is built on, so
-an unpinned install gets a version the server can't start with.
+On macOS, use `pip3` if `pip` isn't found. `server.py` works with both
+version 1 and version 2 of the `mcp` package; the upper limit just keeps a
+future, untested major version from being installed.
 
 **6. Point Claude Desktop at `server.py`**
 

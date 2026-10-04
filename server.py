@@ -39,7 +39,12 @@ import json
 import os
 import time
 
-from mcp.server.fastmcp import FastMCP
+try:
+    # mcp 2.x renamed FastMCP to MCPServer; the API used here (constructor
+    # name, @tool(), run() over stdio, list_tools()) is the same in both.
+    from mcp.server.mcpserver import MCPServer
+except ImportError:  # mcp 1.x
+    from mcp.server.fastmcp import FastMCP as MCPServer
 
 from lwcommandport.layout import Layout
 from lwcommandport.modeler import Modeler
@@ -53,7 +58,7 @@ MODELER_PORT = lw_mcp_config.MODELER_PORT
 RESPONSE_PATH = lw_mcp_config.exchange_path("_mcp_response.json")
 MODELER_RESPONSE_PATH = lw_mcp_config.exchange_path("_mcp_modeler_response.json")
 
-mcp = FastMCP("lightwave")
+mcp = MCPServer("lightwave")
 
 
 def _layout():

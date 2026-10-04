@@ -3610,3 +3610,22 @@ Editor open, unlike the light-falloff case.
 Not done: adding an envelope to an input that has none. `LWEnvelopeFuncs
 .create` exists, but the envelope would also have to be attached to the
 node input, and nothing found so far does that.
+
+## mcp 1.x and 2.x
+
+The first GitHub test run failed because a fresh install picked up mcp
+2.x, which renamed `FastMCP` to `MCPServer` (in `mcp.server.mcpserver`);
+`mcp[cli]` was pinned below 2 as a stopgap. Everything server.py uses is
+otherwise unchanged between the two: the constructor name argument,
+`@mcp.tool()` (still returns the function), `run()` defaulting to
+stdio, and async `list_tools()`; both need Python 3.10+. So server.py
+now imports `MCPServer` and falls back to `FastMCP as MCPServer` on 1.x,
+and the pin is `>=1.20,<3`.
+
+Checked with both 1.28 and 2.3: all unit tests pass, and starting
+server.py as a stdio subprocess (as Claude Desktop does), initializing a
+session and listing tools returns all 86 tools. That startup check is now
+`tests/repo_checks/test_server_starts.py`, and CI runs the whole suite
+once per mcp major version (8 jobs: 2 OSes x 2 Pythons x 2 mcp
+versions). The 2.x client library also renamed `serverInfo` to
+`server_info` - only the test's client code needed that.

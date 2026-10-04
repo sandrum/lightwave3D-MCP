@@ -19,6 +19,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.13"]
+        # server.py supports both mcp major versions - test each.
+        mcp: ["mcp[cli]>=1.20,<2", "mcp[cli]>=2,<3"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +28,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: python -m pip install -r requirements-dev.txt
+        run: python -m pip install -r requirements-dev.txt "${{ matrix.mcp }}"
       - name: Unit tests
         run: python -m pytest tests/unit -v
       - name: Repository checks

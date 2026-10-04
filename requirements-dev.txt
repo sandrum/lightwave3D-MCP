@@ -1,4 +1,4 @@
 # Everything needed to run the test suite (python -m pytest).
-# server.py uses FastMCP, which mcp 2.x removed - keep below 2.
-mcp[cli]<2
+# server.py works with mcp 1.x and 2.x; CI tests both (see the workflow).
+mcp[cli]>=1.20,<3
 pytest
