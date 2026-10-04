@@ -349,6 +349,31 @@ def _get_color_space():
 _OBJECT_GI_MODES = {0: "global", 1: "brute_force", 2: "interpolated"}
 
 
+_BONE_MODES = {0: "full", 1: "full_morphed_positions", 2: "faster", 3: "limited"}
+
+
+def _get_bone_mode(name):
+    """An object's bone mode via LWObjectInfo.boneMode (lwrender.h, v13).
+    The header defines only LWBONEMODE_FULL 0 / FASTER 1 / LIMITED 2, but
+    that's out of date: confirmed live, the value uses the same 0-3
+    numbering as the BoneMode command and the Bones panel's four-entry
+    dropdown - 0 Full, 1 Full (Morphed Positions), 2 Faster, 3 Limited.
+    Also reports numLimitedBones."""
+    obj_id = _find_item(name)
+    if obj_id is None:
+        return {"error": "object not found: %s" % name}
+    oi = lwsdk.LWObjectInfo()
+    result = {"name": name}
+    for key, attr in (("bone_mode_raw", "boneMode"), ("limited_bones", "numLimitedBones")):
+        try:
+            result[key] = int(getattr(oi, attr)(obj_id))
+        except Exception as exc:  # noqa: BLE001
+            result[key + "_error"] = str(exc)
+    if "bone_mode_raw" in result:
+        result["bone_mode"] = _BONE_MODES.get(result["bone_mode_raw"], "unknown")
+    return result
+
+
 def _get_object_gi(name):
     """Per-object global illumination settings (Object Properties) via
     LWObjectInfo's version-12 getters in lwrender.h: giMode,
@@ -1845,6 +1870,8 @@ def _handle_query(text):
             payload = {"result": _get_selection()}
         elif command == "get_color_space":
             payload = {"result": _get_color_space()}
+        elif command == "get_bone_mode":
+            payload = {"result": _get_bone_mode(arg)}
         elif command == "get_object_gi":
             payload = {"result": _get_object_gi(arg)}
         elif command == "get_fog":

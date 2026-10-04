@@ -634,6 +634,13 @@ this is distilled from.
   showed "Twist: 50.0%". See
   `PLAN.md` "Deeper bone rigging" and "Follow-up sweep: closing the
   easy/moderate open items" for the full investigation.
+- `lw_get_bone_mode(item)` / `lw_set_bone_mode(item, mode)` - the
+  Bones panel's mode dropdown: "full", "full_morphed_positions",
+  "faster", "limited" (`BoneMode 0-3`), set and read back. "Use Morphed
+  Positions" is the second of these, not a separate checkbox, which is
+  why `lw_toggle_use_morphed_positions` was refused from Faster Bones.
+  All four confirmed live; the SDK header's own list (three modes) is
+  out of date.
 - `lw_save_endomorph(item, name)` and `lw_toggle_use_morphed_positions()`
   (ROADMAP3.md item 6 follow-up) - wrap `SaveEndomorph(name)`/
   `UseMorphedPositions()`. `SaveEndomorph` has a real, confirmed

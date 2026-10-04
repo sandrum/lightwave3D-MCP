@@ -490,11 +490,13 @@ re-discovering them from scratch.
    ran with no dialog, and a saved copy of the object contained a new
    MORF map "Bent" whose offsets follow the bend (~0 at the bottom, up
    to +0.31 m sideways near the top).
-6. **`UseMorphedPositions`'s positive effect was never observed** -
-   confirmed a real toggle with a real "not supported with the
-   current bone mode" precondition, but no bone mode was ever found in
-   this test rig where the toggle actually succeeds and does something
-   visible.
+6. **`UseMorphedPositions` - RESOLVED.** "Use Morphed Positions" is one
+   of four bone modes in the Bones panel dropdown (Full, Full (Morphed
+   Positions), Faster, Limited - `BoneMode 0-3`), not a separate
+   checkbox; the toggle switches Full <-> Full (Morphed Positions) and
+   is refused from the other two. Earlier tests were in Faster Bones.
+   New `lw_set_bone_mode` / `lw_get_bone_mode` set and read the mode
+   directly; all four confirmed live.
 7. **`BoneWeightMapOnly`/`weight_map_name` - RESOLVED.** Confirmed on
    the new weight-mapped test object (`test_assets/WeightTest_rig.lws`):
    with `WT_Upper` rotated 45 degrees, the column bent at the joint;

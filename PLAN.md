@@ -3552,3 +3552,22 @@ wrote a copy to a temp file (LightWave saves LWO3), parsed back: a new
 `VMAP MORF "Bent"`, 40 of 44 points (unmoved ones omitted), offsets
 ~0 at y = 0.1-0.3, (0.06, 0.03) at 0.6, (0.18, -0.16) at 0.8, (0.31,
 -0.05) at 0.9 - matching the bend. The weight maps were preserved.
+
+Bone mode / UseMorphedPositions (#6): the Bones panel's dropdown under
+Falloff Type lists Full Bones, Full Bones (Morphed Positions), Faster
+Bones, Limited Bones. Choosing Limited by hand logged `BoneMode 3`.
+`BoneMode 0` then showed Full Bones; `UseMorphedPositions` (bare) was
+accepted with no dialog and the dropdown showed "Full Bones (Morphed
+Positions)"; `BoneMode 2` showed Faster Bones; `BoneMode 1` showed Full
+Bones (Morphed Positions). So "Use Morphed Positions" is a mode, and the
+old "not supported with the current bone mode" refusal came from the
+rigs being in Faster Bones. `lwrender.h` lists only LWBONEMODE_FULL 0 /
+FASTER 1 / LIMITED 2, but `LWObjectInfo.boneMode` read back 0, 1, 2, 3
+for the four modes - the same numbering as the command, so the header is
+out of date. New `lw_set_bone_mode` / `lw_get_bone_mode` set and read
+the mode by name; all four round-trips confirmed.
+
+Side note: `lw_save_object` behaves like Save As - after saving a copy
+to a temp file, the scene's object was renamed `WeightTest_baked` and
+pointed at the copy (the repo's WeightTest.lwo was untouched). Layout
+was restarted without saving before continuing.

@@ -310,6 +310,56 @@ def lw_clear_scene() -> str:
         return json.dumps({"error": str(exc)})
 
 
+_BONE_MODES = {"full": 0, "full_morphed_positions": 1, "faster": 2, "limited": 3}
+
+
+@mcp.tool()
+def lw_get_bone_mode(item: str) -> str:
+    """Read an object's bone mode (Bones panel, the dropdown under
+    Falloff Type) via LWObjectInfo.boneMode: `bone_mode` is "full",
+    "full_morphed_positions", "faster" or "limited" (`bone_mode_raw` 0-3,
+    the same numbering as the BoneMode command - confirmed live for all
+    four, although the SDK header lists only three). Also
+    `limited_bones`, the Limited Bones Number. `item` is the object's
+    name."""
+    return json.dumps(_query("get_bone_mode", item))
+
+
+@mcp.tool()
+def lw_set_bone_mode(item: str, mode: str) -> str:
+    """Set an object's bone mode - the Bones panel dropdown under
+    Falloff Type, which applies to every bone on the object. `mode` is
+    "full", "full_morphed_positions", "faster" or "limited"; `item` is
+    the object's name.
+
+    "full_morphed_positions" is LightWave's "Use Morphed Positions":
+    bones deform the mesh after its morphs instead of before. It isn't
+    a separate checkbox in 2019 but one of the four modes - which is why
+    the UseMorphedPositions command (a toggle between Full Bones and
+    Full Bones (Morphed Positions)) is refused with "not supported with
+    the current bone mode" from Faster or Limited Bones.
+
+    Sends `BoneMode <n>` (Full 0, Full (Morphed Positions) 1, Faster 2,
+    Limited 3 - all four confirmed live via Cmd History, the dropdown
+    and the read-back) after selecting the object by ID, then reads the
+    mode back (lw_get_bone_mode) and returns it as `state`."""
+    if mode not in _BONE_MODES:
+        return json.dumps({"error": "mode must be one of %s" % sorted(_BONE_MODES)})
+    item_id, id_resp = _resolve_item_id(item)
+    if not item_id:
+        return json.dumps({"error": "could not resolve object: %s" % item, "detail": id_resp})
+    lw = _layout()
+    try:
+        lw.SelectItem(item_id)
+        lw._send_command("BoneMode", [_BONE_MODES[mode]])
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)})
+    time.sleep(0.3)
+    state = _query("get_bone_mode", item)
+    return json.dumps({"item": item, "id": item_id, "sent": "BoneMode %d" % _BONE_MODES[mode],
+                       "state": state.get("result", state)})
+
+
 @mcp.tool()
 def lw_save_object(name: str, filename: str) -> str:
     """Save one object to its own file - ROADMAP2.md item 3. Wraps the
@@ -336,7 +386,9 @@ def lw_save_object(name: str, filename: str) -> str:
     Layout's Scene Editor or viewport first, then retry - this appears
     to be a one-time per-object-per-session activation, not a
     per-call requirement, once the manual selection touches the object
-    a single time. See PLAN.md 'Scene file I/O' for the full
+    a single time. Note: SaveObject behaves like "Save As" - afterwards
+    the object in the scene is renamed after the new file and points at
+    it, so saving a copy elsewhere redirects the scene to that copy. See PLAN.md 'Scene file I/O' for the full
     investigation. filename must be an absolute path LightWave's
     process can write to."""
     id_resp = _query("get_item_id", name)
@@ -2486,25 +2538,18 @@ def lw_save_endomorph(item: str, name: str) -> str:
 
 @mcp.tool()
 def lw_toggle_use_morphed_positions() -> str:
-    """Flip "Use Morphed Positions" - per LightWave's own (much later,
-    2025-version) documentation, this lets bone deformation apply AFTER
-    morphs instead of before, and is documented there as not supported
-    with Limited Bones. Wraps the native UseMorphedPositions() command.
+    """Flip "Use Morphed Positions": bones deform the mesh after its
+    morphs instead of before. Wraps the native UseMorphedPositions()
+    command, a bare toggle. Prefer lw_set_bone_mode, which sets the mode
+    directly and reads it back.
 
-    Confirmed live to be a real argument-less TOGGLE via the
-    definitive arg-count test (passing an explicit argument raises a
-    clean Python "takes 1 positional argument but 2 were given" error
-    from the stub). Its own checkbox could not be located as a visible
-    UI element in LightWave 2019.1.5 (checked the full Bones panel,
-    Motion Options, General Options, and Object Properties - none show
-    it), BUT calling it live DID pop a real LightWave error dialog:
-    "Use Morphed Positions not supported with the current bone mode." -
-    this closely matches the 2025 documentation's "not supported with
-    Limited Bones" claim, confirming the feature and its precondition
-    are both real in 2019.1.5 too, just gated behind a bone mode this
-    test rig's bones don't have and with no separate checkbox exposed
-    in this build's UI (it may only appear once that mode is active).
-    Shipped as a bare toggle with no way to read state back."""
+    In LightWave 2019 this isn't a separate checkbox but one of the four
+    bone modes in the Bones panel dropdown: the command switches between
+    Full Bones and Full Bones (Morphed Positions) - confirmed live, no
+    dialog, the dropdown then showing "Full Bones (Morphed Positions)".
+    From Faster or Limited Bones it's refused with a modal "Use Morphed
+    Positions not supported with the current bone mode" - the refusal
+    every earlier test hit, since the test rigs were in Faster Bones."""
     try:
         _layout().UseMorphedPositions()
         return json.dumps({"result": "toggled UseMorphedPositions"})
