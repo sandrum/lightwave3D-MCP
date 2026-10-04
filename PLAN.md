@@ -3497,3 +3497,40 @@ checked the reply file at the instant lw_mcp_ring.py was replacing it
 (the ring removes the old file, then renames the new one in) - seen
 once on an `lw_ping`. The modification-time check now treats a missing
 file as "no reply yet".
+
+## Weight-map test rig (ROADMAP3.md Known misses #5-#9)
+
+Several known misses were blocked only because the test scene had no
+real weight-mapped mesh, and none of the objects shipped with LightWave
+2019.1.5 has a weight map (checked by scanning every .lwo in the install
+for a VMAP WGHT chunk). `test_assets/make_weight_test.py` writes one
+directly in LWO2: `WeightTest.lwo`, a 0.2 x 1.0 x 0.2 m column in 10
+segments with weight maps "Upper" (0 at y=0 to 1 at y=1) and "Lower"
+(the reverse). Verified by parsing the file back and loading it.
+
+Rigging it took two attempts. The first sent SelectItem (bone) +
+Position + Rotation + BoneRestLength + RecordRestPosition as parallel
+tool calls: none of them appeared in Cmd History, the bones stayed in
+their default state, and Layout's UI then went bad (blank viewport,
+left mouse button dead) and needed a restart. The second sent the same
+kind of commands one at a time, waiting for each - every one logged in
+order and worked. Parallel sends over the UDP Command Port are not
+safe for dependent sequences (consistent with the dropped/reordered
+commands seen in ROADMAP3 item 3).
+
+Rig, in a fresh scene: SelectItem object, AddBone WT_Lower, AddChildBone
+WT_Upper; SelectItem WT_Lower, Rotation 0 -90 0 (bones default to
+pointing along +Z), BoneRestLength 0.5; SelectItem WT_Upper, Position
+0 0 0.5 (in its parent's space), BoneRestLength 0.5; RecordRestPosition
+for each. Both bones came out active. Saved as `WeightTest_rig.lws`
+after stripping the three lines LightWave writes with absolute paths
+(SaveRGBImagesPrefix, SaveAlphaImagesPrefix, ContentDir); the cleaned
+scene reloads correctly with the Content Directory set to test_assets.
+
+Weight maps (#7): `lw_set_bone(weight_map_name="Upper")` on WT_Upper,
+then Rotation 45 0 0 - the upper half of the column followed the bone
+with a bend at the joint. `lw_toggle_bone_flag("weight_map_only")` -
+logged, no error dialog (a map was assigned) - turned that into a gentle
+lean of the whole column. Switching to "Lower" straightened the top:
+those points have weight 0 in "Lower", and the bottom points, though
+weighted 1, sit on WT_Lower, which dominates there.

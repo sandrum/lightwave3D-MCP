@@ -601,8 +601,10 @@ this is distilled from.
   ^16" to "Inverse Distance ^2"; `BoneActive`/`BoneLimitedRange`
   confirmed real argument-less toggles - a real bone defaulted to
   inactive, confirming a bone can exist and be parented while still
-  off. `weight_map_name` sent cleanly but couldn't be visually confirmed
-  since this test rig's bones have no real mesh/vmap to match against.
+  off. `weight_map_name` and the `weight_map_only` toggle were later
+  confirmed on a real weight-mapped mesh (`test_assets/`): turning
+  "weight map only" on changed a 45-degree bend into a gentle lean, and
+  switching the map from "Upper" to "Lower" straightened the top again.
   `min_range=0.5`/`max_range=3` confirmed live ("Min: 500mm"/"Max: 3m")
   once `limited_range` was toggled on first (grayed out otherwise, same
   precondition shape as DOF/Motion Blur). `rest_position=[1,2,3]`/

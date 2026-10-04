@@ -495,10 +495,13 @@ re-discovering them from scratch.
    current bone mode" precondition, but no bone mode was ever found in
    this test rig where the toggle actually succeeds and does something
    visible.
-7. **`BoneWeightMapOnly`/`weight_map_name` never tested against a real
-   weight map** - this rig's bones live on a Null/simple object with no
-   real mesh vmap data, so both send cleanly but their actual
-   weight-map-driven behavior is unconfirmed.
+7. **`BoneWeightMapOnly`/`weight_map_name` - RESOLVED.** Confirmed on
+   the new weight-mapped test object (`test_assets/WeightTest_rig.lws`):
+   with `WT_Upper` rotated 45 degrees, the column bent at the joint;
+   turning `weight_map_only` on (no error dialog, since a map was
+   assigned) turned that into a gentle lean driven by the "Upper" map;
+   switching to "Lower" straightened the top. See `PLAN.md` "Weight-map
+   test rig".
 8. **`muscle_flex_parent` (`BoneMuscleFlexParent`)'s real UI mapping is
    still uncertain** - toggling `muscle_flex` alone already checks BOTH
    "Muscle Flexing" and "Parental Muscle Flexing", so `muscle_flex_

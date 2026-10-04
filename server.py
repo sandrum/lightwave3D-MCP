@@ -2213,11 +2213,12 @@ def lw_set_bone(item: str, strength: float = None, rest_length: float = None,
     fields) opens a "Set Bone Rest Position/Rotation" requester
     pre-populated with the already-written value - X:1m/Y:2m/Z:3m and
     Heading:10/Pitch:20/Bank:30 respectively, both exact matches.
-    `weight_map_name` sent cleanly (no error, logged correctly) but
-    couldn't be visually confirmed - this test rig's bones live on a
-    plain Null with no real mesh/vmap data, so there was no actual
-    weight map for the name to match; treat this as likely-correct-by-
-    signature rather than fully confirmed."""
+    `weight_map_name` confirmed live on a real weight-mapped mesh
+    (test_assets/WeightTest_rig.lws): with WT_Upper rotated 45 deg and
+    lw_toggle_bone_flag's "weight_map_only" on, the "Upper" map (0 at
+    the bottom, 1 at the top) made the top of the column lean with the
+    bone, and switching to "Lower" (the reverse) straightened it again -
+    so the name selects the map that drives the bone."""
     item_id, id_resp = _resolve_item_id(item)
     if not item_id:
         return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
