@@ -3534,3 +3534,12 @@ logged, no error dialog (a map was assigned) - turned that into a gentle
 lean of the whole column. Switching to "Lower" straightened the top:
 those points have weight 0 in "Lower", and the bottom points, though
 weighted 1, sit on WT_Lower, which dominates there.
+
+Bone twist (#9): on WT_Upper's Bones panel the Bone Type dropdown lists
+only "Z axis" and "Joint"; choosing Joint by hand logged `BoneType 1`
+and enabled the Twist checkbox, which logged a bare `BoneTwist` (a
+toggle). `lw_set_bone_deform(twist=0.5)` then logged `BoneTwistAmount
+0.5` and the panel showed "Twist: 50.0%", no dialog. So the earlier
+"does not apply to the current bone type" refusal was the Z axis type.
+`lw_set_bone` gained `bone_type` ("z_axis"/"joint", sent raw as
+`BoneType <n>`); 1 = Joint confirmed, 0 = Z axis by list order.

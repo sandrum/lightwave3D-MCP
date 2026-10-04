@@ -508,10 +508,11 @@ re-discovering them from scratch.
    parent` produced no independently observable change of its own; it
    may be redundant, or control something outside this session's
    screenshots.
-9. **`twist` (`BoneTwist`/`BoneTwistAmount`) is blocked in this test
-   rig** - confirmed real precondition ("This option does not apply to
-   the current bone type"), but no Bone Type was ever tried where Twist
-   actually works.
+9. **`twist` (`BoneTwist`/`BoneTwistAmount`) - RESOLVED.** Twist needs
+   Bone Type = Joint. The dropdown has only Z axis / Joint (`BoneType
+   0/1`); with Joint, the Twist checkbox (a bare `BoneTwist` toggle) and
+   amount become available, and `BoneTwistAmount 0.5` showed 50.0% with
+   no error dialog. `lw_set_bone` gained `bone_type` to set it.
 10. **`ContentTypeDirectory` only independently confirmed for
     `"Objects"`** - the other twenty-one category strings (`"Scenes"`,
     `"Images"`, etc.) are inferred from the Preferences > Paths panel's

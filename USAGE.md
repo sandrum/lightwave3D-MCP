@@ -99,7 +99,7 @@ installation and setup, see [GETTING_STARTED.md](GETTING_STARTED.md).
 
 | Tool | Description |
 | --- | --- |
-| `lw_set_bone(item, strength=, rest_length=, rest_position=, rest_rotation=, weight_map_name=, falloff_type=, min_range=, max_range=)` | Set a bone's rigging properties. |
+| `lw_set_bone(item, strength=, rest_length=, rest_position=, rest_rotation=, weight_map_name=, falloff_type=, min_range=, max_range=, bone_type=)` | Set a bone's rigging properties; `bone_type` is "z_axis" or "joint". |
 | `lw_toggle_bone_flag(item, flag)` | Flip a bone's toggle flag (`active`, `limited_range`, `weight_map_only`, `strength_multiply`, `joint_comp`, `joint_comp_parent`, `muscle_flex`, `muscle_flex_parent`, `bulge`, `bulge_parent`, `twist`). |
 | `lw_set_bone_deform(item, joint_comp=, joint_comp_parent=, muscle_flex=, muscle_flex_parent=, bulge=, bulge_parent=, twist=)` | Set the muscle/joint-compensation family's amount fields. |
 | `lw_set_morph(item, target=, amount=)` | Set an object-to-object Morph target/amount. |
@@ -626,9 +626,12 @@ this is distilled from.
   `joint_comp`/`joint_comp_parent` and `bulge`/`bulge_parent` are each
   independent checkboxes, but `muscle_flex` checks BOTH
   "Muscle Flexing" AND "Parental Muscle Flexing" together - a real,
-  confirmed asymmetry, not a bug. `twist` has a real precondition,
-  LightWave's own error dialog: "This option does not apply to the
-  current bone type" (this test rig's bones are Z-axis type). See
+  confirmed asymmetry, not a bug. `twist` only works on a **Joint**
+  bone (`lw_set_bone(bone_type="joint")`, logged as `BoneType 1`); on a
+  Z axis bone LightWave refuses it with "This option does not apply to
+  the current bone type". Confirmed on the weight-mapped test rig:
+  with WT_Upper set to Joint and its Twist checkbox on, `twist=0.5`
+  showed "Twist: 50.0%". See
   `PLAN.md` "Deeper bone rigging" and "Follow-up sweep: closing the
   easy/moderate open items" for the full investigation.
 - `lw_save_endomorph(item, name)` and `lw_toggle_use_morphed_positions()`

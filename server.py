@@ -2180,11 +2180,15 @@ def lw_set_alpha_channel_mode(item: str, mode: int) -> str:
         return json.dumps({"error": str(exc)})
 
 
+_BONE_TYPES = {"z_axis": 0, "joint": 1}
+
+
 @mcp.tool()
 def lw_set_bone(item: str, strength: float = None, rest_length: float = None,
                  rest_position: list = None, rest_rotation: list = None,
                  weight_map_name: str = None, falloff_type: int = None,
-                 min_range: float = None, max_range: float = None) -> str:
+                 min_range: float = None, max_range: float = None,
+                 bone_type: str = None) -> str:
     """Set a bone's rigging properties (ROADMAP3.md item 6, Modify >
     Properties > "Bones for <object>" panel, opened while a bone is the
     current item). `item` must be a bone's numeric ID (e.g. "40000000")
@@ -2218,14 +2222,27 @@ def lw_set_bone(item: str, strength: float = None, rest_length: float = None,
     lw_toggle_bone_flag's "weight_map_only" on, the "Upper" map (0 at
     the bottom, 1 at the top) made the top of the column lean with the
     bone, and switching to "Lower" (the reverse) straightened it again -
-    so the name selects the map that drives the bone."""
+    so the name selects the map that drives the bone.
+
+    `bone_type` is the Bone Type dropdown: "z_axis" or "joint" - the
+    only two options in 2019 (Cmd History logs `BoneType 0` / `BoneType
+    1`; 1 confirmed live, 0 by list order). Twist only works on Joint
+    bones: with Joint chosen, the Twist checkbox (lw_toggle_bone_flag
+    "twist") and amount (lw_set_bone_deform twist=) become available,
+    confirmed live (BoneTwistAmount 0.5 showed "Twist: 50.0%"); on a
+    Z axis bone LightWave refuses twist with a modal error dialog."""
     item_id, id_resp = _resolve_item_id(item)
     if not item_id:
         return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
+    if bone_type is not None and bone_type not in _BONE_TYPES:
+        return json.dumps({"error": "bone_type must be one of %s" % sorted(_BONE_TYPES)})
     lw = _layout()
     sent = []
     try:
         lw.SelectItem(item_id)
+        if bone_type is not None:
+            lw._send_command("BoneType", [_BONE_TYPES[bone_type]])
+            sent.append("BoneType %d" % _BONE_TYPES[bone_type])
         if strength is not None:
             lw.BoneStrength(strength)
             sent.append("BoneStrength")
@@ -2358,11 +2375,11 @@ def lw_set_bone_deform(item: str, joint_comp: float = None, joint_comp_parent: f
     `muscle_flex=0.4, muscle_flex_parent=0.7` showing "40.0%"/"70.0%".
     `bulge`/`bulge_parent`/`twist` are each independent single-argument
     setters (BoneBulgeAmount/BoneBulgeParentAmount/BoneTwistAmount) -
-    confirmed live for bulge (`0.55`/`0.8` matched exactly); `twist` has
-    a real precondition, LightWave's own error dialog "This option does
-    not apply to the current bone type" (this test rig's bones are
-    Z-axis type - a different Bone Type may be required, not
-    independently confirmed working end to end)."""
+    confirmed live for bulge (`0.55`/`0.8` matched exactly) and twist
+    (`0.5` showed "Twist: 50.0%"). Twist needs a Joint bone (lw_set_bone
+    bone_type="joint") with its Twist checkbox on (lw_toggle_bone_flag
+    "twist"); on a Z axis bone LightWave refuses it with a modal error
+    dialog, "This option does not apply to the current bone type"."""
     item_id, id_resp = _resolve_item_id(item)
     if not item_id:
         return json.dumps({"error": "could not resolve item: %s" % item, "detail": id_resp})
