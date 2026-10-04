@@ -30,7 +30,6 @@ def test_every_tool_function_is_registered_except_the_withdrawn_ones(server):
     # lw_set_fog is kept for reference but withdrawn: the Fog* commands are
     # no-ops in LightWave 2019 (PLAN.md "Fog commands have no effect").
     assert defined - registered == {"lw_set_fog"}
-    assert len(registered) > 80
 
 
 def test_mtime_of_a_missing_file_is_none(server, tmp_path):

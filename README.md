@@ -87,18 +87,28 @@ leaving the chat.
 
 ## Tests
 
-The suite in `tests/` runs without LightWave, so it works on any machine
-and in CI. It covers the code that doesn't talk to LightWave: the node
-graph text rewriting behind the node tools, `.env` loading, the input
-checks that stop the server sending something LightWave would answer with
-a blocking dialog, the exact commands each tool sends, and static checks
-(every private name used is defined, every tool is registered, no local
-paths in tracked files).
+The tests run without LightWave, so they work on any machine and in CI
+(GitHub Actions runs them on every push and pull request).
+
+- **`tests/unit/`** - the business logic, run against stand-ins and never
+  against LightWave: the node tools end to end (connect, disconnect, add,
+  remove, move, read and set input values) against a stand-in node editor;
+  the node-graph text handling they rely on; the exact commands each server
+  tool sends, with Layout replaced by a recorder; the input checks that stop
+  the server sending something LightWave would answer with a blocking
+  dialog; `.env` loading. These should only fail when the logic they cover
+  changes.
+- **`tests/repo_checks/`** - checks on the repository rather than logic:
+  every private name used is defined, every file compiles, every tool is
+  registered, docs and fixtures stay in sync, no local paths in tracked
+  files.
 
 ```
 pip install -r requirements-dev.txt
 python -m pytest
 ```
+
+The stand-in for LightWave's SDK is `tests/fake_lwsdk.py`.
 
 What LightWave does with those commands can only be checked live, in a
 running Layout - see `PLAN.md` for how each tool was verified.

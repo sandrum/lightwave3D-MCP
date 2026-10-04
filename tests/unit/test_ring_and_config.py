@@ -92,18 +92,10 @@ def test_bad_port_names_the_setting(config):
         cfg._port({"LW_MCP_MODELER_PORT": "abc"}, "LW_MCP_MODELER_PORT")
 
 
-def test_env_example_lists_every_setting():
-    import lw_mcp_config
-    root = os.path.dirname(os.path.abspath(lw_mcp_config.__file__))
-    example = open(os.path.join(root, ".env.example")).read()
-    for key in lw_mcp_config.DEFAULTS:
-        assert key + "=" in example
-
-
 # --- test_assets/make_weight_test.py --------------------------------------
 
 def test_weight_test_object_generates_and_parses(tmp_path):
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    from conftest import ROOT as root
     sys.path.insert(0, os.path.join(root, "test_assets"))
     try:
         import make_weight_test
@@ -132,14 +124,3 @@ def test_weight_test_object_generates_and_parses(tmp_path):
     for index, (_x, y, _z) in enumerate(points):
         assert maps["Upper"][index] == pytest.approx(y)
         assert maps["Lower"][index] == pytest.approx(1 - y)
-
-
-def test_committed_weight_test_object_matches_the_generator():
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    sys.path.insert(0, os.path.join(root, "test_assets"))
-    try:
-        import make_weight_test
-    finally:
-        sys.path.pop(0)
-    with open(os.path.join(root, "test_assets", "WeightTest.lwo"), "rb") as f:
-        assert f.read() == make_weight_test.build()[0]

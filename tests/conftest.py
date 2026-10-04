@@ -1,20 +1,22 @@
 """
 Shared test setup.
 
-These tests run without LightWave. They cover the logic that never talks to
-it - node-graph text rewriting, .env loading, the server tools' input checks
-and the command sequences they send - so a change that breaks those is caught
-before anyone restarts Layout. What LightWave itself does with a command still
-needs checking live (see PLAN.md); these tests don't replace that.
+tests/unit/ holds the unit tests: business logic run against stand-ins, never
+against LightWave or any other real endpoint. tests/repo_checks/ holds checks
+on the repository itself (static analysis, docs and fixtures in sync, no
+local paths) - useful, but not unit tests.
 
-Two stand-ins make that possible:
+What LightWave itself does with a command still needs checking live (see
+PLAN.md); these tests don't replace that.
 
-- a fake `lwsdk` module, installed before lw_mcp_ring.py is imported, with
-  just enough for its module-level code (the master-plugin class and its
-  registration) to load;
-- `fake_layout`, which replaces server.py's connection to Layout with a
-  recorder, so a test can check exactly which commands a tool sends - or that
-  it sends none.
+Stand-ins:
+
+- tests/fake_lwsdk.py replaces LightWave's `lwsdk` module, so lw_mcp_ring.py
+  imports and its node tools run end to end (`fake_lwsdk` fixture);
+- `fake_layout` replaces server.py's connection to Layout with a recorder,
+  so a test can check exactly which commands a tool sends - or that it sends
+  none;
+- `fake_query` replaces server.py's read path with canned replies.
 
 The exchange folder is pointed at a temporary directory, so tests never write
 reply files into the repo.
@@ -35,24 +37,13 @@ if ROOT not in sys.path:
 os.environ.setdefault("LW_MCP_EXCHANGE_DIR", tempfile.mkdtemp(prefix="lw_mcp_tests_"))
 
 
-def _install_fake_lwsdk():
-    if "lwsdk" in sys.modules:
-        return
-    fake = types.ModuleType("lwsdk")
+TESTS = os.path.dirname(os.path.abspath(__file__))
+if TESTS not in sys.path:
+    sys.path.insert(0, TESTS)
 
-    class IMaster(object):
-        def __init__(self, *args, **kwargs):
-            pass
+import fake_lwsdk  # noqa: E402
 
-    fake.IMaster = IMaster
-    fake.MasterFactory = lambda name, cls: (name, cls)
-    fake.SRVTAG_USERNAME = 1
-    fake.LANGID_USENGLISH = 2
-    fake.LWMAST_LAYOUT = 0
-    sys.modules["lwsdk"] = fake
-
-
-_install_fake_lwsdk()
+sys.modules.setdefault("lwsdk", fake_lwsdk)
 
 
 class FakeLayout(object):
@@ -119,10 +110,18 @@ def ring():
 
 
 @pytest.fixture
+def fake_lwsdk_scene():
+    """A clean stand-in scene; tests add surfaces with add_surface()."""
+    fake_lwsdk.reset()
+    yield fake_lwsdk
+    fake_lwsdk.reset()
+
+
+@pytest.fixture
 def template_graph():
     """The node graph LightWave saved for CONNECTOR with a Principled BSDF
     wired into Surface.Material - the real file used throughout the node
     investigation, kept as a fixture."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "principled_wired.txt")
+    path = os.path.join(TESTS, "data", "principled_wired.txt")
     with open(path) as f:
         return f.read()

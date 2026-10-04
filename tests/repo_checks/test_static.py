@@ -1,6 +1,7 @@
 """
-Static checks on the source, for code the other tests can't run because it
-needs a live LightWave (anything that calls the SDK).
+Checks on the repository rather than on business logic: static analysis of
+the source, docs and fixtures kept in sync, no local paths. They read real
+files (and `git ls-files`), so they live apart from the unit tests.
 
 The main one: every private module-level name a file uses (`_something`) is
 defined in that file. An edit once deleted two constants that only
@@ -9,10 +10,11 @@ Layout, with nothing to catch it beforehand.
 """
 import ast
 import os
+import sys
 
 import pytest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from conftest import ROOT  # noqa: E402 - repo root, defined once
 FILES = ["server.py", "lw_mcp_ring.py", "lw_mcp_config.py", "lw_mcp_render_monitor.py"]
 
 
@@ -69,3 +71,22 @@ def test_no_personal_paths_in_tracked_text():
                 if needle in lowered and "<you>" not in lowered:
                     offenders.append("%s:%d" % (rel, number))
     assert offenders == []
+
+
+def test_env_example_lists_every_setting():
+    import lw_mcp_config
+    root = os.path.dirname(os.path.abspath(lw_mcp_config.__file__))
+    example = open(os.path.join(root, ".env.example")).read()
+    for key in lw_mcp_config.DEFAULTS:
+        assert key + "=" in example
+
+
+def test_committed_weight_test_object_matches_the_generator():
+    root = ROOT
+    sys.path.insert(0, os.path.join(root, "test_assets"))
+    try:
+        import make_weight_test
+    finally:
+        sys.path.pop(0)
+    with open(os.path.join(root, "test_assets", "WeightTest.lwo"), "rb") as f:
+        assert f.read() == make_weight_test.build()[0]

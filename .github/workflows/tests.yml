@@ -21,5 +21,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: python -m pip install -r requirements-dev.txt
-      - name: Run tests
-        run: python -m pytest -v
+      - name: Unit tests
+        run: python -m pytest tests/unit -v
+      - name: Repository checks
+        run: python -m pytest tests/repo_checks -v
