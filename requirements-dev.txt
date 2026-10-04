@@ -1,3 +1,4 @@
 # Everything needed to run the test suite (python -m pytest).
-mcp[cli]
+# server.py uses FastMCP, which mcp 2.x removed - keep below 2.
+mcp[cli]<2
 pytest

@@ -1,6 +1,6 @@
 # Claude ↔ LightWave 2019 MCP connector
 
-[![tests](https://github.com/sandrum/lightwaveMCP/actions/workflows/tests.yml/badge.svg)](https://github.com/sandrum/lightwaveMCP/actions/workflows/tests.yml)
+[![tests](https://github.com/sandrum/lightwave3D-MCP/actions/workflows/tests.yml/badge.svg)](https://github.com/sandrum/lightwave3D-MCP/actions/workflows/tests.yml)
 
 A Model Context Protocol (MCP) server that gives Claude direct, live control
 over a running LightWave 2019 session - both Layout and, for writes only,
@@ -126,4 +126,4 @@ this repo's MIT license.
 ## Support
 
 For issues with this connector, open an issue at
-[github.com/sandrum/lightwaveMCP](https://github.com/sandrum/lightwaveMCP/issues).
+[github.com/sandrum/lightwave3D-MCP](https://github.com/sandrum/lightwave3D-MCP/issues).
