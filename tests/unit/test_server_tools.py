@@ -181,3 +181,27 @@ def test_node_key_tools_pass_their_arguments_to_the_plug_in(server, fake_query):
     server.lw_delete_node_key("Principled BSDF (1)", "Roughness", 15)
     assert fake_query.asked[-1] == ("delete_node_key", "CONNECTOR|Principled BSDF (1)|Roughness|15")
 
+
+
+# --- content type directories ---------------------------------------------
+
+def test_content_type_panel_labels_are_translated(server, fake_layout, fake_query):
+    fake_query.replies["get_content_directories"] = {"result": {"directories": {"VertCache": "C:/x"}}}
+    result = reply(server.lw_set_content_type_directory("Vertex Cache", "C:/x"))
+    assert fake_layout.calls == ["ContentTypeDirectory VertCache C:/x"]
+    assert result["now"] == "C:/x"
+
+
+@pytest.mark.parametrize("content_type", ["Output Directory", "Image Cache", "Animations",
+                                          "Hierarchies"])
+def test_unsettable_content_types_are_refused(server, fake_layout, fake_query, content_type):
+    # LightWave ignores these, or (Image Cache) pops a modal dialog - refuse before sending.
+    assert "can't be set by command" in reply(
+        server.lw_set_content_type_directory(content_type, "C:/x"))["error"]
+    assert fake_layout.calls == []
+
+
+def test_unknown_content_type_is_refused(server, fake_layout, fake_query):
+    assert "unknown content type" in reply(server.lw_set_content_type_directory("Bogus", "C:/x"))["error"]
+    assert fake_layout.calls == []
+

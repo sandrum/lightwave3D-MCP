@@ -3629,3 +3629,44 @@ session and listing tools returns all 86 tools. That startup check is now
 once per mcp major version (8 jobs: 2 OSes x 2 Pythons x 2 mcp
 versions). The 2.x client library also renamed `serverInfo` to
 `server_info` - only the test's client code needed that.
+
+## Content type directories (ROADMAP3.md Known misses #10)
+
+Only "Objects" had been confirmed; the other names were copied from the
+Preferences > Paths labels. Changing a folder by hand in that tab logs
+no command (only `GeneralOptions` when it opens), so Cmd History
+couldn't help. The SDK has a reader instead: the Directory Info global,
+`LWDirInfoFunc(type)` in lwhost.h, exposed in Python as
+`lwsdk.LWDirInfoFunc(type)`. New `lw_get_content_directories` reads it.
+
+The reader recognises the no-space SDK names and returns nothing for
+the panel labels with spaces: with the user's hand changes in place,
+`ColorTables`, `ImageCache`, `VertCache`, `Output` and `Backup` returned
+the folders they'd chosen; "Color Tables", "Image Cache", "Vert Cache",
+"Output Directory", "Backup Directory" returned null. The panel label is
+"Vertex Cache", not "Vert Cache" as the old docstring said.
+
+Then each type, in a script using server.py's own sender and reader,
+one command at a time: ContentTypeDirectory <type> <test folder>, read
+back, restore the original, read back. Settable and restored exactly
+(18): Scenes, Objects, Images, Envelopes, Motions, Previews, Surfaces,
+Nodes, Shaders, Dynamics, Rigs, Sounds, Lights, Radiosity, ColorTables,
+VertCache, GridCache, Backup. No effect: Hierarchies (reads back as the
+Scenes folder - LightWave's docs say it follows Scenes), Animations,
+and Output (tried "Output" and "Renders", with existing and new
+folders) - all silent, no dialog.
+
+Image Cache was tried with `ImageCacheDirectory <dir>` and then
+`ContentTypeDirectory ImageCache <dir>`. Neither read back as changed -
+but one of them had popped a modal dialog (shown once; its text wasn't
+noted), and after the user dismissed it the Image Cache field held the
+test folder. So Image Cache can be set by command, but only through a
+dialog that blocks Layout until someone clicks it - which command
+triggers it isn't known. Refused for that reason, like the GPU noise
+filter.
+
+`lw_set_content_type_directory` now accepts the 18 names plus the four
+differing labels, refuses the unsettable ones (and unknown names)
+before sending, and returns the folder read back afterwards. The user's
+test changes were restored and the test folder removed; Image Cache,
+still pointed at the (now deleted) test folder and was reset by hand.

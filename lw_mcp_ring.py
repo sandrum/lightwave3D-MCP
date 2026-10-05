@@ -352,6 +352,41 @@ _OBJECT_GI_MODES = {0: "global", 1: "brute_force", 2: "interpolated"}
 _BONE_MODES = {0: "full", 1: "full_morphed_positions", 2: "faster", 3: "limited"}
 
 
+# The names LWDirInfoFunc recognises (confirmed live): lwhost.h's LWFTYPE_*
+# strings, the extra ones its docs list, and ColorTables/ImageCache/Backup.
+# The Preferences > Paths labels with spaces ("Vertex Cache", "Color
+# Tables", "Output Directory"...) are not recognised and return nothing.
+_DIR_TYPES = (
+    "Content", "Scenes", "Hierarchies", "Objects", "Images", "Envelopes",
+    "Motions", "Previews", "Animations", "Surfaces", "Nodes", "Shaders",
+    "Dynamics", "Rigs", "Sounds", "Lights", "Radiosity", "ColorTables",
+    "ImageCache", "VertCache", "GridCache", "Output", "Backup",
+    "Plug-ins", "Plugins", "Settings", "Install", "Command", "Temp",
+    "Licenses", "PSFonts",
+)
+
+
+def _get_content_directories():
+    """LightWave's directory list via the Directory Info global
+    (LWDirInfoFunc in lwhost.h: dirinfo(type) -> path, possibly relative
+    to the Content Directory, possibly NULL). Read-only. Reports what
+    each candidate name in _DIR_TYPES returns; how the Python wrapper
+    exposes the function is unverified, so a failing call shape is
+    reported rather than guessed past."""
+    func = getattr(lwsdk, "LWDirInfoFunc", None)
+    if func is None:
+        return {"error": "lwsdk has no LWDirInfoFunc"}
+    result = {}
+    for dir_type in _DIR_TYPES:
+        try:
+            value = func(dir_type)
+        except Exception as exc:  # noqa: BLE001
+            return {"error": "LWDirInfoFunc(%r) failed: %s" % (dir_type, exc),
+                    "partial": result}
+        result[dir_type] = value if value is None else str(value)
+    return {"directories": result}
+
+
 def _get_bone_mode(name):
     """An object's bone mode via LWObjectInfo.boneMode (lwrender.h, v13).
     The header defines only LWBONEMODE_FULL 0 / FASTER 1 / LIMITED 2, but
@@ -1950,6 +1985,8 @@ def _handle_query(text):
             parts_dk = arg.split("|")
             payload = {"result": _delete_node_key(parts_dk[0] or "CONNECTOR", parts_dk[1],
                                                   parts_dk[2], float(parts_dk[3]))}
+        elif command == "get_content_directories":
+            payload = {"result": _get_content_directories()}
         elif command == "get_bone_mode":
             payload = {"result": _get_bone_mode(arg)}
         elif command == "get_object_gi":

@@ -515,11 +515,12 @@ re-discovering them from scratch.
    0/1`); with Joint, the Twist checkbox (a bare `BoneTwist` toggle) and
    amount become available, and `BoneTwistAmount 0.5` showed 50.0% with
    no error dialog. `lw_set_bone` gained `bone_type` to set it.
-10. **`ContentTypeDirectory` only independently confirmed for
-    `"Objects"`** - the other twenty-one category strings (`"Scenes"`,
-    `"Images"`, etc.) are inferred from the Preferences > Paths panel's
-    own visible labels, never tested against a real UI change one by
-    one.
+10. **`ContentTypeDirectory` - RESOLVED.** Every type tested live with a
+    read-back (new `lw_get_content_directories`): 18 settable, four
+    panel labels translated to their internal names, and Output
+    Directory, Animations and Hierarchies refused (the command silently
+    ignores them), plus Image Cache (setting it pops a modal dialog). See `PLAN.md` "Content type
+    directories".
 11. **Animated (enveloped) node inputs - RESOLVED.** The guess here
     was wrong: an envelope is NOT stored in the node's saved `{ Attr }`
     data - that keeps its plain static value (confirmed live: Roughness

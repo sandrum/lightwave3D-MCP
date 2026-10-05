@@ -216,33 +216,82 @@ def lw_set_content_directory(path: str) -> str:
 
 
 @mcp.tool()
+def lw_get_content_directories() -> str:
+    """Read LightWave's content directories (Preferences > Paths) via
+    the SDK's Directory Info global - the folder LightWave looks in
+    first for each kind of file, by LightWave's internal names (e.g.
+    "VertCache", "ColorTables", "Output" for the Output Directory, plus
+    "Content", "Temp", "Plugins" and others). A value may be relative
+    to the Content Directory, or null if unset."""
+    return json.dumps(_query("get_content_directories"))
+
+
+# ContentTypeDirectory type names, all confirmed live by setting a test
+# folder and reading it back (lw_get_content_directories), then restoring.
+# Most match the Preferences > Paths labels; four labels differ from the
+# internal name and are translated.
+_CONTENT_TYPES = ("Scenes", "Objects", "Images", "Envelopes", "Motions", "Previews",
+                  "Surfaces", "Nodes", "Shaders", "Dynamics", "Rigs", "Sounds", "Lights",
+                  "Radiosity", "ColorTables", "VertCache", "GridCache", "Backup")
+_CONTENT_TYPE_LABELS = {"Color Tables": "ColorTables", "Vertex Cache": "VertCache",
+                        "Vert Cache": "VertCache", "Grid Cache": "GridCache",
+                        "Backup Directory": "Backup"}
+# Paths-tab entries refused before sending: LightWave silently ignores the
+# command for these - except Image Cache, which pops a modal dialog that
+# blocks Layout until someone clicks it (and only then applies).
+_UNSETTABLE_CONTENT_TYPES = {
+    "Output": "Output Directory", "Output Directory": "Output Directory",
+    "Renders": "Output Directory",
+    "Image Cache": "Image Cache (setting it pops a modal dialog)",
+    "ImageCache": "Image Cache (setting it pops a modal dialog)",
+    "Animations": "Animations", "Hierarchies": "Hierarchies (it follows Scenes)",
+}
+
+
+@mcp.tool()
 def lw_set_content_type_directory(content_type: str, dirname: str) -> str:
-    """Set a per-content-type sub-path under the base Content Directory
-    (Preferences > Paths tab, the "Scenes"/"Objects"/"Images"/etc. button
-    list). Wraps the native ContentTypeDirectory(type, dirname) command.
+    """Set one Preferences > Paths folder - where LightWave looks first
+    for a kind of file. Wraps ContentTypeDirectory(type, dirname).
 
-    `content_type` must exactly match one of the panel's own labels:
-    "Scenes", "Hierarchies", "Objects", "Images", "Envelopes", "Motions",
-    "Previews", "Animations", "Surfaces", "Nodes", "Shaders", "Dynamics",
-    "Rigs", "Sounds", "Lights", "Radiosity", "Color Tables", "Image
-    Cache", "Vert Cache", "Grid Cache", "Output Directory", or "Backup
-    Directory" - confirmed live only for "Objects", the rest are
-    inferred from the visible panel labels, not independently tested.
+    `content_type` is one of: Scenes, Objects, Images, Envelopes,
+    Motions, Previews, Surfaces, Nodes, Shaders, Dynamics, Rigs, Sounds,
+    Lights, Radiosity, ColorTables, VertCache, GridCache, Backup - the
+    panel labels "Color Tables", "Vertex Cache", "Grid Cache" and
+    "Backup Directory" are accepted too and translated. All 18 confirmed
+    live: set to a test folder, read back, restored. `dirname` may be
+    absolute or relative to the Content Directory; Paths only take
+    effect with "Use Custom Paths" ticked in that tab.
 
-    Confirmed live: `content_type_directory("Objects", "TestObjDir")`
-    changed the "Objects" row's own button label from "Objects" to
-    "TestObjDir" - these buttons double as a live display of the
-    current sub-path (not fixed captions), giving a built-in
-    confirmation mechanism with no separate read-back needed. Reverting
-    with `("Objects", "Objects")` correctly restored the "Objects"
-    label. `dirname` can be given as an absolute path; LightWave
-    displays only the portion beyond the base Content Directory when
-    it's a sub-path of it."""
+    Refused, confirmed live: Output Directory, Animations and
+    Hierarchies (which follows Scenes) - the command silently ignores
+    them - and Image Cache, where setting it (via ImageCacheDirectory or
+    ContentTypeDirectory ImageCache) pops a modal dialog that blocks
+    Layout until someone clicks it. These have to be set in the Paths
+    tab by hand.
+
+    After sending, reads the folder back (lw_get_content_directories)
+    and returns it as `now`. Changing a folder by hand in the Paths tab
+    logs no command."""
+    name = _CONTENT_TYPE_LABELS.get(content_type, content_type)
+    if name in _UNSETTABLE_CONTENT_TYPES:
+        return json.dumps({"error": "%s can't be set by command; set it in "
+                                    "Preferences > Paths by hand"
+                                    % _UNSETTABLE_CONTENT_TYPES[name]})
+    if name not in _CONTENT_TYPES:
+        return json.dumps({"error": "unknown content type %r (settable: %s)"
+                                    % (content_type, ", ".join(_CONTENT_TYPES))})
     try:
-        _layout().ContentTypeDirectory(content_type, dirname)
-        return json.dumps({"result": "sent ContentTypeDirectory %s %s" % (content_type, dirname)})
+        _layout()._send_command("ContentTypeDirectory", [name, dirname])
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": str(exc)})
+    time.sleep(0.3)
+    state = _query("get_content_directories")
+    directories = state.get("result", {}).get("directories")
+    if not isinstance(directories, dict):
+        return json.dumps({"sent": "ContentTypeDirectory %s %s" % (name, dirname),
+                           "read_back_error": state})
+    return json.dumps({"sent": "ContentTypeDirectory %s %s" % (name, dirname),
+                       "content_type": name, "now": directories.get(name)})
 
 
 @mcp.tool()

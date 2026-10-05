@@ -28,7 +28,8 @@ installation and setup, see [GETTING_STARTED.md](GETTING_STARTED.md).
 | `lw_load_scene(filename)` | Load a scene file, replacing the current scene. |
 | `lw_clear_scene()` | Clear the scene back to its default empty state. |
 | `lw_set_content_directory(path)` | Set LightWave's base Content Directory. |
-| `lw_set_content_type_directory(content_type, dirname)` | Set a per-content-type sub-path ("Objects", "Scenes", "Images", etc.). |
+| `lw_get_content_directories()` | Read every Preferences > Paths folder (and Content, Temp, Plugins...), by LightWave's internal names. |
+| `lw_set_content_type_directory(content_type, dirname)` | Set one Paths folder ("Objects", "Scenes", "Vertex Cache", ...); reads it back. Refuses the four LightWave ignores. |
 
 **Item queries & hierarchy**
 
@@ -250,14 +251,16 @@ this is distilled from.
 - `lw_set_content_type_directory(content_type, dirname)` (ROADMAP3.md
   item 1 follow-up) - wraps `ContentTypeDirectory(type, dirname)`, the
   per-content-type sub-path buttons in Preferences > Paths ("Scenes",
-  "Objects", "Images", etc.). Confirmed live for `"Objects"`:
-  `content_type` is the literal panel label string, and sending a new
-  `dirname` visibly changes that button's own label to the new
-  sub-path - a live state readout, not a fixed caption, the same
-  pattern found for bone Rest Position/Rotation. The other twenty-one
-  type strings are inferred from the panel's visible labels, not
-  independently tested. See `PLAN.md` "Follow-up sweep: closing the
-  easy/moderate open items" for the full investigation.
+  "Objects", "Images", etc.). All 18 settable types confirmed live
+  by setting a test folder, reading it back with the new
+  `lw_get_content_directories()` (the SDK's Directory Info global), and
+  restoring it. Four panel labels differ from the internal name and are
+  translated ("Color Tables" -> ColorTables, "Vertex Cache" ->
+  VertCache, "Grid Cache" -> GridCache, "Backup Directory" -> Backup).
+  Output Directory and Animations are silently ignored by the command,
+  Hierarchies follows Scenes, and setting Image Cache pops a modal
+  dialog that blocks Layout - the tool refuses all four. Changing a folder by hand logs no
+  command. See `PLAN.md` "Content type directories".
 - `lw_set_keyframe(name, frame, position, rotation, scale)` - wraps the
   common by-hand animation sequence (select, go to frame, set
   transform, create key) into one call. Confirmed live: two keyframes
